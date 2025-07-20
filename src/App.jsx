@@ -1,57 +1,45 @@
-
-import React, { useState, useEffect, useRef } from 'react';
-import { Alchemy, Network } from 'alchemy-sdk';
-import { Chart, registerables } from 'chart.js';
+import React, { useState, useRef, useEffect } from 'react';
+import { Chart } from 'chart.js/auto';
+import jsPDF from 'jspdf';
 import bcrypt from 'bcryptjs';
-import { jsPDF } from 'jspdf';
-import './App.css';
 
-// Register Chart.js components
-Chart.register(...registerables);
-
-// Initialize Alchemy
-const config = {
-  apiKey: "JlWnUY62Jlfn4RVNBULaIwZN916B58SA", // Replace with your Alchemy API key
-  network: Network.ETH_MAINNET,
-};
-const alchemy = new Alchemy(config);
-
-// Mock data (replace with actual Alchemy API calls)
+// Mock data for demonstration
 const mockPortfolioData = {
   balanceHistory: [
-    { date: "2025-07-20", value: 1000000 },
-    { date: "2025-07-19", value: 950000 },
-    { date: "2025-07-18", value: 980000 },
+    { date: '2024-01-01', value: 850000 },
+    { date: '2024-02-01', value: 920000 },
+    { date: '2024-03-01', value: 1100000 },
+    { date: '2024-04-01', value: 1050000 },
+    { date: '2024-05-01', value: 1200000 },
+    { date: '2024-06-01', value: 1350000 },
   ],
   assets: [
     {
-      id: "1",
-      type: "token",
-      name: "ETH",
-      amount: 10,
-      valueUSD: 35000,
-      wallet: "0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98",
-      notes: "",
+      id: 1,
+      name: 'Bitcoin',
+      type: 'cryptocurrency',
+      valueUSD: 450000,
+      wallet: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
+      notes: 'Primary BTC holdings'
     },
     {
-      id: "2",
-      type: "nft",
-      name: "CryptoPunk #1234",
-      valueUSD: 50000,
-      wallet: "0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98",
-      image: "https://via.placeholder.com/150",
-      notes: "",
+      id: 2,
+      name: 'Ethereum',
+      type: 'cryptocurrency',
+      valueUSD: 320000,
+      wallet: '0x742d35Cc6585C42161C0F57C0C5E6Ba5',
+      notes: 'ETH position for DeFi'
     },
     {
-      id: "3",
-      type: "token",
-      name: "SOL",
-      amount: 100,
-      valueUSD: 15000,
-      wallet: "4ZE7D7ecU7tSvA5iJVCVp6MprguDqy7tvXguE64T9Twb",
-      notes: "",
-    },
-  ],
+      id: 3,
+      name: 'Bored Ape #1234',
+      type: 'nft',
+      valueUSD: 85000,
+      wallet: '0x742d35Cc6585C42161C0F57C0C5E6Ba5',
+      image: 'https://via.placeholder.com/150',
+      notes: 'Blue chip NFT'
+    }
+  ]
 };
 
 // Portfolio Chart Component
@@ -107,136 +95,100 @@ const PortfolioChart = ({ data }) => {
 };
 
 // Asset List Component
-const AssetList = ({
-  assets,
-  hiddenAssets,
-  toggleHiddenAsset,
-  setSelectedAsset,
-  isEditor,
-}) => {
+const AssetList = ({ assets, hiddenAssets, toggleHiddenAsset, setSelectedAsset, isEditor }) => {
+  const visibleAssets = assets.filter(asset => !hiddenAssets.includes(asset.id));
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {assets
-        .filter((asset) => !hiddenAssets.includes(asset.id))
-        .map((asset) => (
-          <div
-            key={asset.id}
-            className="bg-gray-800 p-4 rounded-lg shadow"
-          >
-            <h3 className="text-lg font-semibold text-white">
-              {asset.name}
-            </h3>
-            <p className="text-gray-300">Type: {asset.type}</p>
-            <p className="text-gray-300">
-              Value: ${asset.valueUSD.toLocaleString()}
-            </p>
-            <p className="text-gray-300">
-              Wallet: {asset.wallet.slice(0, 6)}...
-              {asset.wallet.slice(-4)}
-            </p>
-            <button
-              onClick={() => setSelectedAsset(asset)}
-              className="mt-2 bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700"
-            >
-              View Details
-            </button>
-            {isEditor && (
-              <button
-                onClick={() => toggleHiddenAsset(asset.id)}
-                className="mt-2 ml-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-              >
-                {hiddenAssets.includes(asset.id) ? "Show" : "Hide"}
-              </button>
-            )}
+    <div>
+      <h2 className="text-xl font-semibold mb-4">Asset List</h2>
+      <div className="space-y-4">
+        {visibleAssets.map(asset => (
+          <div key={asset.id} className="bg-gray-800 p-4 rounded-lg">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-semibold">{asset.name}</h3>
+                <p className="text-gray-400">{asset.type}</p>
+                <p className="text-green-400">${asset.valueUSD.toLocaleString()}</p>
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setSelectedAsset(asset)}
+                  className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                >
+                  View Details
+                </button>
+                {isEditor && (
+                  <button
+                    onClick={() => toggleHiddenAsset(asset.id)}
+                    className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                  >
+                    Hide
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         ))}
+      </div>
     </div>
   );
 };
 
 // Asset Detail Component
 const AssetDetail = ({ asset, updateNotes, isEditor, setSelectedAsset }) => {
-  if (!asset) return null;
+  const [notes, setNotes] = useState(asset.notes || '');
+
+  const handleSaveNotes = () => {
+    updateNotes(asset.id, notes);
+    alert('Notes saved!');
+  };
+
   return (
-    <div className="bg-gray-800 p-6 rounded-lg shadow">
-      <h2 className="text-2xl font-bold text-white mb-4">{asset.name}</h2>
-      {asset.type === "nft" && (
-        <img
-          src={asset.image}
-          alt={asset.name}
-          className="w-32 h-32 mb-4 rounded"
-        />
-      )}
-      <p className="text-gray-300">Type: {asset.type}</p>
-      <p className="text-gray-300">
-        Value: ${asset.valueUSD.toLocaleString()}
-      </p>
-      <p className="text-gray-300">Wallet: {asset.wallet}</p>
-      {isEditor && (
-        <div className="mt-4">
-          <textarea
-            className="w-full p-2 bg-gray-700 text-white rounded"
-            value={asset.notes}
-            onChange={(e) => updateNotes(asset.id, e.target.value)}
-            placeholder="Add notes..."
-          />
-        </div>
-      )}
+    <div className="bg-gray-800 p-6 rounded-lg">
       <button
         onClick={() => setSelectedAsset(null)}
-        className="mt-4 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+        className="mb-4 text-blue-400 hover:text-blue-300"
       >
-        Back to List
+        ← Back to Asset List
       </button>
+      <h2 className="text-2xl font-bold mb-4">{asset.name}</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <p className="text-gray-400 mb-2">Type: {asset.type}</p>
+          <p className="text-gray-400 mb-2">Value: <span className="text-green-400">${asset.valueUSD.toLocaleString()}</span></p>
+          <p className="text-gray-400 mb-4">Wallet: {asset.wallet}</p>
+          {asset.image && (
+            <img src={asset.image} alt={asset.name} className="w-32 h-32 rounded-lg" />
+          )}
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Notes</h3>
+          {isEditor ? (
+            <div>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full p-2 bg-gray-700 text-white rounded mb-2"
+                rows="4"
+                placeholder="Add notes about this asset..."
+              />
+              <button
+                onClick={handleSaveNotes}
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+              >
+                Save Notes
+              </button>
+            </div>
+          ) : (
+            <p className="text-gray-300">{asset.notes || 'No notes available'}</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
 
 // Report Generator Component
-import React, { useState, useRef, useEffect } from 'react';
-import { Chart } from 'chart.js/auto';
-import jsPDF from 'jspdf';
-import bcrypt from 'bcryptjs';
-
-// Mock data for demonstration
-const mockPortfolioData = {
-  balanceHistory: [
-    { date: '2024-01-01', value: 850000 },
-    { date: '2024-02-01', value: 920000 },
-    { date: '2024-03-01', value: 1100000 },
-    { date: '2024-04-01', value: 1050000 },
-    { date: '2024-05-01', value: 1200000 },
-    { date: '2024-06-01', value: 1350000 },
-  ],
-  assets: [
-    {
-      id: 1,
-      name: 'Bitcoin',
-      type: 'cryptocurrency',
-      valueUSD: 450000,
-      wallet: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
-      notes: 'Primary BTC holdings'
-    },
-    {
-      id: 2,
-      name: 'Ethereum',
-      type: 'cryptocurrency',
-      valueUSD: 320000,
-      wallet: '0x742d35Cc6585C42161C0F57C0C5E6Ba5',
-      notes: 'ETH position for DeFi'
-    },
-    {
-      id: 3,
-      name: 'Bored Ape #1234',
-      type: 'nft',
-      valueUSD: 85000,
-      wallet: '0x742d35Cc6585C42161C0F57C0C5E6Ba5',
-      image: 'https://via.placeholder.com/150',
-      notes: 'Blue chip NFT'
-    }
-  ]
-};
-
 const ReportGenerator = ({ portfolioData }) => {
   const periods = ["1 Week", "1 Month", "1 Quarter", "1 Year"];
   const generateReport = (period) => {
@@ -277,6 +229,15 @@ const ReportGenerator = ({ portfolioData }) => {
 
 // Main App Component
 export default function App() {
+  const [isEditor, setIsEditor] = useState(false);
+  const [password, setPassword] = useState("");
+  const [hiddenAssets, setHiddenAssets] = useState([]);
+  const [portfolioData, setPortfolioData] = useState(mockPortfolioData);
+  const [selectedAsset, setSelectedAsset] = useState(null);
+
+  // Sample hashed password (in production, this would come from a secure backend)
+  const hashedPassword = "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi"; // password
+
   const checkPassword = async () => {
     const isValid = await bcrypt.compare(password, hashedPassword);
     if (isValid) {
@@ -302,45 +263,6 @@ export default function App() {
       )
     }));
   };
-  const [isEditor, setIsEditor] = useState(false);
-  const [password, setPassword] = useState("");
-  const [hiddenAssets, setHiddenAssets] = useState([]);
-  const [selectedAsset, setSelectedAsset] = useState(null);
-  const [portfolioData, setPortfolioData] = useState(mockPortfolioData);
-
-  const hashedPassword = "$2a$10$6s9QzX7Y8v2j2z2Qz2z2Qz2z2Qz2z2Qz2z2Qz2z2Qz2z2Qz2z2Qz2"; // Hashed "bullrun"
-
-  const checkPassword = () => {
-    if (bcrypt.compareSync(password, hashedPassword)) {
-      setIsEditor(true);
-      setPassword("");
-    } else {
-      alert("Incorrect password");
-    }
-  };
-
-  const toggleHiddenAsset = (assetId) => {
-    setHiddenAssets((prev) =>
-      prev.includes(assetId)
-        ? prev.filter((id) => id !== assetId)
-        : [...prev, assetId],
-    );
-  };
-
-  const updateNotes = (assetId, notes) => {
-    setPortfolioData((prev) => ({
-      ...prev,
-      assets: prev.assets.map((asset) =>
-        asset.id === assetId ? { ...asset, notes } : asset,
-      ),
-    }));
-  };
-
-  // Fetch portfolio data (mocked for now)
-  useEffect(() => {
-    // Replace with actual Alchemy API calls
-    // Example: alchemy.core.getBalance('0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98').then(balance => {...});
-  }, []);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
