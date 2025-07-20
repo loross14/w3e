@@ -193,6 +193,50 @@ const AssetDetail = ({ asset, updateNotes, isEditor, setSelectedAsset }) => {
 };
 
 // Report Generator Component
+import React, { useState, useRef, useEffect } from 'react';
+import { Chart } from 'chart.js/auto';
+import jsPDF from 'jspdf';
+import bcrypt from 'bcryptjs';
+
+// Mock data for demonstration
+const mockPortfolioData = {
+  balanceHistory: [
+    { date: '2024-01-01', value: 850000 },
+    { date: '2024-02-01', value: 920000 },
+    { date: '2024-03-01', value: 1100000 },
+    { date: '2024-04-01', value: 1050000 },
+    { date: '2024-05-01', value: 1200000 },
+    { date: '2024-06-01', value: 1350000 },
+  ],
+  assets: [
+    {
+      id: 1,
+      name: 'Bitcoin',
+      type: 'cryptocurrency',
+      valueUSD: 450000,
+      wallet: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
+      notes: 'Primary BTC holdings'
+    },
+    {
+      id: 2,
+      name: 'Ethereum',
+      type: 'cryptocurrency',
+      valueUSD: 320000,
+      wallet: '0x742d35Cc6585C42161C0F57C0C5E6Ba5',
+      notes: 'ETH position for DeFi'
+    },
+    {
+      id: 3,
+      name: 'Bored Ape #1234',
+      type: 'nft',
+      valueUSD: 85000,
+      wallet: '0x742d35Cc6585C42161C0F57C0C5E6Ba5',
+      image: 'https://via.placeholder.com/150',
+      notes: 'Blue chip NFT'
+    }
+  ]
+};
+
 const ReportGenerator = ({ portfolioData }) => {
   const periods = ["1 Week", "1 Month", "1 Quarter", "1 Year"];
   const generateReport = (period) => {
@@ -233,6 +277,31 @@ const ReportGenerator = ({ portfolioData }) => {
 
 // Main App Component
 export default function App() {
+  const checkPassword = async () => {
+    const isValid = await bcrypt.compare(password, hashedPassword);
+    if (isValid) {
+      setIsEditor(true);
+    } else {
+      alert('Incorrect password');
+    }
+  };
+
+  const toggleHiddenAsset = (assetId) => {
+    setHiddenAssets(prev => 
+      prev.includes(assetId) 
+        ? prev.filter(id => id !== assetId)
+        : [...prev, assetId]
+    );
+  };
+
+  const updateNotes = (assetId, notes) => {
+    setPortfolioData(prev => ({
+      ...prev,
+      assets: prev.assets.map(asset => 
+        asset.id === assetId ? { ...asset, notes } : asset
+      )
+    }));
+  };
   const [isEditor, setIsEditor] = useState(false);
   const [password, setPassword] = useState("");
   const [hiddenAssets, setHiddenAssets] = useState([]);
