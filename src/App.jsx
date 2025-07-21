@@ -1487,15 +1487,103 @@ const App = () => {
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
-              <div className="w-6 h-6 sm:w-8 sm:h-8bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
                 <span className="text-white font-bold text-xs sm:text-sm">3</span>
               </div>
-              <h1 className="text-lg sm:text-2xl font-bold truncate">Web3Equities Portfolio</h1>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-2xl font-bold truncate">Web3Equities Portfolio</h1>
+                {/* Status Display */}
+                {updateStatus && (
+                  <div className="flex items-center space-x-2 mt-1">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                    <p className="text-xs sm:text-sm text-blue-300 truncate">{updateStatus}</p>
+                  </div>
+                )}
+                {updateError && (
+                  <div className="flex items-center space-x-2 mt-1">
+                    <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                    <p className="text-xs sm:text-sm text-red-300 truncate">Update failed</p>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+              {/* Refresh Button */}
+              <div className="relative">
+                <button 
+                  onClick={updatePortfolio}
+                  disabled={isLoading}
+                  className={`p-2 sm:p-3 rounded-xl transition-all duration-300 ${
+                    isLoading 
+                      ? 'bg-blue-600/20 text-blue-400 cursor-not-allowed' 
+                      : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg hover:shadow-blue-500/25'
+                  } relative group`}
+                  title="Update Portfolio Database"
+                >
+                  <svg 
+                    className={`w-5 h-5 sm:w-6 sm:h-6 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-300'}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {isLoading && (
+                    <div className="absolute inset-0 rounded-xl bg-blue-600/10 animate-pulse"></div>
+                  )}
+                </button>
+                
+                {/* Status Tooltip */}
+                {(updateStatus || updateError) && (
+                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-2xl z-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-white">Portfolio Update Status</h4>
+                      <div className={`w-2 h-2 rounded-full ${
+                        isLoading ? 'bg-blue-400 animate-pulse' : 
+                        updateError ? 'bg-red-400' : 'bg-green-400'
+                      }`}></div>
+                    </div>
+                    
+                    {updateStatus && (
+                      <div className="mb-3">
+                        <div className="flex items-center space-x-2 mb-2">
+                          {isLoading && <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>}
+                          <p className="text-sm text-blue-300">{updateStatus}</p>
+                        </div>
+                        {isLoading && (
+                          <div className="w-full bg-gray-700 rounded-full h-1">
+                            <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-1 rounded-full animate-pulse" style={{width: '60%'}}></div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {updateError && (
+                      <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-3">
+                        <p className="text-sm text-red-300 mb-2">{updateError}</p>
+                        <div className="text-xs text-red-400">
+                          <p className="font-medium mb-1">💡 Troubleshooting:</p>
+                          <ul className="list-disc list-inside space-y-0.5">
+                            <li>Check if backend is running</li>
+                            <li>Verify API keys are set</li>
+                            <li>Check network connection</li>
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    {!isLoading && !updateError && updateStatus && (
+                      <div className="text-xs text-gray-400">
+                        Last updated: {new Date().toLocaleTimeString()}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <button 
                 onClick={() => setShowSettings(true)}
-                className="text-gray-400 hover:text-white transition-colors p-1"
+                className="text-gray-400 hover:text-white transition-colors p-1 sm:p-2"
                 title="Settings"
               >
                 <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1509,41 +1597,7 @@ const App = () => {
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        {/* Database Update Button */}
-        <div className="mb-6">
-          <ActionCard
-            title="🔄 Update Portfolio Database"
-            description="Query all wallets and fetch current balances & history"
-            buttonText={isLoading ? <LoadingSpinner status={updateStatus} /> : "Update Database"}
-            onAction={updatePortfolio}
-            variant="primary"
-            disabled={isLoading}
-          >
-            {/* Status Display */}
-            {updateStatus && (
-              <div className="mt-3 p-3 bg-blue-900/30 border border-blue-700/50 rounded-lg">
-                <p className="text-sm text-blue-300">{updateStatus}</p>
-              </div>
-            )}
-
-            {/* Error Display */}
-            {updateError && (
-              <div className="mt-3 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
-                <p className="text-sm text-red-300">{updateError}</p>
-                <div className="mt-2 text-xs text-red-400">
-                  <p>💡 Troubleshooting:</p>
-                  <ul className="list-disc list-inside mt-1 space-y-1">
-                    <li>Make sure the backend is running (check "Full Stack" workflow)</li>
-                    <li>Check if your ALCHEMY_API_KEY secret is set</li>
-                    <li>Backend should be accessible at: {API_BASE_URL}</li>
-                  </ul>
-                </div>
-              </div>
-            )}
-
-
-          </ActionCard>
-        </div>
+        
 
         {/* Key Metrics - Mobile responsive grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
