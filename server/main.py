@@ -26,8 +26,8 @@ app.add_middleware(
 # Alchemy configuration
 ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
 if not ALCHEMY_API_KEY:
-    print("⚠️ ALCHEMY_API_KEY not found - some features may not work")
-    ALCHEMY_API_KEY = "dummy_key"  # Allow startup without API key for basic functionality
+    print("⚠️ ALCHEMY_API_KEY not found - using demo mode")
+    ALCHEMY_API_KEY = "demo_key"  # Allow startup without API key for demo functionality
 
 # ERC-20 ABI for token interactions
 ERC20_ABI = [
@@ -1563,7 +1563,8 @@ async def health_check():
 
 @app.post("/wallets", response_model=WalletResponse)
 async def create_wallet(wallet: WalletCreate):
-    conn = sqlite3.connect('crypto_fund.db')
+    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     try:
@@ -1587,7 +1588,8 @@ async def create_wallet(wallet: WalletCreate):
 
 @app.get("/wallets", response_model=List[WalletResponse])
 async def get_wallets():
-    conn = sqlite3.connect('crypto_fund.db')
+    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     cursor.execute("SELECT id, address, label, network FROM wallets")

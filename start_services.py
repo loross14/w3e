@@ -43,7 +43,11 @@ def serve_backend():
         print("🚀 Starting FastAPI backend...")
         
         # Install dependencies first
-        subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', 'server/requirements.txt'], check=True)
+        try:
+            subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', 'server/requirements.txt'], 
+                         check=True, timeout=300)
+        except subprocess.TimeoutExpired:
+            print("⚠️ Pip install timeout - continuing with existing packages")
         
         # Set environment variables for production
         os.environ['NODE_ENV'] = 'production'
