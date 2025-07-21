@@ -100,7 +100,7 @@ mode = "parallel"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd server && python3 main.py"
+args = "cd server && python3 -m pip install --break-system-packages -r requirements.txt && python3 main.py"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
