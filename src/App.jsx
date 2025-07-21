@@ -1859,9 +1859,11 @@ const App = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {visibleAssets
-                .filter(asset => asset.isNFT)
-                .map((nft) => (
+              {(() => {
+                const nfts = visibleAssets.filter(asset => asset.isNFT);
+                console.log("🖼️ [NFT DEBUG] NFTs found:", nfts.length, nfts);
+                return nfts;
+              })().map((nft) => (
                   <div
                     key={nft.id}
                     className="bg-gray-900 border border-gray-700 rounded-xl p-4 hover:border-purple-500 cursor-pointer transition-all duration-200"

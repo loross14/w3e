@@ -1387,6 +1387,10 @@ class AssetResponse(BaseModel):
     unrealized_pnl: Optional[float] = 0
     total_return_pct: Optional[float] = 0
     notes: Optional[str] = ""
+    is_nft: Optional[bool] = False
+    floor_price: Optional[float] = 0
+    image_url: Optional[str] = None
+    nft_metadata: Optional[str] = None
 
 class PortfolioResponse(BaseModel):
     total_value: float
@@ -1579,7 +1583,8 @@ async def get_portfolio():
                a.price_usd, a.value_usd, COALESCE(a.purchase_price, 0) as purchase_price,
                COALESCE(a.total_invested, 0) as total_invested, COALESCE(a.realized_pnl, 0) as realized_pnl,
                COALESCE(a.unrealized_pnl, 0) as unrealized_pnl, COALESCE(a.total_return_pct, 0) as total_return_pct,
-               COALESCE(n.notes, '') as notes
+               COALESCE(n.notes, '') as notes, COALESCE(a.is_nft, 0) as is_nft,
+               a.floor_price, a.image_url, a.nft_metadata
         FROM assets a
         LEFT JOIN asset_notes n ON a.symbol = n.symbol
         WHERE NOT EXISTS (
@@ -1599,23 +1604,38 @@ async def get_portfolio():
     assets = []
     for a in assets_data:
         try:
-            asset = AssetResponse(
-                id=a[0] if a[0] else a[1],  # Use token_address as id
-                symbol=a[1] or "Unknown",
-                name=a[2] or "Unknown Token",
-                balance=float(a[3]) if a[3] else 0.0,
-                balance_formatted=a[4] or "0.000000",
-                price_usd=float(a[5]) if a[5] else 0.0,
-                value_usd=float(a[6]) if a[6] else 0.0,
-                purchase_price=float(a[7]) if a[7] else 0.0,
-                total_invested=float(a[8]) if a[8] else 0.0,
-                realized_pnl=float(a[9]) if a[9] else 0.0,
-                unrealized_pnl=float(a[10]) if a[10] else 0.0,
-                total_return_pct=float(a[11]) if a[11] else 0.0,
-                notes=a[12] or ""
-            )
+            is_nft = bool(a[13]) if len(a) > 13 else False
+            floor_price = float(a[14]) if len(a) > 14 and a[14] else 0.0
+            image_url = a[15] if len(a) > 15 else None
+            nft_metadata = a[16] if len(a) > 16 else None
+
+            asset_dict = {
+                "id": a[0] if a[0] else a[1],  # Use token_address as id
+                "symbol": a[1] or "Unknown",
+                "name": a[2] or "Unknown Token",
+                "balance": float(a[3]) if a[3] else 0.0,
+                "balance_formatted": a[4] or "0.000000",
+                "price_usd": float(a[5]) if a[5] else 0.0,
+                "value_usd": float(a[6]) if a[6] else 0.0,
+                "purchase_price": float(a[7]) if a[7] else 0.0,
+                "total_invested": float(a[8]) if a[8] else 0.0,
+                "realized_pnl": float(a[9]) if a[9] else 0.0,
+                "unrealized_pnl": float(a[10]) if a[10] else 0.0,
+                "total_return_pct": float(a[11]) if a[11] else 0.0,
+                "notes": a[12] or "",
+                "is_nft": is_nft,
+                "floor_price": floor_price,
+                "image_url": image_url,
+                "nft_metadata": nft_metadata
+            }
+            
+            asset = AssetResponse(**asset_dict)
             assets.append(asset)
-            print(f"✅ [PORTFOLIO DEBUG] Created asset: {asset.symbol} = ${asset.value_usd:.2f} (Return: {asset.total_return_pct:.1f}%)")
+            
+            if is_nft:
+                print(f"🖼️ [PORTFOLIO DEBUG] Created NFT asset: {asset.symbol} = ${asset.value_usd:.2f} (Floor: ${floor_price})")
+            else:
+                print(f"✅ [PORTFOLIO DEBUG] Created asset: {asset.symbol} = ${asset.value_usd:.2f} (Return: {asset.total_return_pct:.1f}%)")
         except Exception as e:
             print(f"❌ [PORTFOLIO DEBUG] Error creating asset from {a}: {e}")
             continue
@@ -2251,7 +2271,7 @@ async def update_portfolio_data_new():
                 is_low_value_token = (
                     value_usd > 0 and 
                     value_usd < 1.0 and 
-                    not is_nft and
+                    not is_nft and  # Never auto-hide NFTs
                     asset['symbol'] not in ['ETH', 'BTC', 'SOL', 'USDC', 'USDT', 'WBTC', 'PENDLE']  # Preserve major tokens even if small amounts
                 )
 
@@ -2269,6 +2289,12 @@ async def update_portfolio_data_new():
             # Update wallet status with value
             wallet_status[wallet_id]['total_value'] += value_usd
             total_portfolio_value += value_usd
+
+            # Debug NFT detection
+            if is_nft:
+                print(f"🖼️ [NFT DEBUG] Processing NFT: {asset['symbol']} - {asset['name']} - Value: ${value_usd:.6f}")
+            elif asset['symbol'].endswith('NFT') or 'Collection' in asset['name']:
+                print(f"🔍 [NFT DEBUG] Possible missed NFT: {asset['symbol']} - {asset['name']} - isNFT: {is_nft}")
 
             # Get purchase price data if exists
             cursor.execute("""
