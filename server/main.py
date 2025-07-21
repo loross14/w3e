@@ -185,6 +185,7 @@ async def get_token_prices(token_addresses: List[str]) -> Dict[str, float]:
 
     # Known token price mappings (updated with current market prices)
     known_tokens = {
+        # Ethereum tokens
         "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": {"symbol": "WBTC", "coingecko_id": "wrapped-bitcoin"},  # WBTC
         "0x808507121b80c02388fad14726482e061b8da827": {"symbol": "PENDLE", "coingecko_id": "pendle"},  # PENDLE
         "0xa0b86a33e6776dbf0c73809f0c7d6c0d5c0b9c5c1": {"symbol": "USDC", "coingecko_id": "usd-coin"},  # USDC (fix)
@@ -193,6 +194,10 @@ async def get_token_prices(token_addresses: List[str]) -> Dict[str, float]:
         "0x6b175474e89094c44da98b954eedeac495271d0f": {"symbol": "DAI", "coingecko_id": "dai"},  # DAI
         "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984": {"symbol": "UNI", "coingecko_id": "uniswap"},  # UNI
         "0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0": {"symbol": "MATIC", "coingecko_id": "matic-network"},  # MATIC
+        # Solana tokens
+        "epjfwdd5aufqssqem2qn1xzybapC8g4wegghkzwytdt1v": {"symbol": "USDC", "coingecko_id": "usd-coin"},  # Solana USDC
+        "es9vmfrzacermjfrf4h2fyd4kconky11mCce8benwnyb": {"symbol": "USDT", "coingecko_id": "tether"},  # Solana USDT
+        "so11111111111111111111111111111111111111112": {"symbol": "WSOL", "coingecko_id": "wrapped-solana"},  # Wrapped SOL
     }
 
     try:
@@ -302,13 +307,14 @@ async def get_wallet_assets(wallet_address: str, network: str) -> List[Dict]:
     try:
         if network.upper() == "ETH":
             # Get ETH balance
-            if "0x0000000000000000000000000000000000000000" not in hidden_addresses:
+            eth_token_address = "0x0000000000000000000000000000000000000000"
+            if eth_token_address not in hidden_addresses:
                 eth_balance_wei = w3.eth.get_balance(wallet_address)
                 eth_balance_formatted = float(eth_balance_wei) / 10**18
 
                 if eth_balance_formatted > 0:
                     assets.append({
-                        "token_address": "0x0000000000000000000000000000000000000000",
+                        "token_address": eth_token_address,
                         "symbol": "ETH",
                         "name": "Ethereum",
                         "balance": eth_balance_formatted,
@@ -521,12 +527,15 @@ async def get_wallet_assets(wallet_address: str, network: str) -> List[Dict]:
                                         "balance_formatted": f"{balance:.6f}",
                                         "decimals": decimals
                                     })
+                                    print(f"✅ Found Solana token: {symbol} - {balance:.6f} ({mint_address})")
 
                             except Exception as e:
                                 print(f"Error processing Solana token account: {e}")
 
             except Exception as e:
                 print(f"Error fetching Solana wallet assets: {e}")
+                import traceback
+                print(f"Solana error traceback: {traceback.format_exc()}")
 
     except Exception as e:
         print(f"Error fetching wallet assets for {wallet_address}: {e}")
@@ -835,6 +844,17 @@ async def update_portfolio_data():
                 nft_metadata = None
 
             total_portfolio_value += value_usd
+
+            # Auto-hide assets with $0 value (except NFTs which have special handling)
+            if not is_nft and value_usd == 0:
+                try:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO hidden_assets (token_address, symbol, name)
+                        VALUES (?, ?, ?)
+                    """, (asset['token_address'].lower(), asset['symbol'], asset['name']))
+                    print(f"🔍 Auto-hidden zero-value asset: {asset['symbol']} ({asset['token_address']})")
+                except sqlite3.Error as e:
+                    print(f"❌ Error auto-hiding asset {asset['symbol']}: {e}")
 
             cursor.execute("""
                 INSERT INTO assets 
