@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from "react";
 import Chart from "chart.js/auto";
 import { jsPDF } from "jspdf";
@@ -49,7 +48,7 @@ const ActionCard = ({ title, description, buttonText, onAction, variant = "prima
 
 const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
   const weight = ((asset.valueUSD / totalValue) * 100).toFixed(1);
-  
+
   return (
     <div 
       className="bg-gray-900 border border-gray-700 rounded-xl p-4 hover:border-gray-600 cursor-pointer transition-all duration-200"
@@ -77,7 +76,7 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
           </button>
         )}
       </div>
-      
+
       <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
         <div>
           <span className="text-gray-400 block">Balance</span>
@@ -207,7 +206,7 @@ const WalletCard = ({ wallet, onClick, walletData }) => {
           <div className="text-sm font-medium text-white">{wallet.network}</div>
         </div>
       </div>
-      
+
       <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm">
         <div>
           <span className="text-gray-400 block">Total Value</span>
@@ -380,7 +379,7 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
               </svg>
             </button>
           </div>
-          
+
           <div className="space-y-3 mb-4 text-sm sm:text-base">
             <div className="flex justify-between">
               <span className="text-gray-400">Balance:</span>
@@ -395,7 +394,7 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
               <span className="text-white font-mono">${asset.priceUSD.toFixed(4)}</span>
             </div>
           </div>
-          
+
           {isEditor && (
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2 text-gray-300">Notes:</label>
@@ -408,7 +407,7 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
               />
             </div>
           )}
-          
+
           <div className="flex space-x-3">
             {isEditor && (
               <button
@@ -509,11 +508,11 @@ const App = () => {
     }
   };
 
-  const toggleHiddenAsset = (assetId) => {
+  const toggleHiddenAsset = (asset) => {
     setHiddenAssets((prev) => {
-      const newHiddenAssets = prev.includes(assetId)
-        ? prev.filter((id) => id !== assetId)
-        : [...prev, assetId];
+      const newHiddenAssets = prev.includes(asset.id)
+        ? prev.filter((id) => id !== asset.id)
+        : [...prev, asset.id];
       localStorage.setItem("hiddenAssets", JSON.stringify(newHiddenAssets));
       return newHiddenAssets;
     });
@@ -524,29 +523,29 @@ const App = () => {
       setSelectedAsset(null);
       return;
     }
-    
+
     try {
       const asset = portfolioData.assets.find(a => a.id === assetId);
       if (!asset) return;
-      
+
       const response = await fetch(`${API_BASE_URL}/assets/${asset.symbol}/notes?notes=${encodeURIComponent(notes)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to update notes');
       }
-      
+
       setPortfolioData((prev) => ({
         ...prev,
         assets: prev.assets.map((a) =>
           a.id === assetId ? { ...a, notes } : a,
         ),
       }));
-      
+
     } catch (error) {
       console.error('Error updating notes:', error);
       alert(`Failed to update notes: ${error.message}`);
@@ -570,7 +569,7 @@ const App = () => {
       alert("Please enter both wallet address and label");
       return;
     }
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/wallets`, {
         method: 'POST',
@@ -583,22 +582,22 @@ const App = () => {
           network: newWalletNetwork
         }),
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.detail || 'Failed to add wallet');
       }
-      
+
       const newWallet = await response.json();
-      
+
       const updatedWallets = [...walletAddresses, newWallet];
       setWalletAddresses(updatedWallets);
       localStorage.setItem("fundWallets", JSON.stringify(updatedWallets));
-      
+
       setNewWalletAddress("");
       setNewWalletLabel("");
       setNewWalletNetwork("ETH");
-      
+
       alert("Wallet added successfully!");
     } catch (error) {
       console.error('Error adding wallet:', error);
@@ -611,21 +610,21 @@ const App = () => {
       const response = await fetch(`${API_BASE_URL}/wallets/${walletId}`, {
         method: 'DELETE',
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to remove wallet');
       }
-      
+
       const updatedWallets = walletAddresses.filter(wallet => wallet.id !== walletId);
       setWalletAddresses(updatedWallets);
       localStorage.setItem("fundWallets", JSON.stringify(updatedWallets));
-      
+
       // Remove wallet data from local state
       const newWalletData = { ...walletData };
       delete newWalletData[walletId];
       setWalletData(newWalletData);
       localStorage.setItem("walletData", JSON.stringify(newWalletData));
-      
+
     } catch (error) {
       console.error('Error removing wallet:', error);
       alert(`Failed to remove wallet: ${error.message}`);
@@ -645,7 +644,7 @@ const App = () => {
   useEffect(() => {
     const syncWalletsWithBackend = async (retryCount = 0) => {
       const maxRetries = 3;
-      
+
       try {
         // Test backend connection first
         const healthResponse = await fetch(`${API_BASE_URL}/`, {
@@ -654,16 +653,16 @@ const App = () => {
             'Content-Type': 'application/json',
           },
         });
-        
+
         if (!healthResponse.ok) {
           throw new Error('Backend not ready');
         }
-        
+
         // Get current wallets from backend
         const response = await fetch(`${API_BASE_URL}/wallets`);
         if (response.ok) {
           const backendWallets = await response.json();
-          
+
           // If backend is empty but we have local wallets, sync them
           if (backendWallets.length === 0 && walletAddresses.length > 0) {
             console.log('Syncing local wallets to backend...');
@@ -680,7 +679,7 @@ const App = () => {
                     network: wallet.network
                   }),
                 });
-                
+
                 if (syncResponse.ok) {
                   console.log(`✅ Synced wallet: ${wallet.label}`);
                 } else {
@@ -696,7 +695,7 @@ const App = () => {
         }
       } catch (error) {
         console.error(`❌ Error syncing wallets (attempt ${retryCount + 1}/${maxRetries + 1}):`, error.message);
-        
+
         // Retry with exponential backoff if backend isn't ready yet
         if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('Backend not ready'))) {
           const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s delays
@@ -715,7 +714,7 @@ const App = () => {
     setIsLoading(true);
     setUpdateError('');
     setUpdateStatus('🔗 Connecting to backend...');
-    
+
     try {
       // Step 1: Test backend connection
       setUpdateStatus('🔗 Testing backend connection...');
@@ -725,11 +724,11 @@ const App = () => {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (!healthResponse.ok) {
         throw new Error(`Backend not responding (${healthResponse.status})`);
       }
-      
+
       // Step 2: Trigger portfolio update
       setUpdateStatus('🚀 Starting portfolio update...');
       const updateResponse = await fetch(`${API_BASE_URL}/portfolio/update`, {
@@ -738,20 +737,20 @@ const App = () => {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (!updateResponse.ok) {
         const errorText = await updateResponse.text();
         throw new Error(`Update failed (${updateResponse.status}): ${errorText}`);
       }
-      
+
       // Step 3: Wait for processing
       setUpdateStatus('⏳ Processing wallet data...');
       await new Promise(resolve => setTimeout(resolve, 3000));
-      
+
       // Step 4: Wait a bit more for backend processing
       setUpdateStatus('⏳ Waiting for backend processing...');
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       // Step 5: Fetch updated portfolio data
       setUpdateStatus('📊 Fetching portfolio data...');
       const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
@@ -759,12 +758,12 @@ const App = () => {
         const errorText = await portfolioResponse.text();
         throw new Error(`Failed to fetch portfolio (${portfolioResponse.status}): ${errorText}`);
       }
-      
+
       const portfolioData = await portfolioResponse.json();
-      
+
       // Log the fetched data for debugging
       console.log('Fetched portfolio data:', portfolioData);
-      
+
       // Step 6: Transform data
       setUpdateStatus('🔄 Processing asset data...');
       const updatedAssets = portfolioData.assets.map(asset => ({
@@ -772,13 +771,13 @@ const App = () => {
         name: asset.name,
         symbol: asset.symbol,
         balance: asset.balance,
-        priceUSD: asset.price_usd || 0,
+        price_usd: asset.price_usd || 0,
         valueUSD: asset.value_usd || 0,
         notes: asset.notes || "",
       }));
 
       const newTotalValue = portfolioData.total_value || 0;
-      
+
       // Generate balance history (simplified - in production you'd fetch from backend)
       const newBalanceHistory = newTotalValue > 0 ? [
         { value: newTotalValue * 0.92 },
@@ -787,14 +786,14 @@ const App = () => {
         { value: newTotalValue * 0.96 },
         { value: newTotalValue }
       ] : [{ value: 0 }];
-      
+
       console.log(`Found ${updatedAssets.length} assets with total value $${newTotalValue}`);
-      
+
       // Step 7: Fetch individual wallet data
       setUpdateStatus('💼 Updating wallet details...');
       const newWalletData = {};
       let walletCount = 0;
-      
+
       for (const wallet of walletAddresses) {
         try {
           setUpdateStatus(`💼 Processing ${wallet.label} (${++walletCount}/${walletAddresses.length})...`);
@@ -810,9 +809,9 @@ const App = () => {
               valueUSD: asset.value_usd || 0,
               notes: asset.notes || "",
             }));
-            
+
             const walletTotalValue = walletDetails.total_value;
-            
+
             newWalletData[wallet.id] = {
               assets: walletAssets,
               performance: walletDetails.performance_24h,
@@ -831,30 +830,30 @@ const App = () => {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
-      
+
       // Step 8: Save data
       setUpdateStatus('💾 Saving data...');
       setWalletData(newWalletData);
       localStorage.setItem("walletData", JSON.stringify(newWalletData));
-      
+
       // Force update portfolio data
       setPortfolioData({
         assets: updatedAssets,
         balanceHistory: newBalanceHistory,
         totalValue: newTotalValue
       });
-      
+
       // Step 9: Complete
       const assetCount = updatedAssets.length;
       const valueFormatted = newTotalValue.toLocaleString();
       setUpdateStatus(`✅ Updated ${assetCount} assets • $${valueFormatted}`);
       setTimeout(() => setUpdateStatus(''), 5000);
-      
+
       console.log('Portfolio updated successfully with real data');
     } catch (error) {
       console.error('Error updating portfolio:', error);
       let errorMessage = 'Unknown error occurred';
-      
+
       if (error.message.includes('Failed to fetch')) {
         errorMessage = '🔌 Cannot connect to backend server. Make sure the backend is running on port 8000.';
       } else if (error.message.includes('CORS')) {
@@ -864,7 +863,7 @@ const App = () => {
       } else {
         errorMessage = `❌ ${error.message}`;
       }
-      
+
       setUpdateError(errorMessage);
       setUpdateStatus('');
     } finally {
@@ -876,7 +875,7 @@ const App = () => {
   const visibleAssets = portfolioData.assets.filter(
     (asset) => !hiddenAssets.includes(asset.id),
   );
-  
+
   const totalValue = visibleAssets.reduce(
     (sum, asset) => sum + asset.valueUSD,
     0,
@@ -929,7 +928,7 @@ const App = () => {
                 <p className="text-sm text-blue-300">{updateStatus}</p>
               </div>
             )}
-            
+
             {/* Error Display */}
             {updateError && (
               <div className="mt-3 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
@@ -956,7 +955,7 @@ const App = () => {
             changeType="positive"
             icon="#10B981"
           />
-          
+
           <MetricCard
             title="Assets"
             value={visibleAssets.length}
@@ -1009,7 +1008,7 @@ const App = () => {
               variant="secondary"
               disabled={isLoading}
             />
-            
+
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
               <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">Generate Reports</h3>
               <p className="text-sm text-gray-400 mb-4">Export performance reports</p>
@@ -1022,7 +1021,7 @@ const App = () => {
         {isEditor && (
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
             <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">Fund Wallets</h3>
-            
+
             {/* Current Wallets */}
             <div className="space-y-3 mb-6">
               {walletAddresses.map((wallet) => (
@@ -1097,7 +1096,7 @@ const App = () => {
               {visibleAssets.length} assets • ${totalValue.toLocaleString()}
             </span>
           </div>
-          
+
           {visibleAssets.length === 0 ? (
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 text-center">
               <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1124,7 +1123,7 @@ const App = () => {
                   key={asset.id}
                   asset={asset}
                   onClick={() => setSelectedAsset(asset)}
-                  onHide={() => toggleHiddenAsset(asset.id)}
+                  onHide={() => toggleHiddenAsset(asset)}
                   isEditor={isEditor}
                   totalValue={totalValue}
                 />
@@ -1141,7 +1140,7 @@ const App = () => {
               {walletAddresses.length} wallets • {Object.keys(walletData).length} active
             </span>
           </div>
-          
+
           {walletAddresses.length === 0 ? (
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 text-center">
               <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1195,7 +1194,7 @@ const App = () => {
                       <span className="text-white font-medium truncate">{asset.name}</span>
                     </div>
                     <button
-                      onClick={() => toggleHiddenAsset(asset.id)}
+                      onClick={() => toggleHiddenAsset(asset)}
                       className="text-xs bg-green-600/20 text-green-400 px-3 py-1 rounded-md hover:bg-green-600/30 transition-colors border border-green-600/30 whitespace-nowrap"
                     >
                       Show

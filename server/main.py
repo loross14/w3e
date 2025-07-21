@@ -116,6 +116,17 @@ def init_db():
         )
     ''')
     
+    # Hidden assets table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS hidden_assets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token_address TEXT UNIQUE NOT NULL,
+            symbol TEXT NOT NULL,
+            name TEXT NOT NULL,
+            hidden_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -155,42 +166,68 @@ class WalletDetailsResponse(BaseModel):
 
 # Utility functions
 async def get_token_prices(token_addresses: List[str]) -> Dict[str, float]:
-    """Get token prices from CoinGecko API"""
+    """Get token prices from multiple sources with fallbacks"""
     if not token_addresses:
         return {}
     
-    # Filter out ETH and known stablecoins
     eth_address = "0x0000000000000000000000000000000000000000"
-    usdc_address = "0xa0b86a33e6d6dbf0c73809f0c7d6c0d5c0b9c5c1"
-    
     price_map = {}
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             # Get ETH price
             response = await client.get(
                 "https://api.coingecko.com/api/v3/simple/price",
-                params={"ids": "ethereum", "vs_currencies": "usd"}
+                params={"ids": "ethereum,solana", "vs_currencies": "usd"}
             )
             if response.status_code == 200:
                 data = response.json()
                 price_map[eth_address] = data.get("ethereum", {}).get("usd", 0)
+                # Store SOL price for later use
+                price_map["solana"] = data.get("solana", {}).get("usd", 0)
             
-            # Get other token prices if any
-            if len(token_addresses) > 1:
-                contract_addresses = [addr for addr in token_addresses if addr != eth_address]
-                if contract_addresses:
+            # Get ERC-20 token prices from CoinGecko
+            contract_addresses = [addr for addr in token_addresses if addr != eth_address and addr != "solana"]
+            if contract_addresses:
+                # Try CoinGecko first
+                try:
                     response = await client.get(
                         "https://api.coingecko.com/api/v3/simple/token_price/ethereum",
                         params={
-                            "contract_addresses": ",".join(contract_addresses),
+                            "contract_addresses": ",".join(contract_addresses[:50]),  # Limit batch size
                             "vs_currencies": "usd"
                         }
                     )
                     if response.status_code == 200:
                         data = response.json()
                         for addr, price_data in data.items():
-                            price_map[addr] = price_data.get("usd", 0)
+                            if isinstance(price_data, dict) and "usd" in price_data:
+                                price_map[addr.lower()] = price_data["usd"]
+                except Exception as e:
+                    print(f"CoinGecko error: {e}")
+                
+                # Fallback to DEX price APIs for missing tokens
+                for addr in contract_addresses:
+                    if addr.lower() not in price_map:
+                        try:
+                            # Try 1inch API for DEX prices
+                            response = await client.get(
+                                f"https://api.1inch.exchange/v4.0/1/quote",
+                                params={
+                                    "fromTokenAddress": addr,
+                                    "toTokenAddress": "0xA0b86a33E6776dbf0C73809F0C7D6C0d5c0B9C5c1",  # USDC
+                                    "amount": "1000000000000000000"  # 1 token with 18 decimals
+                                }
+                            )
+                            if response.status_code == 200:
+                                data = response.json()
+                                # Calculate price based on USDC output
+                                usdc_amount = int(data.get("toTokenAmount", "0"))
+                                if usdc_amount > 0:
+                                    price_map[addr.lower()] = usdc_amount / 1000000  # USDC has 6 decimals
+                        except Exception as e:
+                            print(f"1inch fallback error for {addr}: {e}")
+                            price_map[addr.lower()] = 0  # Set to 0 if all fails
     
     except Exception as e:
         print(f"Error fetching prices: {e}")
@@ -198,28 +235,36 @@ async def get_token_prices(token_addresses: List[str]) -> Dict[str, float]:
     return price_map
 
 async def get_wallet_assets(wallet_address: str, network: str) -> List[Dict]:
-    """Fetch assets for a wallet using Web3 and Alchemy API"""
+    """Fetch assets for a wallet using Web3, Alchemy API, and Solana RPC"""
     assets = []
+    
+    # Check if any assets should be hidden (skip fetching to save API calls)
+    conn = sqlite3.connect('crypto_fund.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT token_address FROM hidden_assets")
+    hidden_addresses = set(row[0].lower() for row in cursor.fetchall())
+    conn.close()
     
     try:
         if network.upper() == "ETH":
             # Get ETH balance
-            eth_balance_wei = w3.eth.get_balance(wallet_address)
-            eth_balance_formatted = float(eth_balance_wei) / 10**18
-            
-            if eth_balance_formatted > 0:
-                assets.append({
-                    "token_address": "0x0000000000000000000000000000000000000000",
-                    "symbol": "ETH",
-                    "name": "Ethereum",
-                    "balance": eth_balance_formatted,
-                    "balance_formatted": f"{eth_balance_formatted:.6f}",
-                    "decimals": 18
-                })
+            if "0x0000000000000000000000000000000000000000" not in hidden_addresses:
+                eth_balance_wei = w3.eth.get_balance(wallet_address)
+                eth_balance_formatted = float(eth_balance_wei) / 10**18
+                
+                if eth_balance_formatted > 0:
+                    assets.append({
+                        "token_address": "0x0000000000000000000000000000000000000000",
+                        "symbol": "ETH",
+                        "name": "Ethereum",
+                        "balance": eth_balance_formatted,
+                        "balance_formatted": f"{eth_balance_formatted:.6f}",
+                        "decimals": 18
+                    })
             
             # Get ERC-20 token balances using Alchemy API
             try:
-                async with httpx.AsyncClient() as client:
+                async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(
                         ALCHEMY_URL,
                         json={
@@ -237,7 +282,11 @@ async def get_wallet_assets(wallet_address: str, network: str) -> List[Dict]:
                         for token_balance in token_balances:
                             if token_balance.get("tokenBalance") and int(token_balance["tokenBalance"], 16) > 0:
                                 try:
-                                    contract_address = token_balance["contractAddress"]
+                                    contract_address = token_balance["contractAddress"].lower()
+                                    
+                                    # Skip if this token is hidden
+                                    if contract_address in hidden_addresses:
+                                        continue
                                     
                                     # Get token metadata using Alchemy API
                                     metadata_response = await client.post(
@@ -272,9 +321,99 @@ async def get_wallet_assets(wallet_address: str, network: str) -> List[Dict]:
                 print(f"Error fetching token balances: {e}")
         
         elif network.upper() == "SOL":
-            # For Solana, we would need a different API
-            # For now, return placeholder - you'd integrate with Solana RPC
-            pass
+            # Solana wallet support using public RPC
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    # Get SOL balance
+                    if "solana" not in hidden_addresses:
+                        sol_response = await client.post(
+                            "https://api.mainnet-beta.solana.com",
+                            json={
+                                "jsonrpc": "2.0",
+                                "id": 1,
+                                "method": "getBalance",
+                                "params": [wallet_address]
+                            }
+                        )
+                        
+                        if sol_response.status_code == 200:
+                            sol_data = sol_response.json()
+                            if "result" in sol_data:
+                                sol_balance_lamports = sol_data["result"]["value"]
+                                sol_balance = sol_balance_lamports / 1_000_000_000  # Convert lamports to SOL
+                                
+                                if sol_balance > 0:
+                                    assets.append({
+                                        "token_address": "solana",
+                                        "symbol": "SOL",
+                                        "name": "Solana",
+                                        "balance": sol_balance,
+                                        "balance_formatted": f"{sol_balance:.6f}",
+                                        "decimals": 9
+                                    })
+                    
+                    # Get SPL token accounts
+                    spl_response = await client.post(
+                        "https://api.mainnet-beta.solana.com",
+                        json={
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "getTokenAccountsByOwner",
+                            "params": [
+                                wallet_address,
+                                {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
+                                {"encoding": "jsonParsed"}
+                            ]
+                        }
+                    )
+                    
+                    if spl_response.status_code == 200:
+                        spl_data = spl_response.json()
+                        token_accounts = spl_data.get("result", {}).get("value", [])
+                        
+                        for token_account in token_accounts:
+                            try:
+                                token_info = token_account["account"]["data"]["parsed"]["info"]
+                                token_amount = token_info.get("tokenAmount", {})
+                                mint_address = token_info.get("mint", "")
+                                
+                                # Skip if this token is hidden
+                                if mint_address.lower() in hidden_addresses:
+                                    continue
+                                
+                                balance = float(token_amount.get("uiAmount", 0))
+                                decimals = token_amount.get("decimals", 0)
+                                
+                                if balance > 0.001:  # Filter out dust
+                                    # Try to get token metadata (simplified)
+                                    symbol = mint_address[:6] + "..."  # Fallback symbol
+                                    name = f"SPL Token {mint_address[:8]}..."
+                                    
+                                    # Common Solana tokens mapping
+                                    known_tokens = {
+                                        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {"symbol": "USDC", "name": "USD Coin"},
+                                        "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": {"symbol": "USDT", "name": "Tether USD"},
+                                        "So11111111111111111111111111111111111111112": {"symbol": "WSOL", "name": "Wrapped SOL"},
+                                    }
+                                    
+                                    if mint_address in known_tokens:
+                                        symbol = known_tokens[mint_address]["symbol"]
+                                        name = known_tokens[mint_address]["name"]
+                                    
+                                    assets.append({
+                                        "token_address": mint_address,
+                                        "symbol": symbol,
+                                        "name": name,
+                                        "balance": balance,
+                                        "balance_formatted": f"{balance:.6f}",
+                                        "decimals": decimals
+                                    })
+                                    
+                            except Exception as e:
+                                print(f"Error processing Solana token account: {e}")
+                                
+            except Exception as e:
+                print(f"Error fetching Solana wallet assets: {e}")
             
     except Exception as e:
         print(f"Error fetching wallet assets for {wallet_address}: {e}")
@@ -461,6 +600,62 @@ async def update_asset_notes(symbol: str, notes: str):
     conn.close()
     
     return {"message": "Notes updated successfully"}
+
+@app.post("/assets/hide")
+async def hide_asset(token_address: str, symbol: str, name: str):
+    """Hide an asset from portfolio calculations"""
+    conn = sqlite3.connect('crypto_fund.db')
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("""
+            INSERT OR REPLACE INTO hidden_assets (token_address, symbol, name)
+            VALUES (?, ?, ?)
+        """, (token_address.lower(), symbol, name))
+        
+        conn.commit()
+        return {"message": f"Asset {symbol} hidden successfully"}
+    except sqlite3.Error as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        conn.close()
+
+@app.delete("/assets/hide/{token_address}")
+async def unhide_asset(token_address: str):
+    """Unhide an asset to include in portfolio calculations"""
+    conn = sqlite3.connect('crypto_fund.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("DELETE FROM hidden_assets WHERE token_address = ?", (token_address.lower(),))
+    
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Hidden asset not found")
+    
+    conn.commit()
+    conn.close()
+    return {"message": "Asset unhidden successfully"}
+
+@app.get("/assets/hidden")
+async def get_hidden_assets():
+    """Get list of hidden assets"""
+    conn = sqlite3.connect('crypto_fund.db')
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT token_address, symbol, name, hidden_at FROM hidden_assets")
+    hidden_assets = cursor.fetchall()
+    conn.close()
+    
+    return [
+        {
+            "token_address": h[0],
+            "symbol": h[1], 
+            "name": h[2],
+            "hidden_at": h[3]
+        }
+        for h in hidden_assets
+    ]
 
 async def update_portfolio_data():
     """Background task to update portfolio data"""
