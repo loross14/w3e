@@ -154,7 +154,7 @@ class WalletResponse(BaseModel):
     network: str
 
 class AssetResponse(BaseModel):
-    id: int
+    id: str  # Changed from int to str to handle token addresses
     symbol: str
     name: str
     balance: float
