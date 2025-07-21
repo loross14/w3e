@@ -216,7 +216,7 @@ const WalletCard = ({ wallet, onClick, walletData }) => {
   const totalValue = walletData?.assets?.reduce((sum, asset) => sum + asset.valueUSD, 0) || 0;
   const assetCount = walletData?.assets?.length || 0;
   const performance = walletData?.performance || 0;
-  
+
   // Check if wallet has errors or no data (especially Solana wallets)
   const isSolanaWallet = wallet.network === 'SOL';
   const hasError = walletData?.hasError || walletData?.error || (isSolanaWallet && assetCount === 0 && walletData?.status !== 'loading');
@@ -882,7 +882,7 @@ const App = () => {
 
         const savedData = await portfolioResponse.json();
         addDebugInfo("📊 Raw portfolio data received", savedData);
-        
+
         console.log("🔍 [FRONTEND DEBUG] Full backend response:", savedData);
         console.log("🔍 [FRONTEND DEBUG] Assets array:", savedData.assets);
         console.log("🔍 [FRONTEND DEBUG] Assets length:", savedData.assets?.length);
@@ -940,12 +940,26 @@ const App = () => {
           const backendWallets = await walletsResponse.json();
           addDebugInfo(`📋 Backend has ${backendWallets.length} wallets`, backendWallets);
 
-          // Update local wallet state to match backend
-          if (backendWallets.length > 0) {
-            setWalletAddresses(backendWallets);
-            localStorage.setItem("fundWallets", JSON.stringify(backendWallets));
-            addDebugInfo("✅ Local wallets synced with backend");
-          }
+            // Update local wallet state to match backend, but preserve default wallets
+            if (backendWallets.length > 0) {
+              // Merge backend wallets with local state, ensuring important wallets aren't lost
+              const currentWallets = [...walletAddresses];
+              const mergedWallets = [...backendWallets];
+
+              // Check if Solana wallet exists in backend, if not preserve it
+              const hasSolanaWallet = backendWallets.some(w => w.network === "SOL");
+              if (!hasSolanaWallet) {
+                const localSolanaWallet = currentWallets.find(w => w.network === "SOL");
+                if (localSolanaWallet) {
+                  mergedWallets.push(localSolanaWallet);
+                  addDebugInfo("🔄 Preserved Solana wallet in sync");
+                }
+              }
+
+              setWalletAddresses(mergedWallets);
+              localStorage.setItem("fundWallets", JSON.stringify(mergedWallets));
+              addDebugInfo("✅ Local wallets synced with backend (with preservation)");
+            }
 
           // Load wallet status information
           try {
@@ -1300,7 +1314,7 @@ const App = () => {
               </div>
             )}
 
-            
+
           </ActionCard>
         </div>
 
@@ -1573,7 +1587,7 @@ const App = () => {
                 const status = walletStatus.find(s => s.wallet_id === wallet.id);
                 const hasData = walletData[wallet.id];
                 const hasError = status?.status === 'error' || (!hasData && wallet.network === 'SOL');
-                
+
                 return (
                   <WalletCard
                     key={wallet.id}
@@ -1617,7 +1631,7 @@ const App = () => {
           </div>
         )}
 
-        
+
       </div>
 
       {/* Asset Modal */}
