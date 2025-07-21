@@ -657,6 +657,9 @@ class SolanaPriceFetcher(PriceFetcher):
             "epjfwdd5aufqssqem2qn1xzybapC8g4wegghkzwytdt1v": {"symbol": "USDC", "coingecko_id": "usd-coin"},
             "es9vmfrzacermjfrf4h2fyd4kconky11mce8benwnyb": {"symbol": "USDT", "coingecko_id": "tether"},
             "so11111111111111111111111111111111111111112": {"symbol": "WSOL", "coingecko_id": "wrapped-solana"},
+            "mnderfzgvmt87ueuhvvu9vctqsap5b3ftgpshuupa5ey": {"symbol": "MNDE", "coingecko_id": "marinade"},
+            "7atgf8kqo4wjrd5atgx7t1v2zvvykpjbffnevf1icfv1": {"symbol": "CHAT", "coingecko_id": "chatcoin"},
+            # Add more known SPL tokens as needed
         }
 
     async def fetch_prices(self, token_addresses: List[str]) -> Dict[str, float]:
@@ -679,35 +682,20 @@ class SolanaPriceFetcher(PriceFetcher):
 
                 # Process mint addresses
                 mint_addresses = [addr for addr in token_addresses if addr != "solana"]
-                known_ids = []
-                address_to_id = {}
+                
+                # Method 1: Try known tokens first
+                await self._fetch_known_token_prices(client, mint_addresses, price_map)
+                
+                # Method 2: Try Jupiter API for SPL token prices
+                await self._fetch_jupiter_prices(client, mint_addresses, price_map)
+                
+                # Method 3: Try DexScreener API for pump.fun and other tokens
+                await self._fetch_dexscreener_prices(client, mint_addresses, price_map)
+                
+                # Method 4: Try Birdeye API as fallback
+                await self._fetch_birdeye_prices(client, mint_addresses, price_map)
 
-                for addr in mint_addresses:
-                    addr_lower = addr.lower()
-                    if addr_lower in self.known_tokens:
-                        coingecko_id = self.known_tokens[addr_lower]["coingecko_id"]
-                        known_ids.append(coingecko_id)
-                        address_to_id[coingecko_id] = addr_lower
-                        print(f"✅ Found known Solana token: {self.known_tokens[addr_lower]['symbol']} -> {coingecko_id}")
-
-                # Fetch known token prices
-                if known_ids:
-                    response = await client.get(
-                        "https://api.coingecko.com/api/v3/simple/price",
-                        params={"ids": ",".join(known_ids), "vs_currencies": "usd"}
-                    )
-                    if response.status_code == 200:
-                        data = response.json()
-                        for coingecko_id, price_data in data.items():
-                            if isinstance(price_data, dict) and "usd" in price_data:
-                                addr = address_to_id.get(coingecko_id)
-                                if addr:
-                                    price_map[addr] = price_data["usd"]
-                                    original_addr = next((a for a in mint_addresses if a.lower() == addr), addr)
-                                    price_map[original_addr] = price_data["usd"]
-                                    print(f"✅ Got Solana price: {addr} = ${price_data['usd']}")
-
-                # Set fallback prices for unknown Solana tokens
+                # Set fallback prices for remaining unknown tokens
                 for addr in mint_addresses:
                     if addr.lower() not in price_map and addr not in price_map:
                         price_map[addr.lower()] = 0
@@ -718,6 +706,145 @@ class SolanaPriceFetcher(PriceFetcher):
             print(f"❌ Error fetching Solana prices: {e}")
 
         return price_map
+
+    async def _fetch_known_token_prices(self, client: httpx.AsyncClient, mint_addresses: List[str], price_map: Dict[str, float]):
+        """Fetch prices for known tokens using CoinGecko"""
+        known_ids = []
+        address_to_id = {}
+
+        for addr in mint_addresses:
+            addr_lower = addr.lower()
+            if addr_lower in self.known_tokens:
+                coingecko_id = self.known_tokens[addr_lower]["coingecko_id"]
+                known_ids.append(coingecko_id)
+                address_to_id[coingecko_id] = addr_lower
+                print(f"✅ Found known Solana token: {self.known_tokens[addr_lower]['symbol']} -> {coingecko_id}")
+
+        if known_ids:
+            try:
+                response = await client.get(
+                    "https://api.coingecko.com/api/v3/simple/price",
+                    params={"ids": ",".join(known_ids), "vs_currencies": "usd"}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    for coingecko_id, price_data in data.items():
+                        if isinstance(price_data, dict) and "usd" in price_data:
+                            addr = address_to_id.get(coingecko_id)
+                            if addr:
+                                price_map[addr] = price_data["usd"]
+                                original_addr = next((a for a in mint_addresses if a.lower() == addr), addr)
+                                price_map[original_addr] = price_data["usd"]
+                                print(f"✅ Got known Solana price: {addr} = ${price_data['usd']}")
+            except Exception as e:
+                print(f"⚠️ Error fetching known token prices: {e}")
+
+    async def _fetch_jupiter_prices(self, client: httpx.AsyncClient, mint_addresses: List[str], price_map: Dict[str, float]):
+        """Fetch prices using Jupiter API"""
+        try:
+            # Jupiter API expects comma-separated mints
+            remaining_mints = [addr for addr in mint_addresses if addr.lower() not in price_map and addr not in price_map]
+            if not remaining_mints:
+                return
+
+            # Jupiter price API (free, no auth required)
+            mints_param = ",".join(remaining_mints[:50])  # Limit to 50 tokens per request
+            
+            response = await client.get(
+                f"https://price.jup.ag/v4/price?ids={mints_param}",
+                timeout=15.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if "data" in data:
+                    for mint, price_info in data["data"].items():
+                        if isinstance(price_info, dict) and "price" in price_info:
+                            price = float(price_info["price"])
+                            price_map[mint.lower()] = price
+                            price_map[mint] = price
+                            print(f"✅ Jupiter price: {mint[:12]}... = ${price}")
+                else:
+                    print(f"⚠️ Jupiter API returned unexpected format: {data}")
+            else:
+                print(f"⚠️ Jupiter API error: {response.status_code}")
+                
+        except Exception as e:
+            print(f"⚠️ Error fetching Jupiter prices: {e}")
+
+    async def _fetch_dexscreener_prices(self, client: httpx.AsyncClient, mint_addresses: List[str], price_map: Dict[str, float]):
+        """Fetch prices using DexScreener API for pump.fun and other DEX tokens"""
+        try:
+            remaining_mints = [addr for addr in mint_addresses if addr.lower() not in price_map and addr not in price_map]
+            if not remaining_mints:
+                return
+
+            # DexScreener supports batch requests
+            for i in range(0, len(remaining_mints), 30):  # Process in batches of 30
+                batch_mints = remaining_mints[i:i+30]
+                mints_param = ",".join(batch_mints)
+                
+                response = await client.get(
+                    f"https://api.dexscreener.com/latest/dex/tokens/{mints_param}",
+                    timeout=15.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "pairs" in data and data["pairs"]:
+                        for pair in data["pairs"]:
+                            if pair and "baseToken" in pair and "priceUsd" in pair:
+                                mint = pair["baseToken"]["address"]
+                                price = float(pair["priceUsd"])
+                                if price > 0:
+                                    price_map[mint.lower()] = price
+                                    price_map[mint] = price
+                                    print(f"✅ DexScreener price: {mint[:12]}... = ${price}")
+                    else:
+                        print(f"⚠️ DexScreener: No pairs found for batch {i//30 + 1}")
+                else:
+                    print(f"⚠️ DexScreener API error: {response.status_code}")
+                
+                # Rate limiting
+                await asyncio.sleep(0.1)
+                
+        except Exception as e:
+            print(f"⚠️ Error fetching DexScreener prices: {e}")
+
+    async def _fetch_birdeye_prices(self, client: httpx.AsyncClient, mint_addresses: List[str], price_map: Dict[str, float]):
+        """Fetch prices using Birdeye API as final fallback"""
+        try:
+            remaining_mints = [addr for addr in mint_addresses if addr.lower() not in price_map and addr not in price_map]
+            if not remaining_mints:
+                return
+
+            # Birdeye multi-price endpoint (free tier)
+            for mint in remaining_mints[:10]:  # Limit to avoid rate limits
+                try:
+                    response = await client.get(
+                        f"https://public-api.birdeye.so/defi/price?address={mint}",
+                        headers={"X-API-KEY": ""},  # Can work without API key for basic requests
+                        timeout=10.0
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if "data" in data and "value" in data["data"]:
+                            price = float(data["data"]["value"])
+                            if price > 0:
+                                price_map[mint.lower()] = price
+                                price_map[mint] = price
+                                print(f"✅ Birdeye price: {mint[:12]}... = ${price}")
+                    
+                    # Rate limiting for free tier
+                    await asyncio.sleep(0.2)
+                    
+                except Exception as mint_error:
+                    print(f"⚠️ Birdeye error for {mint[:12]}...: {mint_error}")
+                    continue
+                
+        except Exception as e:
+            print(f"⚠️ Error fetching Birdeye prices: {e}")
 
 # Chain factory
 class ChainFactory:
