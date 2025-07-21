@@ -636,7 +636,6 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
                       <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()} profit</div>
                     </div>
                   ))}
-                  </div>
                 </div>
               </div>
 
