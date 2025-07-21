@@ -77,83 +77,99 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
 
   return (
     <div 
-      className="bg-gray-900 border border-gray-700 rounded-xl p-4 hover:border-gray-600 cursor-pointer transition-all duration-200"
+      className="bg-gradient-to-b from-gray-900 to-gray-950 border border-gray-700 rounded-xl overflow-hidden hover:border-gray-500 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10"
       onClick={onClick}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center space-x-3 min-w-0 flex-1">
-          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-            isNFTCollection 
-              ? 'bg-gradient-to-r from-pink-500 to-purple-500' 
-              : safeAsset.total_return_pct >= 0
-                ? 'bg-gradient-to-r from-green-500 to-emerald-500'
-                : 'bg-gradient-to-r from-red-500 to-red-600'
-          }`}>
-            <span className="text-white font-bold text-sm">
-              {isNFTCollection ? '🖼️' : safeAsset.symbol.slice(0, 2)}
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg ${
+              isNFTCollection 
+                ? 'bg-gradient-to-r from-pink-500 to-purple-500' 
+                : safeAsset.total_return_pct >= 0
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-500'
+                  : 'bg-gradient-to-r from-red-500 to-red-600'
+            }`}>
+              <span className="text-white font-bold text-sm">
+                {isNFTCollection ? '🖼️' : safeAsset.symbol.slice(0, 2)}
+              </span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-medium text-white text-sm sm:text-base truncate">{safeAsset.name}</h3>
+              <p className="text-xs sm:text-sm text-gray-400 truncate">
+                {safeAsset.symbol}
+                {isNFTCollection && <span className=" ml-1 text-pink-400">NFT Collection</span>}
+                {!isNFTCollection && safeAsset.total_return_pct !== 0 && (
+                  <span className={`ml-2 font-bold ${returnColor}`}>
+                    {returnIcon} {safeAsset.total_return_pct >= 0 ? '+' : ''}{safeAsset.total_return_pct.toFixed(0)}%
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          {isEditor && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onHide();
+              }}
+              className="text-xs bg-red-600/20 text-red-400 px-2 py-1 rounded-md hover:bg-red-600/30 transition-colors border border-red-600/30 ml-2 flex-shrink-0"
+            >
+              Hide
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm mb-3">
+          <div>
+            <span className="text-gray-400 block">{isNFTCollection ? 'Count' : 'Balance'}</span>
+            <span className="text-white font-mono">
+              {isNFTCollection ? `${Math.floor(safeAsset.balance)} NFTs` : safeAsset.balance}
             </span>
           </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-medium text-white text-sm sm:text-base truncate">{safeAsset.name}</h3>
-            <p className="text-xs sm:text-sm text-gray-400 truncate">
-              {safeAsset.symbol}
-              {isNFTCollection && <span className=" ml-1 text-pink-400">NFT Collection</span>}
-              {!isNFTCollection && safeAsset.total_return_pct !== 0 && (
-                <span className={`ml-2 font-bold ${returnColor}`}>
-                  {returnIcon} {safeAsset.total_return_pct >= 0 ? '+' : ''}{safeAsset.total_return_pct.toFixed(0)}%
-                </span>
-              )}
-            </p>
+          <div>
+            <span className="text-gray-400 block">{isNFTCollection ? 'Floor Price' : 'Current Price'}</span>
+            <span className="text-white font-mono">
+              {isNFTCollection ? 'Coming Soon' : `$${safeAsset.priceUSD.toLocaleString()}`}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400 block">{isNFTCollection ? 'Est. Value' : 'Current Value'}</span>
+            <span className="text-white font-mono">
+              {isNFTCollection ? 'TBD' : `$${safeAsset.valueUSD.toLocaleString()}`}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-400 block">{isNFTCollection ? 'Weight' : 'Purchase Price'}</span>
+            <span className="text-blue-400 font-mono">
+              {isNFTCollection ? 'N/A' : `$${safeAsset.purchase_price.toFixed(4)}`}
+            </span>
           </div>
         </div>
-        {isEditor && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onHide();
-            }}
-            className="text-xs bg-red-600/20 text-red-400 px-2 py-1 rounded-md hover:bg-red-600/30 transition-colors border border-red-600/30 ml-2 flex-shrink-0"
-          >
-            Hide
-          </button>
-        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
-        <div>
-          <span className="text-gray-400 block">{isNFTCollection ? 'Count' : 'Balance'}</span>
-          <span className="text-white font-mono">
-            {isNFTCollection ? `${Math.floor(safeAsset.balance)} NFTs` : safeAsset.balance}
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-400 block">{isNFTCollection ? 'Floor Price' : 'Current Price'}</span>
-          <span className="text-white font-mono">
-            {isNFTCollection ? 'Coming Soon' : `$${safeAsset.priceUSD.toLocaleString()}`}
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-400 block">{isNFTCollection ? 'Est. Value' : 'Current Value'}</span>
-          <span className="text-white font-mono">
-            {isNFTCollection ? 'TBD' : `$${safeAsset.valueUSD.toLocaleString()}`}
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-400 block">{isNFTCollection ? 'Weight' : 'Purchase Price'}</span>
-          <span className="text-blue-400 font-mono">
-            {isNFTCollection ? 'N/A' : `$${safeAsset.purchase_price.toFixed(4)}`}
-          </span>
-        </div>
-      </div>
-
-      {/* Performance indicator bar */}
+      {/* Enhanced P&L section with gradient background */}
       {!isNFTCollection && safeAsset.total_invested > 0 && (
-        <div className="mt-3 pt-2 border-t border-gray-700">
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-gray-400">P&L:</span>
-            <span className={`font-bold ${returnColor}`}>
-              ${safeAsset.unrealized_pnl.toLocaleString()}
-            </span>
+        <div className={`px-4 py-3 ${
+          safeAsset.unrealized_pnl >= 0 
+            ? 'bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-t border-green-700/50' 
+            : 'bg-gradient-to-r from-red-900/40 to-red-800/40 border-t border-red-700/50'
+        }`}>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-2">
+              <span className={`w-2 h-2 rounded-full ${
+                safeAsset.unrealized_pnl >= 0 ? 'bg-green-400' : 'bg-red-400'
+              }`}></span>
+              <span className="text-xs sm:text-sm font-medium text-gray-300">P&L</span>
+            </div>
+            <div className="text-right">
+              <div className={`text-sm sm:text-base font-bold ${returnColor}`}>
+                {safeAsset.unrealized_pnl >= 0 ? '+' : ''}${safeAsset.unrealized_pnl.toLocaleString()}
+              </div>
+              <div className={`text-xs ${returnColor} opacity-80`}>
+                {safeAsset.total_return_pct >= 0 ? '+' : ''}{safeAsset.total_return_pct.toFixed(1)}%
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1851,7 +1867,7 @@ const App = () => {
         {/* Regular Assets Grid - Mobile responsive */}
         <div className="mb-6 sm:mb-8">
           <div className="flex justify-between items-center mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-semibold text-white">💰 Token Holdings</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-white">💰 Current Positions</h3>
             <span className="text-xs sm:text-sm text-gray-400">
               {visibleAssets.filter(asset => !asset.isNFT).length} tokens • ${visibleAssets.filter(asset => !asset.isNFT).reduce((sum, asset) => sum + asset.valueUSD, 0).toLocaleString()}
             </span>
