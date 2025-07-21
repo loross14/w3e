@@ -1594,7 +1594,8 @@ async def get_portfolio():
                COALESCE(a.total_invested, 0) as total_invested, COALESCE(a.realized_pnl, 0) as realized_pnl,
                COALESCE(a.unrealized_pnl, 0) as unrealized_pnl, COALESCE(a.total_return_pct, 0) as total_return_pct,
                COALESCE(n.notes, '') as notes, COALESCE(a.is_nft, 0) as is_nft,
-               a.floor_price, a.image_url, a.nft_metadata
+               COALESCE(a.floor_price, 0) as floor_price, a.image_url, a.nft_metadata,
+               COALESCE(a.price_change_24h, 0) as price_change_24h
         FROM assets a
         LEFT JOIN asset_notes n ON a.symbol = n.symbol
         WHERE NOT EXISTS (
@@ -1627,6 +1628,7 @@ async def get_portfolio():
             floor_price = float(a[14]) if len(a) > 14 and a[14] else 0.0
             image_url = a[15] if len(a) > 15 else None
             nft_metadata = a[16] if len(a) > 16 else None
+            price_change_24h = float(a[17]) if len(a) > 17 and a[17] else 0.0
 
             asset_dict = {
                 "id": a[0] if a[0] else a[1],  # Use token_address as id
@@ -1645,7 +1647,8 @@ async def get_portfolio():
                 "is_nft": is_nft,
                 "floor_price": floor_price,
                 "image_url": image_url,
-                "nft_metadata": nft_metadata
+                "nft_metadata": nft_metadata,
+                "price_change_24h": price_change_24h
             }
             
             asset = AssetResponse(**asset_dict)
