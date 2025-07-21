@@ -518,17 +518,38 @@ const App = () => {
     });
   };
 
-  const updateNotes = (assetId, notes) => {
+  const updateNotes = async (assetId, notes) => {
     if (!assetId) {
       setSelectedAsset(null);
       return;
     }
-    setPortfolioData((prev) => ({
-      ...prev,
-      assets: prev.assets.map((asset) =>
-        asset.id === assetId ? { ...asset, notes } : asset,
-      ),
-    }));
+    
+    try {
+      const asset = portfolioData.assets.find(a => a.id === assetId);
+      if (!asset) return;
+      
+      const response = await fetch(`${API_BASE_URL}/assets/${asset.symbol}/notes?notes=${encodeURIComponent(notes)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update notes');
+      }
+      
+      setPortfolioData((prev) => ({
+        ...prev,
+        assets: prev.assets.map((a) =>
+          a.id === assetId ? { ...a, notes } : a,
+        ),
+      }));
+      
+    } catch (error) {
+      console.error('Error updating notes:', error);
+      alert(`Failed to update notes: ${error.message}`);
+    }
   };
 
   // Wallet addresses for the fund - stored in state for dynamic management
@@ -543,141 +564,162 @@ const App = () => {
   const [newWalletLabel, setNewWalletLabel] = useState("");
   const [newWalletNetwork, setNewWalletNetwork] = useState("ETH");
 
-  const addWallet = () => {
+  const addWallet = async () => {
     if (!newWalletAddress.trim() || !newWalletLabel.trim()) {
       alert("Please enter both wallet address and label");
       return;
     }
     
-    const newWallet = {
-      id: Date.now(),
-      address: newWalletAddress.trim(),
-      label: newWalletLabel.trim(),
-      network: newWalletNetwork
-    };
-    
-    const updatedWallets = [...walletAddresses, newWallet];
-    setWalletAddresses(updatedWallets);
-    localStorage.setItem("fundWallets", JSON.stringify(updatedWallets));
-    
-    setNewWalletAddress("");
-    setNewWalletLabel("");
-    setNewWalletNetwork("ETH");
+    try {
+      const response = await fetch(`${API_BASE_URL}/wallets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          address: newWalletAddress.trim(),
+          label: newWalletLabel.trim(),
+          network: newWalletNetwork
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to add wallet');
+      }
+      
+      const newWallet = await response.json();
+      
+      const updatedWallets = [...walletAddresses, newWallet];
+      setWalletAddresses(updatedWallets);
+      localStorage.setItem("fundWallets", JSON.stringify(updatedWallets));
+      
+      setNewWalletAddress("");
+      setNewWalletLabel("");
+      setNewWalletNetwork("ETH");
+      
+      alert("Wallet added successfully!");
+    } catch (error) {
+      console.error('Error adding wallet:', error);
+      alert(`Failed to add wallet: ${error.message}`);
+    }
   };
 
-  const removeWallet = (walletId) => {
-    const updatedWallets = walletAddresses.filter(wallet => wallet.id !== walletId);
-    setWalletAddresses(updatedWallets);
-    localStorage.setItem("fundWallets", JSON.stringify(updatedWallets));
+  const removeWallet = async (walletId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/wallets/${walletId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to remove wallet');
+      }
+      
+      const updatedWallets = walletAddresses.filter(wallet => wallet.id !== walletId);
+      setWalletAddresses(updatedWallets);
+      localStorage.setItem("fundWallets", JSON.stringify(updatedWallets));
+      
+      // Remove wallet data from local state
+      const newWalletData = { ...walletData };
+      delete newWalletData[walletId];
+      setWalletData(newWalletData);
+      localStorage.setItem("walletData", JSON.stringify(newWalletData));
+      
+    } catch (error) {
+      console.error('Error removing wallet:', error);
+      alert(`Failed to remove wallet: ${error.message}`);
+    }
   };
+
+  const API_BASE_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:8000' 
+    : 'https://your-repl-name.username.repl.co:8000';
 
   const updatePortfolio = async () => {
     setIsLoading(true);
     try {
-      console.log('Querying wallets:', walletAddresses.map(w => `${w.label} (${w.network}): ${w.address}`));
+      console.log('Updating portfolio with real blockchain data...');
       
-      // Simulate API calls to query wallet balances
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Simulate fetching real wallet data and price updates
-      let updatedAssets;
-      
-      if (portfolioData.assets.length === 0) {
-        // Generate sample data if no assets exist
-        updatedAssets = [
-          {
-            id: 1,
-            name: "Ethereum",
-            symbol: "ETH",
-            balance: 125.75,
-            priceUSD: 2420.50,
-            valueUSD: 125.75 * 2420.50,
-            notes: "",
-          },
-          {
-            id: 2,
-            name: "Bitcoin",
-            symbol: "BTC",
-            balance: 3.2,
-            priceUSD: 43180.00,
-            valueUSD: 3.2 * 43180.00,
-            notes: "",
-          },
-          {
-            id: 3,
-            name: "Solana",
-            symbol: "SOL",
-            balance: 850,
-            priceUSD: 98.40,
-            valueUSD: 850 * 98.40,
-            notes: "",
-          },
-        ];
-      } else {
-        // Update existing assets
-        updatedAssets = portfolioData.assets.map(asset => {
-          const priceChange = 0.95 + Math.random() * 0.1; // ±5% price change
-          const newPrice = asset.priceUSD * priceChange;
-          const balanceChange = 0.98 + Math.random() * 0.04; // ±2% balance change
-          const newBalance = asset.balance * balanceChange;
-          
-          return {
-            ...asset,
-            priceUSD: newPrice,
-            balance: parseFloat(newBalance.toFixed(6)),
-            valueUSD: newBalance * newPrice
-          };
-        });
-      }
-
-      const newTotalValue = updatedAssets.reduce((sum, asset) => sum + asset.valueUSD, 0);
-      
-      // Generate or update balance history
-      const newBalanceHistory = portfolioData.balanceHistory.length === 0 
-        ? [
-            { value: newTotalValue * 0.85 },
-            { value: newTotalValue * 0.92 },
-            { value: newTotalValue * 0.88 },
-            { value: newTotalValue * 0.96 },
-            { value: newTotalValue }
-          ]
-        : [
-            ...portfolioData.balanceHistory.slice(1),
-            { value: newTotalValue }
-          ];
-      
-      // Generate individual wallet data
-      const newWalletData = {};
-      walletAddresses.forEach((wallet, index) => {
-        const walletAssets = [];
-        const assetsPerWallet = Math.floor(updatedAssets.length / walletAddresses.length) + (index < updatedAssets.length % walletAddresses.length ? 1 : 0);
-        const startIndex = index * Math.floor(updatedAssets.length / walletAddresses.length) + Math.min(index, updatedAssets.length % walletAddresses.length);
-        
-        for (let i = 0; i < assetsPerWallet && startIndex + i < updatedAssets.length; i++) {
-          const asset = updatedAssets[startIndex + i];
-          const portion = 0.3 + Math.random() * 0.7; // 30-100% of asset in this wallet
-          walletAssets.push({
-            ...asset,
-            balance: asset.balance * portion,
-            valueUSD: asset.valueUSD * portion
-          });
-        }
-        
-        const walletTotalValue = walletAssets.reduce((sum, asset) => sum + asset.valueUSD, 0);
-        const performance = -5 + Math.random() * 10; // ±5% performance
-        
-        newWalletData[wallet.id] = {
-          assets: walletAssets,
-          performance: performance,
-          performanceHistory: [
-            { value: walletTotalValue * 0.85 },
-            { value: walletTotalValue * 0.92 },
-            { value: walletTotalValue * 0.88 },
-            { value: walletTotalValue * 0.96 },
-            { value: walletTotalValue }
-          ]
-        };
+      // Trigger backend portfolio update
+      const updateResponse = await fetch(`${API_BASE_URL}/portfolio/update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
+      
+      if (!updateResponse.ok) {
+        throw new Error(`Update failed: ${updateResponse.status}`);
+      }
+      
+      // Wait a moment for the update to process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Fetch updated portfolio data
+      const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
+      if (!portfolioResponse.ok) {
+        throw new Error(`Failed to fetch portfolio: ${portfolioResponse.status}`);
+      }
+      
+      const portfolioData = await portfolioResponse.json();
+      
+      // Transform API data to frontend format
+      const updatedAssets = portfolioData.assets.map(asset => ({
+        id: asset.id,
+        name: asset.name,
+        symbol: asset.symbol,
+        balance: asset.balance,
+        priceUSD: asset.price_usd || 0,
+        valueUSD: asset.value_usd || 0,
+        notes: asset.notes || "",
+      }));
+
+      const newTotalValue = portfolioData.total_value;
+      
+      // Generate balance history (simplified - in production you'd fetch from backend)
+      const newBalanceHistory = [
+        { value: newTotalValue * 0.92 },
+        { value: newTotalValue * 0.95 },
+        { value: newTotalValue * 0.88 },
+        { value: newTotalValue * 0.96 },
+        { value: newTotalValue }
+      ];
+      
+      // Fetch individual wallet data
+      const newWalletData = {};
+      for (const wallet of walletAddresses) {
+        try {
+          const walletResponse = await fetch(`${API_BASE_URL}/wallets/${wallet.id}/details`);
+          if (walletResponse.ok) {
+            const walletDetails = await walletResponse.json();
+            const walletAssets = walletDetails.assets.map(asset => ({
+              id: asset.id,
+              name: asset.name,
+              symbol: asset.symbol,
+              balance: asset.balance,
+              priceUSD: asset.price_usd || 0,
+              valueUSD: asset.value_usd || 0,
+              notes: asset.notes || "",
+            }));
+            
+            const walletTotalValue = walletDetails.total_value;
+            
+            newWalletData[wallet.id] = {
+              assets: walletAssets,
+              performance: walletDetails.performance_24h,
+              performanceHistory: [
+                { value: walletTotalValue * 0.92 },
+                { value: walletTotalValue * 0.95 },
+                { value: walletTotalValue * 0.88 },
+                { value: walletTotalValue * 0.96 },
+                { value: walletTotalValue }
+              ]
+            };
+          }
+        } catch (error) {
+          console.error(`Error fetching wallet ${wallet.id} details:`, error);
+        }
+      }
       
       setWalletData(newWalletData);
       localStorage.setItem("walletData", JSON.stringify(newWalletData));
@@ -685,13 +727,14 @@ const App = () => {
       setPortfolioData(prev => ({
         ...prev,
         assets: updatedAssets,
-        balanceHistory: newBalanceHistory
+        balanceHistory: newBalanceHistory,
+        totalValue: newTotalValue
       }));
       
-      console.log('Portfolio updated successfully');
+      console.log('Portfolio updated successfully with real data');
     } catch (error) {
       console.error('Error updating portfolio:', error);
-      alert('Failed to update portfolio. Please try again.');
+      alert(`Failed to update portfolio: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
