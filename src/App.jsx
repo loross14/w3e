@@ -1217,6 +1217,29 @@ const App = () => {
           </div>
         )}
 
+        {/* Editor Exit */}
+        {isEditor && (
+          <div className="mb-6">
+            <ActionCard
+              title="✅ Editor Mode Active"
+              description="You're currently in editor mode. Save your changes and return to viewer mode."
+              buttonText="Save & Exit Editor"
+              onAction={() => {
+                setIsEditor(false);
+                setPassword("");
+                // Show a temporary success message
+                setUpdateStatus("✅ Changes saved! Returned to viewer mode.");
+                setTimeout(() => setUpdateStatus(''), 3000);
+              }}
+              variant="secondary"
+            >
+              <div className="text-sm text-green-400 mt-2">
+                🔧 Editor features enabled: Hide assets, manage wallets, update notes
+              </div>
+            </ActionCard>
+          </div>
+        )}
+
         {/* Editor Access */}
         {!isEditor && (
           <div className="mb-6">
