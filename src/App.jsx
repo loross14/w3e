@@ -65,7 +65,7 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
     unrealized_pnl: asset?.unrealized_pnl || 0,
     total_return_pct: asset?.total_return_pct || 0,
     notes: asset?.notes || '',
-    isNFT: asset?.symbol?.includes('NFT') || asset?.name?.includes('Collection')
+    isNFT: asset?.isNFT === true || asset?.symbol?.includes('NFT') || asset?.name?.includes('Collection')
   };
 
   const safeTotalValue = totalValue || 1; // Avoid division by zero
@@ -1116,7 +1116,7 @@ const App = () => {
           unrealized_pnl: asset.unrealized_pnl || 0,
           total_return_pct: asset.total_return_pct || 0,
           notes: asset.notes || "",
-          isNFT: asset.is_nft || false,
+          isNFT: asset.is_nft === true || asset.symbol?.includes('NFT') || asset.name?.includes('Collection'),
           floorPrice: asset.floor_price || (nftMetadata?.floor_price) || 0,
           imageUrl: asset.image_url || (nftMetadata?.image_url) || null,
           performance24h: asset.price_change_24h || 0
@@ -1849,21 +1849,41 @@ const App = () => {
         </div>
 
         {/* NFT Collections */}
-        {visibleAssets.some(asset => asset.isNFT) && (
+        {(() => {
+          // Enhanced NFT detection - check both is_nft flag and symbol/name patterns
+          const nfts = visibleAssets.filter(asset => {
+            const isMarkedAsNFT = asset.isNFT === true;
+            const hasNFTInSymbol = asset.symbol && asset.symbol.includes('NFT');
+            const hasNFTInName = asset.name && (asset.name.includes('Collection') || asset.name.includes('NFT'));
+            const isNFT = isMarkedAsNFT || hasNFTInSymbol || hasNFTInName;
+            
+            console.log(`🖼️ [NFT DEBUG] Asset ${asset.symbol}: isMarkedAsNFT=${isMarkedAsNFT}, hasNFTInSymbol=${hasNFTInSymbol}, hasNFTInName=${hasNFTInName}, finalIsNFT=${isNFT}`);
+            return isNFT;
+          });
+          
+          console.log("🖼️ [NFT DEBUG] Total NFTs found:", nfts.length, nfts);
+          return nfts.length > 0;
+        })() && (
           <div className="mb-6 sm:mb-8">
             <div className="flex justify-between items-center mb-4 sm:mb-6">
               <h3 className="text-base sm:text-lg font-semibold text-white">🖼️ NFT Collections</h3>
               <span className="text-xs sm:text-sm text-gray-400">
-                {visibleAssets.filter(asset => asset.isNFT).length} collections
+                {visibleAssets.filter(asset => {
+                  const isMarkedAsNFT = asset.isNFT === true;
+                  const hasNFTInSymbol = asset.symbol && asset.symbol.includes('NFT');
+                  const hasNFTInName = asset.name && (asset.name.includes('Collection') || asset.name.includes('NFT'));
+                  return isMarkedAsNFT || hasNFTInSymbol || hasNFTInName;
+                }).length} collections
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {(() => {
-                const nfts = visibleAssets.filter(asset => asset.isNFT);
-                console.log("🖼️ [NFT DEBUG] NFTs found:", nfts.length, nfts);
-                return nfts;
-              })().map((nft) => (
+              {visibleAssets.filter(asset => {
+                const isMarkedAsNFT = asset.isNFT === true;
+                const hasNFTInSymbol = asset.symbol && asset.symbol.includes('NFT');
+                const hasNFTInName = asset.name && (asset.name.includes('Collection') || asset.name.includes('NFT'));
+                return isMarkedAsNFT || hasNFTInSymbol || hasNFTInName;
+              }).map((nft) => (
                   <div
                     key={nft.id}
                     className="bg-gray-900 border border-gray-700 rounded-xl p-4 hover:border-purple-500 cursor-pointer transition-all duration-200"
@@ -1951,7 +1971,14 @@ const App = () => {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {visibleAssets
-                .filter(asset => !asset.isNFT)
+                .filter(asset => {
+                  const isMarkedAsNFT = asset.isNFT === true;
+                  const hasNFTInSymbol = asset.symbol && asset.symbol.includes('NFT');
+                  const hasNFTInName = asset.name && (asset.name.includes('Collection') || asset.name.includes('NFT'));
+                  const isNFT = isMarkedAsNFT || hasNFTInSymbol || hasNFTInName;
+                  console.log(`💰 [TOKENS DEBUG] Asset ${asset.symbol}: isNFT=${isNFT}, will include=${!isNFT}`);
+                  return !isNFT; // Exclude NFTs from regular token section
+                })
                 .map((asset) => (
                   <AssetCard
                     key={asset.id}
