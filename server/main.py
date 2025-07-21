@@ -7,9 +7,10 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
-from alchemy_sdk import Alchemy, Network
+from web3 import Web3
 import sqlite3
 import json
+import requests
 
 app = FastAPI(title="Crypto Fund API", version="1.0.0")
 
@@ -27,8 +28,41 @@ ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
 if not ALCHEMY_API_KEY:
     raise RuntimeError("ALCHEMY_API_KEY environment variable is required")
 
-# Initialize Alchemy for different networks
-alchemy_mainnet = Alchemy(api_key=ALCHEMY_API_KEY, network=Network.ETH_MAINNET)
+# Initialize Web3 with Alchemy endpoint
+ALCHEMY_URL = f"https://eth-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
+w3 = Web3(Web3.HTTPProvider(ALCHEMY_URL))
+
+# ERC-20 ABI for token interactions
+ERC20_ABI = [
+    {
+        "constant": True,
+        "inputs": [],
+        "name": "name",
+        "outputs": [{"name": "", "type": "string"}],
+        "type": "function"
+    },
+    {
+        "constant": True,
+        "inputs": [],
+        "name": "symbol",
+        "outputs": [{"name": "", "type": "string"}],
+        "type": "function"
+    },
+    {
+        "constant": True,
+        "inputs": [],
+        "name": "decimals",
+        "outputs": [{"name": "", "type": "uint8"}],
+        "type": "function"
+    },
+    {
+        "constant": True,
+        "inputs": [{"name": "_owner", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"name": "balance", "type": "uint256"}],
+        "type": "function"
+    }
+]
 
 # Database initialization
 def init_db():
@@ -164,14 +198,14 @@ async def get_token_prices(token_addresses: List[str]) -> Dict[str, float]:
     return price_map
 
 async def get_wallet_assets(wallet_address: str, network: str) -> List[Dict]:
-    """Fetch assets for a wallet using Alchemy"""
+    """Fetch assets for a wallet using Web3 and Alchemy API"""
     assets = []
     
     try:
         if network.upper() == "ETH":
             # Get ETH balance
-            eth_balance = await alchemy_mainnet.core.get_balance(wallet_address, "latest")
-            eth_balance_formatted = float(eth_balance) / 10**18
+            eth_balance_wei = w3.eth.get_balance(wallet_address)
+            eth_balance_formatted = float(eth_balance_wei) / 10**18
             
             if eth_balance_formatted > 0:
                 assets.append({
@@ -183,29 +217,59 @@ async def get_wallet_assets(wallet_address: str, network: str) -> List[Dict]:
                     "decimals": 18
                 })
             
-            # Get ERC-20 token balances
-            token_balances = await alchemy_mainnet.core.get_token_balances(wallet_address)
-            
-            for token_balance in token_balances.token_balances:
-                if int(token_balance.token_balance, 16) > 0:
-                    # Get token metadata
-                    try:
-                        metadata = await alchemy_mainnet.core.get_token_metadata(token_balance.contract_address)
-                        balance_int = int(token_balance.token_balance, 16)
-                        decimals = metadata.decimals or 18
-                        balance_formatted = balance_int / (10 ** decimals)
+            # Get ERC-20 token balances using Alchemy API
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        ALCHEMY_URL,
+                        json={
+                            "id": 1,
+                            "jsonrpc": "2.0",
+                            "method": "alchemy_getTokenBalances",
+                            "params": [wallet_address]
+                        }
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        token_balances = data.get("result", {}).get("tokenBalances", [])
                         
-                        if balance_formatted > 0.001:  # Filter out dust
-                            assets.append({
-                                "token_address": token_balance.contract_address,
-                                "symbol": metadata.symbol or "UNKNOWN",
-                                "name": metadata.name or "Unknown Token",
-                                "balance": balance_formatted,
-                                "balance_formatted": f"{balance_formatted:.6f}",
-                                "decimals": decimals
-                            })
-                    except Exception as e:
-                        print(f"Error getting metadata for {token_balance.contract_address}: {e}")
+                        for token_balance in token_balances:
+                            if token_balance.get("tokenBalance") and int(token_balance["tokenBalance"], 16) > 0:
+                                try:
+                                    contract_address = token_balance["contractAddress"]
+                                    
+                                    # Get token metadata using Alchemy API
+                                    metadata_response = await client.post(
+                                        ALCHEMY_URL,
+                                        json={
+                                            "id": 1,
+                                            "jsonrpc": "2.0",
+                                            "method": "alchemy_getTokenMetadata",
+                                            "params": [contract_address]
+                                        }
+                                    )
+                                    
+                                    if metadata_response.status_code == 200:
+                                        metadata = metadata_response.json().get("result", {})
+                                        balance_int = int(token_balance["tokenBalance"], 16)
+                                        decimals = metadata.get("decimals", 18)
+                                        balance_formatted = balance_int / (10 ** decimals)
+                                        
+                                        if balance_formatted > 0.001:  # Filter out dust
+                                            assets.append({
+                                                "token_address": contract_address,
+                                                "symbol": metadata.get("symbol", "UNKNOWN"),
+                                                "name": metadata.get("name", "Unknown Token"),
+                                                "balance": balance_formatted,
+                                                "balance_formatted": f"{balance_formatted:.6f}",
+                                                "decimals": decimals
+                                            })
+                                except Exception as e:
+                                    print(f"Error getting metadata for {contract_address}: {e}")
+                                    
+            except Exception as e:
+                print(f"Error fetching token balances: {e}")
         
         elif network.upper() == "SOL":
             # For Solana, we would need a different API
