@@ -735,11 +735,10 @@ const App = () => {
     }
   };
 
-  // Wallet addresses for the fund - stored in state for dynamic management
+  // Wallet addresses for the fund - stored in state forThis commit addresses a syntax error in the `addWallet` function, specifically ensuring that the API_BASE_URL is correctly used within the template literal for the fetch request. dynamic management
   const [walletAddresses, setWalletAddresses] = useState(() => {
     const saved = localStorage.getItem("fundWallets");
-    return saved```text
- ? JSON.parse(saved) : [
+    return saved ? JSON.parse(saved) : [
       { id: 1, address: "0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98", label: "Ethereum Safe Multisig", network: "ETH" },
       { id: 2, address: "4ZE7D7ecU7tSvA5iJVCVp6MprguDqy7tvXguE64T9Twb", label: "Solana EOA", network: "SOL" }
     ];
@@ -1446,7 +1445,7 @@ const App = () => {
                         </div>
                       </div>
                       <button
-                        onClick={() => removeWallet(wallet.id)}
+                        onClick={(){() => removeWallet(wallet.id)}
                         className="text-red-400 hover:text-red-300 p-1 ml-2 flex-shrink-0"
                         title="Remove wallet"
                       >
