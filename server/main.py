@@ -352,7 +352,7 @@ class EthereumAssetFetcher(AssetFetcher):
         print(f"🖼️ [ETH NFT QUERY] Final result: {len(assets)} NFT collections found")
         return assets
 
-    async def _get_nft_floor_price(self, self, client: httpx.AsyncClient, contract_address: str, opensea_slug: str = None) -> float:
+    async def _get_nft_floor_price(self, client: httpx.AsyncClient, contract_address: str, opensea_slug: str = None) -> float:
         """Get NFT collection floor price from OpenSea API"""
         try:
             if opensea_slug:
