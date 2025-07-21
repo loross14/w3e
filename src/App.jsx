@@ -636,7 +636,7 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
                       <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()} profit</div>
                     </div>
                   ))}
-                </div>
+                </div>                  
               </div>
 
               {/* Worst Performers */}
@@ -1126,11 +1126,6 @@ const App = () => {
       alert(`Failed to remove wallet: ${error.message}`);
     }
   };
-
-  // API Configuration for Replit environment
-  const API_BASE_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:8000' 
-    : `https://${window.location.hostname}`;
 
   // Status tracking state
   const [updateStatus, setUpdateStatus] = useState('');
