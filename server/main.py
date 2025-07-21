@@ -1605,6 +1605,15 @@ async def get_portfolio():
     """)
     assets_data = cursor.fetchall()
     print(f"🔍 [PORTFOLIO DEBUG] Assets after filtering: {len(assets_data)} assets")
+    
+    # Check for NFTs in the result
+    nft_count = sum(1 for a in assets_data if len(a) > 13 and bool(a[13]))
+    print(f"🖼️ [PORTFOLIO DEBUG] NFTs found in filtered results: {nft_count}")
+    
+    if nft_count > 0:
+        for a in assets_data:
+            if len(a) > 13 and bool(a[13]):
+                print(f"🖼️ [PORTFOLIO DEBUG] Found NFT: {a[1]} - {a[2]} - Floor: ${a[14] if len(a) > 14 else 0} - Image: {a[15] if len(a) > 15 else None}")
 
     if len(assets_data) > 0:
         print(f"🔍 [PORTFOLIO DEBUG] Sample asset: {assets_data[0]}")

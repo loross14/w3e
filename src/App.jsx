@@ -1192,7 +1192,7 @@ const App = () => {
           }
         }
 
-        // Enhanced NFT detection
+        // Enhanced NFT detection - check backend flag first
         const isNFT = asset.is_nft === true || 
                      asset.is_nft === 1 || 
                      asset.symbol?.includes('NFT') || 
@@ -1201,7 +1201,9 @@ const App = () => {
                      (nftMetadata && nftMetadata.token_ids);
 
         if (isNFT) {
-          console.log(`🖼️ [NFT DEBUG] Detected NFT: ${asset.symbol} - ${asset.name} - isNFT flag: ${asset.is_nft}`);
+          console.log(`🖼️ [NFT DEBUG] Detected NFT: ${asset.symbol} - ${asset.name} - Backend isNFT: ${asset.is_nft}`);
+          console.log(`🖼️ [NFT DEBUG] NFT Floor Price: ${asset.floor_price}, Image: ${asset.image_url}`);
+          console.log(`🖼️ [NFT DEBUG] NFT Metadata: ${asset.nft_metadata}`);
         }
 
         const transformed = {
@@ -1223,7 +1225,12 @@ const App = () => {
           performance24h: asset.price_change_24h || 0,
           tokenIds: nftMetadata?.token_ids || []
         };
-        console.log(`✅ [FRONTEND DEBUG] Transformed to:`, transformed);
+        
+        if (isNFT) {
+          console.log(`🖼️ [NFT DEBUG] Final NFT asset:`, transformed);
+        } else {
+          console.log(`✅ [FRONTEND DEBUG] Transformed to:`, transformed);
+        }
         return transformed;
       });
           console.log("🎯 [FRONTEND DEBUG] Final transformed assets:", transformedAssets);
