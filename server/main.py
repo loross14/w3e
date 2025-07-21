@@ -1701,7 +1701,7 @@ async def update_portfolio_data_new():
 
                 print(f"💰 {asset['network']} Asset: {asset['symbol']} - Balance: {asset['balance']:.6f}, Price: ${price_usd:.6f}, Value: ${value_usd:.2f}")
 
-                # Identify spam/scam tokens for auto-hiding (be very specific to avoid hiding legitimate assets)
+                # Identify spam/scam tokens and low-value tokens for auto-hiding
                 is_spam_token = (
                     value_usd == 0 and 
                     asset['balance'] > 0 and 
@@ -1716,12 +1716,23 @@ async def update_portfolio_data_new():
                     )
                 )
 
-                if is_spam_token:
+                # Auto-hide tokens with value less than $1 (excluding NFTs and major tokens)
+                is_low_value_token = (
+                    value_usd > 0 and 
+                    value_usd < 1.0 and 
+                    not is_nft and
+                    asset['symbol'] not in ['ETH', 'BTC', 'SOL', 'USDC', 'USDT', 'WBTC', 'PENDLE']  # Preserve major tokens even if small amounts
+                )
+
+                if is_spam_token or is_low_value_token:
+                    reason = "spam/scam" if is_spam_token else f"low value (${value_usd:.6f})"
                     auto_hide_candidates.append({
                         'token_address': token_address,
                         'symbol': asset['symbol'],
                         'name': asset['name'],
-                        'balance': asset['balance']
+                        'balance': asset['balance'],
+                        'value_usd': value_usd,
+                        'reason': reason
                     })
 
             # Update wallet status with value
@@ -1755,18 +1766,18 @@ async def update_portfolio_data_new():
             cursor.execute("DELETE FROM hidden_assets WHERE LOWER(token_address) = LOWER(?)", (token_address,))
             print(f"🔓 Unhid valuable asset: {symbol} (${cursor.rowcount} rows removed)")
 
-        # Auto-hide only confirmed spam/scam tokens
+        # Auto-hide spam/scam tokens and low-value tokens
         if auto_hide_candidates:
-            print(f"🔍 Auto-hiding {len(auto_hide_candidates)} confirmed spam tokens...")
-            for spam_asset in auto_hide_candidates:
+            print(f"🔍 Auto-hiding {len(auto_hide_candidates)} tokens...")
+            for hide_asset in auto_hide_candidates:
                 try:
                     cursor.execute("""
                         INSERT OR REPLACE INTO hidden_assets (token_address, symbol, name)
                         VALUES (?, ?, ?)
-                    """, (spam_asset['token_address'].lower(), spam_asset['symbol'], spam_asset['name']))
-                    print(f"🙈 Auto-hidden spam: {spam_asset['symbol'] or 'unnamed'}")
+                    """, (hide_asset['token_address'].lower(), hide_asset['symbol'], hide_asset['name']))
+                    print(f"🙈 Auto-hidden {hide_asset['reason']}: {hide_asset['symbol'] or 'unnamed'} (${hide_asset.get('value_usd', 0):.6f})")
                 except sqlite3.Error as e:
-                    print(f"❌ Error auto-hiding asset {spam_asset['symbol']}: {e}")
+                    print(f"❌ Error auto-hiding asset {hide_asset['symbol']}: {e}")
 
         # Record portfolio history
         cursor.execute(
