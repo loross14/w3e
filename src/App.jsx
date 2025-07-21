@@ -1253,6 +1253,12 @@ const App = () => {
 
   const topAssetWeight = topAsset ? ((topAsset.valueUSD / totalValue) * 100).toFixed(1) : 0;
 
+  // Calculate performance vs raised capital
+  const raisedCapital = 138000; // Hardcoded raised capital amount
+  const performanceVsRaised = totalValue > 0 ? ((totalValue - raisedCapital) / raisedCapital * 100) : 0;
+  const performanceSign = performanceVsRaised >= 0 ? "+" : "";
+  const performanceChangeType = performanceVsRaised >= 0 ? "positive" : "negative";
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Mobile-optimized Header */}
@@ -1346,9 +1352,9 @@ const App = () => {
 
           <MetricCard
             title="Performance"
-            value="+5.6%"
-            change="Since inception"
-            changeType="positive"
+            value={`${performanceSign}${performanceVsRaised.toFixed(1)}%`}
+            change={`vs $${raisedCapital.toLocaleString()} raised`}
+            changeType={performanceChangeType}
             icon="#F59E0B"
           />
         </div>
