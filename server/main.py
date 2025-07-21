@@ -206,11 +206,11 @@ class EthereumAssetFetcher(AssetFetcher):
                 print(f"🖼️ [ETH NFT QUERY] Starting NFT query for wallet: {wallet_address}")
                 print(f"🖼️ [ETH NFT QUERY] Alchemy URL: {self.alchemy_url}")
 
-                # Enhanced NFT fetch with metadata
+                # Use the correct Alchemy NFT method
                 nft_query_payload = {
                     "id": 1,
                     "jsonrpc": "2.0",
-                    "method": "alchemy_getNFTsForOwner",
+                    "method": "alchemy_getNFTs",
                     "params": [
                         wallet_address,
                         {
@@ -337,11 +337,17 @@ class EthereumAssetFetcher(AssetFetcher):
                 else:
                     print(f"❌ [ETH NFT QUERY] HTTP Error {nft_response.status_code}")
                     print(f"❌ [ETH NFT QUERY] Response text: {nft_response.text}")
+                    
+                    # If the NFT API fails, continue without NFTs rather than failing completely
+                    if nft_response.status_code == 400:
+                        print(f"⚠️ [ETH NFT QUERY] NFT API not supported, skipping NFT collection...")
+                        return assets
 
         except Exception as e:
             print(f"❌ [ETH NFT QUERY] Exception: {e}")
-            import traceback
-            print(f"📋 [ETH NFT QUERY] Traceback: {traceback.format_exc()}")
+            print(f"⚠️ [ETH NFT QUERY] Continuing without NFTs due to API error")
+            # Don't fail the entire asset fetch if NFTs fail
+            return assets
 
         print(f"🖼️ [ETH NFT QUERY] Final result: {len(assets)} NFT collections found")
         return assets

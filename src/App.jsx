@@ -328,77 +328,97 @@ const PortfolioChart = ({ data }) => {
   return <canvas ref={chartRef} className="w-full h-full" />;
 };
 
-// Wallet Card Component
-const WalletCard = ({ wallet, onClick, walletData }) => {
-  const totalValue = walletData?.assets?.reduce((sum, asset) => sum + asset.valueUSD, 0) || 0;
-  const assetCount = walletData?.assets?.length || 0;
-  const performance = walletData?.performance || 0;
+const WalletCard = ({ wallet, walletData, assets, totalValue, performance }) => {
+    const assetCount = assets ? assets.length : 0;
+    const hasError = walletData?.status === 'error' || walletData?.status === 'timeout';
 
-  // Check if wallet has errors or no data (especially Solana wallets)
-  const isSolanaWallet = wallet.network === 'SOL';
-  const hasError = walletData?.hasError || walletData?.error || (isSolanaWallet && assetCount === 0 && walletData?.status !== 'loading');
+    // Get wallet-specific assets
+    const walletAssets = assets ? assets.filter(asset => {
+      // Map assets to wallets based on token type
+      if (wallet.network === 'SOL') {
+        return asset.id === 'solana' || 
+               asset.id.length > 40 || // Solana addresses are longer
+               asset.symbol.startsWith('SPL-') ||
+               asset.symbol === 'PENGU' ||
+               asset.symbol === 'Fartcoin ' ||
+               asset.name?.includes('pump') ||
+               asset.id.includes('pump');
+      } else if (wallet.network === 'ETH') {
+        return asset.id.startsWith('0x') || asset.id === '0x0000000000000000000000000000000000000000';
+      }
+      return false;
+    }) : [];
 
-  return (
-    <div 
-      className={`bg-gray-900 border rounded-xl p-4 hover:border-gray-600 cursor-pointer transition-all duration-200 ${
-        hasError ? 'border-red-700' : 'border-gray-700'
-      }`}
-      onClick={onClick}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center space-x-3 min-w-0 flex-1">
-          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-            hasError 
-              ? 'bg-gradient-to-r from-red-500 to-red-600' 
-              : 'bg-gradient-to-r from-green-500 to-emerald-500'
-          }`}>
-            <span className="text-white font-bold text-sm">{wallet.network}</span>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center space-x-2">
-              <h3 className="font-medium text-white text-sm sm:text-base truncate">{wallet.label}</h3>
-              {hasError && <span className="text-red-400 text-xs">❌</span>}
+    const walletValue = walletAssets.reduce((sum, asset) => sum + (asset.valueUSD || 0), 0);
+    const walletAssetCount = walletAssets.length;
+
+    return (
+      <div className={`p-3 border rounded-lg ${wallet.network === 'SOL' ? 'border-purple-500/30 bg-purple-900/10' : 'border-blue-500/30 bg-blue-900/10'}`}>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-medium text-white flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${wallet.network === 'SOL' ? 'bg-purple-400' : 'bg-blue-400'}`}></span>
+            {wallet.label}
+          </h3>
+          <span className={`text-xs px-2 py-1 rounded ${wallet.network === 'SOL' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}`}>
+            {wallet.network}
+          </span>
+        </div>
+
+        <div className="text-xs text-gray-400 mb-2 font-mono break-all">
+          {wallet.address.slice(0, 8)}...{wallet.address.slice(-8)}
+        </div>
+
+        {hasError ? (
+          <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
+            <div className="text-red-400 text-xs font-medium mb-1">⚠️ {wallet.network} Fetch Error</div>
+            <div className="text-red-300 text-xs">
+              {walletData?.errorMessage || `Unable to fetch ${wallet.network} data. This could be due to API limits, network issues, or wallet address format problems.`}
             </div>
-            <p className="text-xs sm:text-sm text-gray-400 font-mono truncate">{wallet.address}</p>
+            <div className="text-red-400 text-xs mt-1">
+              💡 Try updating the portfolio again or check if the {wallet.network} address is valid.
+            </div>
           </div>
-        </div>
-        <div className="text-right">
-          <div className="text-xs text-gray-400">Network</div>
-          <div className="text-sm font-medium text-white">{wallet.network}</div>
-        </div>
-      </div>
+        ) : (
+          <div>
+            <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm mb-2">
+              <div>
+                <span className="text-gray-400 block">Total Value</span>
+                <span className="text-white font-mono">${walletValue.toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-gray-400 block">Assets</span>
+                <span className="text-white font-mono">{walletAssetCount}</span>
+              </div>
+              <div>
+                <span className="text-gray-400 block">24h Change</span>
+                <span className={`font-mono ${performance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {performance >= 0 ? '+' : ''}{performance.toFixed(2)}%
+                </span>
+              </div>
+            </div>
 
-      {hasError ? (
-        <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
-          <div className="text-red-400 text-xs font-medium mb-1">⚠️ Solana Fetch Error</div>
-          <div className="text-red-300 text-xs">
-            {walletData?.errorMessage || 'Unable to fetch Solana data. This could be due to API limits, network issues, or wallet address format problems.'}
+            {/* Show top assets for this wallet */}
+            {walletAssets.length > 0 && (
+              <div className="border-t border-gray-700/50 pt-2">
+                <div className="text-xs text-gray-400 mb-1">Top Assets:</div>
+                {walletAssets
+                  .filter(asset => asset.valueUSD > 0)
+                  .sort((a, b) => b.valueUSD - a.valueUSD)
+                  .slice(0, 3)
+                  .map(asset => (
+                    <div key={asset.id} className="flex justify-between text-xs py-1">
+                      <span className="text-gray-300 truncate max-w-[120px]">{asset.symbol}</span>
+                      <span className="text-white font-mono">${asset.valueUSD.toLocaleString()}</span>
+                    </div>
+                  ))
+                }
+              </div>
+            )}
           </div>
-          <div className="text-red-400 text-xs mt-1">
-            💡 Try updating the portfolio again or check if the Solana address is valid.
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm">
-          <div>
-            <span className="text-gray-400 block">Total Value</span>
-            <span className="text-white font-mono">${totalValue.toLocaleString()}</span>
-          </div>
-          <div>
-            <span className="text-gray-400 block">Assets</span>
-            <span className="text-white font-mono">{assetCount}</span>
-          </div>
-          <div>
-            <span className="text-gray-400 block">24h Change</span>
-            <span className={`font-mono ${performance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {performance >= 0 ? '+' : ''}{performance.toFixed(2)}%
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+        )}
+      </div>
+    );
+  };
 
 // Wallet Details Modal
 const WalletModal = ({ wallet, onClose, walletData, portfolioData }) => {
@@ -1026,7 +1046,7 @@ const App = () => {
 
     try {
       addDebugInfo(`Adding wallet: ${newWalletLabel} (${newWalletNetwork})`);
-      
+
       const response = await fetch(`${API_BASE_URL}/wallets`, {
         method: 'POST',
         headers: {
@@ -1065,7 +1085,7 @@ const App = () => {
       setNewWalletNetwork("ETH");
 
       addDebugInfo(`✅ Wallet "${newWallet.label}" added successfully`);
-      
+
       // Show success message
       setUpdateStatus(`✅ Added wallet: ${newWallet.label}`);
       setTimeout(() => setUpdateStatus(''), 3000);
@@ -1310,7 +1330,7 @@ const App = () => {
                     network: wallet.network
                   }),
                 });
-                
+
                 if (response.ok) {
                   const newWallet = await response.json();
                   addDebugInfo(`✅ Synced wallet to backend: ${wallet.label}`);
@@ -1328,7 +1348,7 @@ const App = () => {
             // Wait for all syncs to complete
             const syncedWallets = await Promise.all(syncPromises);
             const successfulWallets = syncedWallets.filter(w => w !== null);
-            
+
             if (successfulWallets.length > 0) {
               setWalletAddresses(successfulWallets);
               localStorage.setItem("fundWallets", JSON.stringify(successfulWallets));
@@ -2083,8 +2103,6 @@ const App = () => {
           </div>
         </div>
 
-
-
         {/* Current Positions Grid - Mobile responsive */}
         <div className="mb-6 sm:mb-8">
           <div className="flex justify-between items-center mb-4 sm:mb-6">
@@ -2172,6 +2190,9 @@ const App = () => {
                     wallet={wallet}
                     onClick={() => setSelectedWallet(wallet)}
                     walletData={walletData[wallet.id] || { assets: [], performance: 0, hasError }}
+                    assets={portfolioData.assets}
+                    totalValue={portfolioData.totalValue}
+                    performance={portfolioData.performance24h || 0}
                   />
                 );
               })}
@@ -2208,8 +2229,6 @@ const App = () => {
             </div>
           </div>
         )}
-
-
       </div>
 
       {/* Asset Modal */}
