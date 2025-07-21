@@ -16,7 +16,12 @@ const MetricCard = ({ title, value, change, changeType = "positive", icon, child
         {value}
       </p>
       {change && (
-        <p className={`text-xs sm:text-sm ${changeType === "positive" ? "text-green-400" : "text-red-400"} mt-1`}>
+        <p className={`text-xs sm:text-sm ${
+          changeType === "positive" ? "text-green-400" : 
+          changeType === "negative" ? "text-red-400" : 
+          changeType === "white" ? "text-white" : 
+          "text-gray-400"
+        } mt-1`}>
           {change}
         </p>
       )}
@@ -1538,7 +1543,7 @@ const App = () => {
             title="Assets"
             value={visibleAssets.length}
             change="Active positions"
-            changeType="neutral"
+            changeType="white"
             icon="#3B82F6"
           />
 
@@ -1546,7 +1551,7 @@ const App = () => {
             title="Top Asset"
             value={topAsset?.symbol || "N/A"}
             change={`${topAssetWeight}% of portfolio`}
-            changeType="neutral"
+            changeType="white"
             icon="#8B5CF6"
           />
 
