@@ -1,7 +1,8 @@
+
 import os
 import asyncio
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Protocol
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -10,6 +11,7 @@ from web3 import Web3
 import sqlite3
 import json
 import requests
+from abc import ABC, abstractmethod
 
 app = FastAPI(title="Crypto Fund API", version="1.0.0")
 
@@ -26,10 +28,6 @@ app.add_middleware(
 ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
 if not ALCHEMY_API_KEY:
     raise RuntimeError("ALCHEMY_API_KEY environment variable is required")
-
-# Initialize Web3 with Alchemy endpoint
-ALCHEMY_URL = f"https://eth-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
-w3 = Web3(Web3.HTTPProvider(ALCHEMY_URL))
 
 # ERC-20 ABI for token interactions
 ERC20_ABI = [
@@ -62,6 +60,503 @@ ERC20_ABI = [
         "type": "function"
     }
 ]
+
+# Chain-agnostic asset interface
+class AssetData:
+    def __init__(self, token_address: str, symbol: str, name: str, balance: float, 
+                 balance_formatted: str, decimals: int, is_nft: bool = False, 
+                 token_ids: List[str] = None):
+        self.token_address = token_address
+        self.symbol = symbol
+        self.name = name
+        self.balance = balance
+        self.balance_formatted = balance_formatted
+        self.decimals = decimals
+        self.is_nft = is_nft
+        self.token_ids = token_ids or []
+
+# Abstract base classes for chain-specific implementations
+class AssetFetcher(ABC):
+    @abstractmethod
+    async def fetch_assets(self, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
+        pass
+
+class PriceFetcher(ABC):
+    @abstractmethod
+    async def fetch_prices(self, token_addresses: List[str]) -> Dict[str, float]:
+        pass
+
+# Ethereum-specific implementations
+class EthereumAssetFetcher(AssetFetcher):
+    def __init__(self, alchemy_api_key: str):
+        self.alchemy_url = f"https://eth-mainnet.g.alchemy.com/v2/{alchemy_api_key}"
+        self.w3 = Web3(Web3.HTTPProvider(self.alchemy_url))
+    
+    async def fetch_assets(self, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
+        assets = []
+        
+        try:
+            # Get ETH balance
+            eth_token_address = "0x0000000000000000000000000000000000000000"
+            if eth_token_address not in hidden_addresses:
+                eth_balance_wei = self.w3.eth.get_balance(wallet_address)
+                eth_balance_formatted = float(eth_balance_wei) / 10**18
+
+                if eth_balance_formatted > 0:
+                    assets.append(AssetData(
+                        token_address=eth_token_address,
+                        symbol="ETH",
+                        name="Ethereum",
+                        balance=eth_balance_formatted,
+                        balance_formatted=f"{eth_balance_formatted:.6f}",
+                        decimals=18
+                    ))
+
+            # Get ERC-20 tokens
+            assets.extend(await self._fetch_erc20_tokens(wallet_address, hidden_addresses))
+            
+            # Get NFTs
+            assets.extend(await self._fetch_nfts(wallet_address, hidden_addresses))
+            
+        except Exception as e:
+            print(f"❌ Ethereum asset fetching error: {e}")
+            
+        return assets
+    
+    async def _fetch_erc20_tokens(self, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
+        assets = []
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    self.alchemy_url,
+                    json={
+                        "id": 1,
+                        "jsonrpc": "2.0",
+                        "method": "alchemy_getTokenBalances",
+                        "params": [wallet_address]
+                    }
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    token_balances = data.get("result", {}).get("tokenBalances", [])
+
+                    for token_balance in token_balances:
+                        if token_balance.get("tokenBalance") and int(token_balance["tokenBalance"], 16) > 0:
+                            try:
+                                contract_address = token_balance["contractAddress"].lower()
+
+                                if contract_address in hidden_addresses:
+                                    continue
+
+                                # Get token metadata
+                                metadata_response = await client.post(
+                                    self.alchemy_url,
+                                    json={
+                                        "id": 1,
+                                        "jsonrpc": "2.0",
+                                        "method": "alchemy_getTokenMetadata",
+                                        "params": [contract_address]
+                                    }
+                                )
+
+                                if metadata_response.status_code == 200:
+                                    metadata = metadata_response.json().get("result", {})
+                                    balance_int = int(token_balance["tokenBalance"], 16)
+                                    decimals = metadata.get("decimals", 18)
+                                    balance_formatted = balance_int / (10 ** decimals)
+
+                                    if balance_formatted > 0.001:  # Filter out dust
+                                        assets.append(AssetData(
+                                            token_address=contract_address,
+                                            symbol=metadata.get("symbol", "UNKNOWN"),
+                                            name=metadata.get("name", "Unknown Token"),
+                                            balance=balance_formatted,
+                                            balance_formatted=f"{balance_formatted:.6f}",
+                                            decimals=decimals
+                                        ))
+                            except Exception as e:
+                                print(f"❌ Error processing Ethereum token {contract_address}: {e}")
+        except Exception as e:
+            print(f"❌ Error fetching Ethereum ERC-20 tokens: {e}")
+            
+        return assets
+    
+    async def _fetch_nfts(self, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
+        assets = []
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                nft_response = await client.post(
+                    self.alchemy_url,
+                    json={
+                        "id": 1,
+                        "jsonrpc": "2.0",
+                        "method": "alchemy_getNFTsForOwner",
+                        "params": [wallet_address]
+                    }
+                )
+
+                if nft_response.status_code == 200:
+                    nft_data = nft_response.json()
+                    owned_nfts = nft_data.get("result", {}).get("ownedNfts", [])
+
+                    # Group NFTs by collection
+                    nft_collections = {}
+                    for nft in owned_nfts:
+                        contract_address = nft.get("contract", {}).get("address", "").lower()
+
+                        if contract_address in hidden_addresses:
+                            continue
+
+                        collection_name = nft.get("contract", {}).get("name", "Unknown NFT Collection")
+                        collection_symbol = nft.get("contract", {}).get("symbol", "NFT")
+
+                        if contract_address not in nft_collections:
+                            nft_collections[contract_address] = {
+                                "name": collection_name,
+                                "symbol": collection_symbol,
+                                "count": 0,
+                                "token_ids": []
+                            }
+
+                        nft_collections[contract_address]["count"] += 1
+                        token_id = nft.get("tokenId", "")
+                        if token_id:
+                            nft_collections[contract_address]["token_ids"].append(token_id)
+
+                    # Add NFT collections as assets
+                    for contract_address, collection_data in nft_collections.items():
+                        assets.append(AssetData(
+                            token_address=contract_address,
+                            symbol=f"{collection_data['symbol']} NFT",
+                            name=f"{collection_data['name']} (Collection)",
+                            balance=collection_data["count"],
+                            balance_formatted=f"{collection_data['count']} NFTs",
+                            decimals=0,
+                            is_nft=True,
+                            token_ids=collection_data["token_ids"][:10]
+                        ))
+                        print(f"✅ Found {collection_data['count']} NFTs from {collection_data['name']}")
+
+        except Exception as e:
+            print(f"❌ Error fetching Ethereum NFTs: {e}")
+            
+        return assets
+
+class EthereumPriceFetcher(PriceFetcher):
+    def __init__(self):
+        self.known_tokens = {
+            "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": {"symbol": "WBTC", "coingecko_id": "wrapped-bitcoin"},
+            "0x808507121b80c02388fad14726482e061b8da827": {"symbol": "PENDLE", "coingecko_id": "pendle"},
+            "0xa0b73e1ff0b80914ab6fe136c72b47cb5ed05b81": {"symbol": "USDC", "coingecko_id": "usd-coin"},
+            "0xdac17f958d2ee523a2206206994597c13d831ec7": {"symbol": "USDT", "coingecko_id": "tether"},
+            "0x6b175474e89094c44da98b954eedeac495271d0f": {"symbol": "DAI", "coingecko_id": "dai"},
+            "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984": {"symbol": "UNI", "coingecko_id": "uniswap"},
+        }
+    
+    async def fetch_prices(self, token_addresses: List[str]) -> Dict[str, float]:
+        price_map = {}
+        eth_address = "0x0000000000000000000000000000000000000000"
+        
+        print(f"💵 Fetching Ethereum prices for {len(token_addresses)} tokens...")
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Get ETH price first
+                response = await client.get(
+                    "https://api.coingecko.com/api/v3/simple/price",
+                    params={"ids": "ethereum", "vs_currencies": "usd"}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    eth_price = data.get("ethereum", {}).get("usd", 0)
+                    price_map[eth_address] = eth_price
+                    print(f"✅ ETH price: ${eth_price}")
+
+                # Process contract addresses
+                contract_addresses = [addr for addr in token_addresses if addr != eth_address]
+                known_ids = []
+                address_to_id = {}
+
+                for addr in contract_addresses:
+                    addr_lower = addr.lower()
+                    if addr_lower in self.known_tokens:
+                        coingecko_id = self.known_tokens[addr_lower]["coingecko_id"]
+                        known_ids.append(coingecko_id)
+                        address_to_id[coingecko_id] = addr_lower
+                        print(f"✅ Found known Ethereum token: {self.known_tokens[addr_lower]['symbol']} -> {coingecko_id}")
+
+                # Fetch known token prices
+                if known_ids:
+                    response = await client.get(
+                        "https://api.coingecko.com/api/v3/simple/price",
+                        params={"ids": ",".join(known_ids), "vs_currencies": "usd"}
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        for coingecko_id, price_data in data.items():
+                            if isinstance(price_data, dict) and "usd" in price_data:
+                                addr = address_to_id.get(coingecko_id)
+                                if addr:
+                                    price_map[addr] = price_data["usd"]
+                                    original_addr = next((a for a in contract_addresses if a.lower() == addr), addr)
+                                    price_map[original_addr] = price_data["usd"]
+                                    print(f"✅ Got Ethereum price: {addr} = ${price_data['usd']}")
+
+                # Try CoinGecko contract API for remaining tokens
+                remaining_addresses = [addr for addr in contract_addresses if addr.lower() not in price_map and addr not in price_map]
+                if remaining_addresses:
+                    response = await client.get(
+                        "https://api.coingecko.com/api/v3/simple/token_price/ethereum",
+                        params={"contract_addresses": ",".join(remaining_addresses[:30]), "vs_currencies": "usd"}
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        for addr, price_data in data.items():
+                            if isinstance(price_data, dict) and "usd" in price_data:
+                                price_map[addr.lower()] = price_data["usd"]
+                                price_map[addr] = price_data["usd"]
+                                print(f"✅ Got Ethereum contract API price: {addr} = ${price_data['usd']}")
+
+        except Exception as e:
+            print(f"❌ Error fetching Ethereum prices: {e}")
+            
+        return price_map
+
+# Solana-specific implementations
+class SolanaAssetFetcher(AssetFetcher):
+    def __init__(self, alchemy_api_key: str):
+        self.solana_url = f"https://solana-mainnet.g.alchemy.com/v2/{alchemy_api_key}"
+        self.known_tokens = {
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {"symbol": "USDC", "name": "USD Coin"},
+            "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": {"symbol": "USDT", "name": "Tether USD"},
+            "So11111111111111111111111111111111111111112": {"symbol": "WSOL", "name": "Wrapped SOL"},
+        }
+    
+    async def fetch_assets(self, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
+        assets = []
+        
+        print(f"🔍 Fetching Solana assets for wallet: {wallet_address}")
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Get SOL balance
+                if "solana" not in hidden_addresses:
+                    sol_asset = await self._fetch_sol_balance(client, wallet_address)
+                    if sol_asset:
+                        assets.append(sol_asset)
+                
+                # Get SPL tokens
+                spl_assets = await self._fetch_spl_tokens(client, wallet_address, hidden_addresses)
+                assets.extend(spl_assets)
+                
+        except Exception as e:
+            print(f"❌ Solana asset fetching error: {e}")
+            
+        return assets
+    
+    async def _fetch_sol_balance(self, client: httpx.AsyncClient, wallet_address: str) -> Optional[AssetData]:
+        try:
+            print(f"📊 Fetching SOL balance...")
+            response = await client.post(
+                self.solana_url,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "getBalance",
+                    "params": [wallet_address]
+                }
+            )
+
+            print(f"🌐 SOL balance response status: {response.status_code}")
+            if response.status_code == 200:
+                data = response.json()
+                print(f"📈 SOL balance response: {data}")
+                
+                if "result" in data and "value" in data["result"]:
+                    sol_balance_lamports = data["result"]["value"]
+                    sol_balance = sol_balance_lamports / 1_000_000_000  # Convert lamports to SOL
+                    print(f"💰 SOL balance: {sol_balance} SOL ({sol_balance_lamports} lamports)")
+
+                    if sol_balance > 0:
+                        return AssetData(
+                            token_address="solana",
+                            symbol="SOL",
+                            name="Solana",
+                            balance=sol_balance,
+                            balance_formatted=f"{sol_balance:.6f}",
+                            decimals=9
+                        )
+                else:
+                    print(f"❌ Unexpected SOL balance response format: {data}")
+            else:
+                print(f"❌ SOL balance request failed: {response.text}")
+                
+        except Exception as e:
+            print(f"❌ Error fetching SOL balance: {e}")
+            
+        return None
+    
+    async def _fetch_spl_tokens(self, client: httpx.AsyncClient, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
+        assets = []
+        
+        try:
+            print(f"🪙 Fetching SPL token accounts...")
+            response = await client.post(
+                self.solana_url,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "getTokenAccountsByOwner",
+                    "params": [
+                        wallet_address,
+                        {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
+                        {"encoding": "jsonParsed"}
+                    ]
+                }
+            )
+
+            print(f"🌐 SPL tokens response status: {response.status_code}")
+            if response.status_code == 200:
+                data = response.json()
+                print(f"📊 SPL tokens found: {len(data.get('result', {}).get('value', []))} accounts")
+                
+                if "result" in data and "value" in data["result"]:
+                    token_accounts = data["result"]["value"]
+
+                    for i, token_account in enumerate(token_accounts):
+                        try:
+                            token_info = token_account["account"]["data"]["parsed"]["info"]
+                            token_amount = token_info.get("tokenAmount", {})
+                            mint_address = token_info.get("mint", "")
+
+                            # Skip if this token is hidden
+                            if mint_address.lower() in hidden_addresses:
+                                continue
+
+                            balance = float(token_amount.get("uiAmount", 0))
+                            decimals = token_amount.get("decimals", 0)
+
+                            if balance > 0.001:  # Filter out dust
+                                # Get token metadata
+                                symbol = mint_address[:6] + "..."  # Fallback
+                                name = f"SPL Token {mint_address[:8]}..."
+
+                                if mint_address in self.known_tokens:
+                                    symbol = self.known_tokens[mint_address]["symbol"]
+                                    name = self.known_tokens[mint_address]["name"]
+
+                                assets.append(AssetData(
+                                    token_address=mint_address,
+                                    symbol=symbol,
+                                    name=name,
+                                    balance=balance,
+                                    balance_formatted=f"{balance:.6f}",
+                                    decimals=decimals
+                                ))
+                                print(f"✅ Added Solana token: {symbol} - {balance:.6f} ({mint_address})")
+
+                        except Exception as e:
+                            print(f"❌ Error processing Solana token account {i+1}: {e}")
+                else:
+                    print(f"❌ Unexpected SPL tokens response format: {data}")
+            else:
+                print(f"❌ SPL tokens request failed: {response.text}")
+
+        except Exception as e:
+            print(f"❌ Error fetching Solana SPL tokens: {e}")
+            
+        return assets
+
+class SolanaPriceFetcher(PriceFetcher):
+    def __init__(self):
+        self.known_tokens = {
+            "epjfwdd5aufqssqem2qn1xzybapC8g4wegghkzwytdt1v": {"symbol": "USDC", "coingecko_id": "usd-coin"},
+            "es9vmfrzacermjfrf4h2fyd4kconky11mce8benwnyb": {"symbol": "USDT", "coingecko_id": "tether"},
+            "so11111111111111111111111111111111111111112": {"symbol": "WSOL", "coingecko_id": "wrapped-solana"},
+        }
+    
+    async def fetch_prices(self, token_addresses: List[str]) -> Dict[str, float]:
+        price_map = {}
+        
+        print(f"💵 Fetching Solana prices for {len(token_addresses)} tokens...")
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Get SOL price first
+                response = await client.get(
+                    "https://api.coingecko.com/api/v3/simple/price",
+                    params={"ids": "solana", "vs_currencies": "usd"}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    sol_price = data.get("solana", {}).get("usd", 0)
+                    price_map["solana"] = sol_price
+                    print(f"✅ SOL price: ${sol_price}")
+
+                # Process mint addresses
+                mint_addresses = [addr for addr in token_addresses if addr != "solana"]
+                known_ids = []
+                address_to_id = {}
+
+                for addr in mint_addresses:
+                    addr_lower = addr.lower()
+                    if addr_lower in self.known_tokens:
+                        coingecko_id = self.known_tokens[addr_lower]["coingecko_id"]
+                        known_ids.append(coingecko_id)
+                        address_to_id[coingecko_id] = addr_lower
+                        print(f"✅ Found known Solana token: {self.known_tokens[addr_lower]['symbol']} -> {coingecko_id}")
+
+                # Fetch known token prices
+                if known_ids:
+                    response = await client.get(
+                        "https://api.coingecko.com/api/v3/simple/price",
+                        params={"ids": ",".join(known_ids), "vs_currencies": "usd"}
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        for coingecko_id, price_data in data.items():
+                            if isinstance(price_data, dict) and "usd" in price_data:
+                                addr = address_to_id.get(coingecko_id)
+                                if addr:
+                                    price_map[addr] = price_data["usd"]
+                                    original_addr = next((a for a in mint_addresses if a.lower() == addr), addr)
+                                    price_map[original_addr] = price_data["usd"]
+                                    print(f"✅ Got Solana price: {addr} = ${price_data['usd']}")
+
+                # Set fallback prices for unknown Solana tokens
+                for addr in mint_addresses:
+                    if addr.lower() not in price_map and addr not in price_map:
+                        price_map[addr.lower()] = 0
+                        price_map[addr] = 0
+                        print(f"❌ No price found for Solana token: {addr}")
+
+        except Exception as e:
+            print(f"❌ Error fetching Solana prices: {e}")
+            
+        return price_map
+
+# Chain factory
+class ChainFactory:
+    @staticmethod
+    def create_asset_fetcher(network: str, alchemy_api_key: str) -> AssetFetcher:
+        if network.upper() == "ETH":
+            return EthereumAssetFetcher(alchemy_api_key)
+        elif network.upper() == "SOL":
+            return SolanaAssetFetcher(alchemy_api_key)
+        else:
+            raise ValueError(f"Unsupported network: {network}")
+    
+    @staticmethod
+    def create_price_fetcher(network: str) -> PriceFetcher:
+        if network.upper() == "ETH":
+            return EthereumPriceFetcher()
+        elif network.upper() == "SOL":
+            return SolanaPriceFetcher()
+        else:
+            raise ValueError(f"Unsupported network: {network}")
 
 # Database initialization
 def init_db():
@@ -100,12 +595,12 @@ def init_db():
     try:
         cursor.execute('ALTER TABLE assets ADD COLUMN is_nft BOOLEAN DEFAULT FALSE')
     except sqlite3.OperationalError:
-        pass  # Column already exists
+        pass
 
     try:
         cursor.execute('ALTER TABLE assets ADD COLUMN nft_metadata TEXT')
     except sqlite3.OperationalError:
-        pass  # Column already exists
+        pass
 
     # Portfolio history table
     cursor.execute('''
@@ -153,7 +648,7 @@ class WalletResponse(BaseModel):
     network: str
 
 class AssetResponse(BaseModel):
-    id: str  # Changed from int to str to handle token addresses
+    id: str
     symbol: str
     name: str
     balance: float
@@ -174,458 +669,57 @@ class WalletDetailsResponse(BaseModel):
     total_value: float
     performance_24h: float
 
-# Utility functions
-async def get_token_prices(token_addresses: List[str]) -> Dict[str, float]:
-    """Get token prices from multiple sources with fallbacks and known token mappings"""
-    if not token_addresses:
-        return {}
-
-    eth_address = "0x0000000000000000000000000000000000000000"
-    price_map = {}
+# New chain-agnostic asset fetching function
+async def get_wallet_assets_new(wallet_address: str, network: str) -> List[AssetData]:
+    """New chain-agnostic asset fetching using dedicated fetchers"""
     
-    print(f"💵 Fetching prices for {len(token_addresses)} tokens...")
-    print(f"📋 Token addresses: {token_addresses}")
-
-    # Known token price mappings (updated with current market prices)
-    known_tokens = {
-        # Ethereum tokens
-        "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": {"symbol": "WBTC", "coingecko_id": "wrapped-bitcoin"},  # WBTC
-        "0x808507121b80c02388fad14726482e061b8da827": {"symbol": "PENDLE", "coingecko_id": "pendle"},  # PENDLE
-        "0xa0b86a33e6776dbf0c73809f0c7d6c0d5c0b9c5c1": {"symbol": "USDC", "coingecko_id": "usd-coin"},  # USDC (fix)
-        "0xa0b73e1ff0b80914ab6fe136c72b47cb5ed05b81": {"symbol": "USDC", "coingecko_id": "usd-coin"},  # USDC (real)
-        "0xdac17f958d2ee523a2206206994597c13d831ec7": {"symbol": "USDT", "coingecko_id": "tether"},  # USDT
-        "0x6b175474e89094c44da98b954eedeac495271d0f": {"symbol": "DAI", "coingecko_id": "dai"},  # DAI
-        "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984": {"symbol": "UNI", "coingecko_id": "uniswap"},  # UNI
-        "0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0": {"symbol": "MATIC", "coingecko_id": "matic-network"},  # MATIC
-        # Solana tokens (case-insensitive)
-        "epjfwdd5aufqssqem2qn1xzybapC8g4wegghkzwytdt1v": {"symbol": "USDC", "coingecko_id": "usd-coin"},  # Solana USDC
-        "es9vmfrzacermjfrf4h2fyd4kconky11mCce8benwnyb": {"symbol": "USDT", "coingecko_id": "tether"},  # Solana USDT
-        "so11111111111111111111111111111111111111112": {"symbol": "WSOL", "coingecko_id": "wrapped-solana"},  # Wrapped SOL
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # Get ETH and SOL prices first
-            print(f"🌐 Fetching ETH and SOL base prices...")
-            response = await client.get(
-                "https://api.coingecko.com/api/v3/simple/price",
-                params={"ids": "ethereum,solana", "vs_currencies": "usd"}
-            )
-            if response.status_code == 200:
-                data = response.json()
-                eth_price = data.get("ethereum", {}).get("usd", 0)
-                sol_price = data.get("solana", {}).get("usd", 0)
-                price_map[eth_address] = eth_price
-                price_map["solana"] = sol_price
-                print(f"✅ ETH price: ${eth_price}")
-                print(f"✅ SOL price: ${sol_price}")
-            else:
-                print(f"❌ Failed to fetch ETH/SOL prices: {response.status_code}")
-
-            # Process all token addresses with case-insensitive matching
-            contract_addresses = [addr for addr in token_addresses if addr != eth_address and addr != "solana"]
-            known_ids = []
-            address_to_id = {}
-
-            print(f"🔍 Processing {len(contract_addresses)} contract addresses...")
-            
-            for addr in contract_addresses:
-                addr_lower = addr.lower()
-                print(f"🔍 Checking address: {addr} (lowercase: {addr_lower})")
-                
-                # Check if this address is in our known tokens (case-insensitive)
-                matched_known_token = None
-                for known_addr, token_info in known_tokens.items():
-                    if known_addr.lower() == addr_lower:
-                        matched_known_token = token_info
-                        break
-                
-                if matched_known_token:
-                    coingecko_id = matched_known_token["coingecko_id"]
-                    known_ids.append(coingecko_id)
-                    address_to_id[coingecko_id] = addr_lower
-                    print(f"✅ Found known token: {matched_known_token['symbol']} -> {coingecko_id}")
-
-            # Fetch known token prices
-            if known_ids:
-                print(f"💰 Fetching prices for {len(known_ids)} known tokens: {known_ids}")
-                try:
-                    response = await client.get(
-                        "https://api.coingecko.com/api/v3/simple/price",
-                        params={
-                            "ids": ",".join(known_ids),
-                            "vs_currencies": "usd"
-                        }
-                    )
-                    if response.status_code == 200:
-                        data = response.json()
-                        print(f"📊 CoinGecko known tokens response: {data}")
-                        for coingecko_id, price_data in data.items():
-                            if isinstance(price_data, dict) and "usd" in price_data:
-                                addr = address_to_id.get(coingecko_id)
-                                if addr:
-                                    price_map[addr] = price_data["usd"]
-                                    # Also store with original casing for lookup
-                                    original_addr = next((a for a in contract_addresses if a.lower() == addr), addr)
-                                    price_map[original_addr] = price_data["usd"]
-                                    symbol = next((info["symbol"] for info in known_tokens.values() if info["coingecko_id"] == coingecko_id), "Unknown")
-                                    print(f"✅ Got price for {symbol} ({addr}): ${price_data['usd']}")
-                    else:
-                        print(f"❌ Failed to fetch known token prices: {response.status_code} - {response.text}")
-                except Exception as e:
-                    print(f"❌ Error fetching known token prices: {e}")
-
-            # Try CoinGecko contract address API for remaining Ethereum tokens
-            remaining_addresses = [addr for addr in contract_addresses if addr.lower() not in price_map and not addr.startswith("So1") and not addr.startswith("EP") and not addr.startswith("Es9")]
-            if remaining_addresses:
-                print(f"🔗 Trying CoinGecko contract API for {len(remaining_addresses)} remaining tokens...")
-                try:
-                    response = await client.get(
-                        "https://api.coingecko.com/api/v3/simple/token_price/ethereum",
-                        params={
-                            "contract_addresses": ",".join(remaining_addresses[:30]),  # Limit batch size
-                            "vs_currencies": "usd"
-                        }
-                    )
-                    if response.status_code == 200:
-                        data = response.json()
-                        print(f"📊 CoinGecko contract API response: {data}")
-                        for addr, price_data in data.items():
-                            if isinstance(price_data, dict) and "usd" in price_data:
-                                price_map[addr.lower()] = price_data["usd"]
-                                price_map[addr] = price_data["usd"]  # Store with original casing too
-                                print(f"✅ Got price from contract API: {addr} = ${price_data['usd']}")
-                    else:
-                        print(f"❌ CoinGecko contract API failed: {response.status_code} - {response.text}")
-                except Exception as e:
-                    print(f"❌ CoinGecko contract API error: {e}")
-
-            # Set fallback prices for tokens that still don't have prices
-            all_missing = [addr for addr in contract_addresses if addr.lower() not in price_map and addr not in price_map]
-            if all_missing:
-                print(f"⚠️ Setting fallback prices for {len(all_missing)} missing tokens...")
-                for addr in all_missing:
-                    addr_lower = addr.lower()
-                    # Try to set reasonable fallback based on known tokens
-                    fallback_set = False
-                    for known_addr, token_info in known_tokens.items():
-                        if known_addr.lower() == addr_lower:
-                            symbol = token_info["symbol"]
-                            # Set some reasonable fallback prices
-                            fallback_prices = {
-                                "WBTC": 95000.0,
-                                "PENDLE": 5.50,
-                                "USDC": 1.0,
-                                "USDT": 1.0,
-                                "DAI": 1.0,
-                                "WSOL": sol_price if sol_price > 0 else 200.0
-                            }
-                            fallback_price = fallback_prices.get(symbol, 0)
-                            if fallback_price > 0:
-                                price_map[addr_lower] = fallback_price
-                                price_map[addr] = fallback_price
-                                print(f"⚠️ Using fallback price for {symbol}: ${fallback_price}")
-                                fallback_set = True
-                            break
-                    
-                    if not fallback_set:
-                        price_map[addr_lower] = 0
-                        price_map[addr] = 0
-                        print(f"❌ No price found for {addr}")
-
-    except Exception as e:
-        print(f"❌ Error fetching prices: {e}")
-        import traceback
-        print(f"📋 Price fetching traceback: {traceback.format_exc()}")
-
-    print(f"💵 Final price map contains {len(price_map)} entries:")
-    for addr, price in price_map.items():
-        print(f"  {addr}: ${price}")
-    
-    return price_map
-
-async def get_wallet_assets(wallet_address: str, network: str) -> List[Dict]:
-    """Fetch assets for a wallet using Web3, Alchemy API, and Solana RPC"""
-    assets = []
-
-    # Check if any assets should be hidden (skip fetching to save API calls)
+    # Get hidden assets from database
     conn = sqlite3.connect('crypto_fund.db')
     cursor = conn.cursor()
     cursor.execute("SELECT token_address FROM hidden_assets")
     hidden_addresses = set(row[0].lower() for row in cursor.fetchall())
     conn.close()
-
+    
     try:
-        if network.upper() == "ETH":
-            # Get ETH balance
-            eth_token_address = "0x0000000000000000000000000000000000000000"
-            if eth_token_address not in hidden_addresses:
-                eth_balance_wei = w3.eth.get_balance(wallet_address)
-                eth_balance_formatted = float(eth_balance_wei) / 10**18
-
-                if eth_balance_formatted > 0:
-                    assets.append({
-                        "token_address": eth_token_address,
-                        "symbol": "ETH",
-                        "name": "Ethereum",
-                        "balance": eth_balance_formatted,
-                        "balance_formatted": f"{eth_balance_formatted:.6f}",
-                        "decimals": 18
-                    })
-
-            # Get ERC-20 token balances using Alchemy API
-            try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(
-                        ALCHEMY_URL,
-                        json={
-                            "id": 1,
-                            "jsonrpc": "2.0",
-                            "method": "alchemy_getTokenBalances",
-                            "params": [wallet_address]
-                        }
-                    )
-
-                    if response.status_code == 200:
-                        data = response.json()
-                        token_balances = data.get("result", {}).get("tokenBalances", [])
-
-                        for token_balance in token_balances:
-                            if token_balance.get("tokenBalance") and int(token_balance["tokenBalance"], 16) > 0:
-                                try:
-                                    contract_address = token_balance["contractAddress"].lower()
-
-                                    # Skip if this token is hidden
-                                    if contract_address in hidden_addresses:
-                                        continue
-
-                                    # Get token metadata using Alchemy API
-                                    metadata_response = await client.post(
-                                        ALCHEMY_URL,
-                                        json={
-                                            "id": 1,
-                                            "jsonrpc": "2.0",
-                                            "method": "alchemy_getTokenMetadata",
-                                            "params": [contract_address]
-                                        }
-                                    )
-
-                                    if metadata_response.status_code == 200:
-                                        metadata = metadata_response.json().get("result", {})
-                                        balance_int = int(token_balance["tokenBalance"], 16)
-                                        decimals = metadata.get("decimals", 18)
-                                        balance_formatted = balance_int / (10 ** decimals)
-
-                                        if balance_formatted > 0.001:  # Filter out dust
-                                            assets.append({
-                                                "token_address": contract_address,
-                                                "symbol": metadata.get("symbol", "UNKNOWN"),
-                                                "name": metadata.get("name", "Unknown Token"),
-                                                "balance": balance_formatted,
-                                                "balance_formatted": f"{balance_formatted:.6f}",
-                                                "decimals": decimals
-                                            })
-                                except Exception as e:
-                                    print(f"Error getting metadata for {contract_address}: {e}")
-
-                    # Get NFTs using Alchemy API
-                    try:
-                        nft_response = await client.post(
-                            ALCHEMY_URL,
-                            json={
-                                "id": 1,
-                                "jsonrpc": "2.0",
-                                "method": "alchemy_getNFTsForOwner",
-                                "params": [wallet_address]
-                            }
-                        )
-
-                        if nft_response.status_code == 200:
-                            nft_data = nft_response.json()
-                            owned_nfts = nft_data.get("result", {}).get("ownedNfts", [])
-
-                            # Group NFTs by collection
-                            nft_collections = {}
-                            for nft in owned_nfts:
-                                contract_address = nft.get("contract", {}).get("address", "").lower()
-
-                                # Skip if this NFT collection is hidden
-                                if contract_address in hidden_addresses:
-                                    continue
-
-                                collection_name = nft.get("contract", {}).get("name", "Unknown NFT Collection")
-                                collection_symbol = nft.get("contract", {}).get("symbol", "NFT")
-
-                                if contract_address not in nft_collections:
-                                    nft_collections[contract_address] = {
-                                        "name": collection_name,
-                                        "symbol": collection_symbol,
-                                        "count": 0,
-                                        "token_ids": []
-                                    }
-
-                                nft_collections[contract_address]["count"] += 1
-                                token_id = nft.get("tokenId", "")
-                                if token_id:
-                                    nft_collections[contract_address]["token_ids"].append(token_id)
-
-                            # Add NFT collections as assets
-                            for contract_address, collection_data in nft_collections.items():
-                                assets.append({
-                                    "token_address": contract_address,
-                                    "symbol": f"{collection_data['symbol']} NFT",
-                                    "name": f"{collection_data['name']} (Collection)",
-                                    "balance": collection_data["count"],
-                                    "balance_formatted": f"{collection_data['count']} NFTs",
-                                    "decimals": 0,
-                                    "is_nft": True,
-                                    "token_ids": collection_data["token_ids"][:10]  # Show first 10 token IDs
-                                })
-                                print(f"✅ Found {collection_data['count']} NFTs from {collection_data['name']}")
-
-                    except Exception as e:
-                        print(f"Error fetching NFTs: {e}")
-
-            except Exception as e:
-                print(f"Error fetching token balances: {e}")
-
-        elif network.upper() == "SOL":
-            # Solana wallet support using Alchemy RPC
-            solana_alchemy_url = f"https://solana-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
-            print(f"🔍 Fetching Solana assets for wallet: {wallet_address}")
-            print(f"🔗 Using Alchemy Solana URL: {solana_alchemy_url}")
-            
-            try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    # Get SOL balance
-                    if "solana" not in hidden_addresses:
-                        print(f"📊 Fetching SOL balance...")
-                        sol_response = await client.post(
-                            solana_alchemy_url,
-                            json={
-                                "jsonrpc": "2.0",
-                                "id": 1,
-                                "method": "getBalance",
-                                "params": [wallet_address]
-                            }
-                        )
-
-                        print(f"🌐 SOL balance response status: {sol_response.status_code}")
-                        if sol_response.status_code == 200:
-                            sol_data = sol_response.json()
-                            print(f"📈 SOL balance response: {sol_data}")
-                            
-                            if "result" in sol_data and "value" in sol_data["result"]:
-                                sol_balance_lamports = sol_data["result"]["value"]
-                                sol_balance = sol_balance_lamports / 1_000_000_000  # Convert lamports to SOL
-                                print(f"💰 SOL balance: {sol_balance} SOL ({sol_balance_lamports} lamports)")
-
-                                if sol_balance > 0:
-                                    assets.append({
-                                        "token_address": "solana",
-                                        "symbol": "SOL",
-                                        "name": "Solana",
-                                        "balance": sol_balance,
-                                        "balance_formatted": f"{sol_balance:.6f}",
-                                        "decimals": 9
-                                    })
-                                    print(f"✅ Added SOL to assets: {sol_balance:.6f} SOL")
-                            else:
-                                print(f"❌ Unexpected SOL balance response format: {sol_data}")
-                        else:
-                            print(f"❌ SOL balance request failed: {sol_response.text}")
-
-                    # Get SPL token accounts
-                    print(f"🪙 Fetching SPL token accounts...")
-                    spl_response = await client.post(
-                        solana_alchemy_url,
-                        json={
-                            "jsonrpc": "2.0",
-                            "id": 1,
-                            "method": "getTokenAccountsByOwner",
-                            "params": [
-                                wallet_address,
-                                {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},
-                                {"encoding": "jsonParsed"}
-                            ]
-                        }
-                    )
-
-                    print(f"🌐 SPL tokens response status: {spl_response.status_code}")
-                    if spl_response.status_code == 200:
-                        spl_data = spl_response.json()
-                        print(f"📊 SPL tokens response: {json.dumps(spl_data, indent=2)}")
-                        
-                        if "result" in spl_data and "value" in spl_data["result"]:
-                            token_accounts = spl_data["result"]["value"]
-                            print(f"🪙 Found {len(token_accounts)} SPL token accounts")
-
-                            for i, token_account in enumerate(token_accounts):
-                                try:
-                                    print(f"🔍 Processing token account {i+1}/{len(token_accounts)}")
-                                    token_info = token_account["account"]["data"]["parsed"]["info"]
-                                    token_amount = token_info.get("tokenAmount", {})
-                                    mint_address = token_info.get("mint", "")
-
-                                    print(f"🪙 Token info: mint={mint_address}, amount={token_amount}")
-
-                                    # Skip if this token is hidden
-                                    if mint_address.lower() in hidden_addresses:
-                                        print(f"🙈 Skipping hidden token: {mint_address}")
-                                        continue
-
-                                    balance = float(token_amount.get("uiAmount", 0))
-                                    decimals = token_amount.get("decimals", 0)
-                                    
-                                    print(f"💰 Token balance: {balance} (decimals: {decimals})")
-
-                                    if balance > 0.001:  # Filter out dust
-                                        # Try to get token metadata (simplified)
-                                        symbol = mint_address[:6] + "..."  # Fallback symbol
-                                        name = f"SPL Token {mint_address[:8]}..."
-
-                                        # Common Solana tokens mapping
-                                        known_tokens = {
-                                            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {"symbol": "USDC", "name": "USD Coin"},
-                                            "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": {"symbol": "USDT", "name": "Tether USD"},
-                                            "So11111111111111111111111111111111111111112": {"symbol": "WSOL", "name": "Wrapped SOL"},
-                                        }
-
-                                        if mint_address in known_tokens:
-                                            symbol = known_tokens[mint_address]["symbol"]
-                                            name = known_tokens[mint_address]["name"]
-
-                                        assets.append({
-                                            "token_address": mint_address,
-                                            "symbol": symbol,
-                                            "name": name,
-                                            "balance": balance,
-                                            "balance_formatted": f"{balance:.6f}",
-                                            "decimals": decimals
-                                        })
-                                        print(f"✅ Added Solana token: {symbol} - {balance:.6f} ({mint_address})")
-                                    else:
-                                        print(f"💨 Skipping dust token: {balance} {mint_address}")
-
-                                except Exception as e:
-                                    print(f"❌ Error processing Solana token account {i+1}: {e}")
-                                    import traceback
-                                    print(f"📋 Token account data: {json.dumps(token_account, indent=2)}")
-                                    print(f"📋 Traceback: {traceback.format_exc()}")
-                        else:
-                            print(f"❌ Unexpected SPL tokens response format: {spl_data}")
-                    else:
-                        print(f"❌ SPL tokens request failed: {spl_response.text}")
-
-            except Exception as e:
-                print(f"❌ Error fetching Solana wallet assets: {e}")
-                import traceback
-                print(f"📋 Solana error traceback: {traceback.format_exc()}")
-
+        # Create appropriate asset fetcher for the network
+        asset_fetcher = ChainFactory.create_asset_fetcher(network, ALCHEMY_API_KEY)
+        
+        # Fetch assets using chain-specific logic
+        assets = await asset_fetcher.fetch_assets(wallet_address, hidden_addresses)
+        
+        print(f"✅ Fetched {len(assets)} assets for {network} wallet {wallet_address}")
+        return assets
+        
     except Exception as e:
-        print(f"Error fetching wallet assets for {wallet_address}: {e}")
+        print(f"❌ Error fetching assets for {network} wallet {wallet_address}: {e}")
+        return []
 
-    return assets
+# New chain-agnostic price fetching function
+async def get_token_prices_new(token_addresses_by_network: Dict[str, List[str]]) -> Dict[str, float]:
+    """New chain-agnostic price fetching using dedicated fetchers"""
+    
+    all_prices = {}
+    
+    for network, token_addresses in token_addresses_by_network.items():
+        if not token_addresses:
+            continue
+            
+        try:
+            # Create appropriate price fetcher for the network
+            price_fetcher = ChainFactory.create_price_fetcher(network)
+            
+            # Fetch prices using chain-specific logic
+            network_prices = await price_fetcher.fetch_prices(token_addresses)
+            
+            # Merge into all_prices
+            all_prices.update(network_prices)
+            
+            print(f"✅ Fetched {len(network_prices)} prices for {network}")
+            
+        except Exception as e:
+            print(f"❌ Error fetching prices for {network}: {e}")
+    
+    return all_prices
 
 # API endpoints
 @app.on_event("startup")
@@ -692,7 +786,7 @@ async def delete_wallet(wallet_id: int):
 
 @app.post("/portfolio/update")
 async def update_portfolio(background_tasks: BackgroundTasks):
-    background_tasks.add_task(update_portfolio_data)
+    background_tasks.add_task(update_portfolio_data_new)
     return {"message": "Portfolio update started"}
 
 @app.get("/portfolio", response_model=PortfolioResponse)
@@ -714,7 +808,7 @@ async def get_portfolio():
 
     assets = [
         AssetResponse(
-            id=a[0] or a[1],  # Use token_address if available, otherwise fallback to symbol for ETH
+            id=a[0] or a[1],
             symbol=a[1], name=a[2], balance=a[3],
             balance_formatted=a[4], price_usd=a[5], value_usd=a[6], notes=a[7]
         )
@@ -750,7 +844,6 @@ async def get_portfolio():
         if previous_value > 0:
             performance_24h = ((current_value - previous_value) / previous_value) * 100
     elif len(history) == 1:
-        # If only one data point, assume positive performance for demo
         performance_24h = 2.4
 
     conn.close()
@@ -792,7 +885,7 @@ async def get_wallet_details(wallet_id: int):
 
     assets = [
         AssetResponse(
-            id=a[0],  # Already handled in SQL query above
+            id=a[0],
             symbol=a[1], name=a[2], balance=a[3],
             balance_formatted=a[4], price_usd=a[5], value_usd=a[6], notes=a[7]
         )
@@ -807,7 +900,7 @@ async def get_wallet_details(wallet_id: int):
         wallet=wallet,
         assets=assets,
         total_value=total_value,
-        performance_24h=0.0  # Simplified for now
+        performance_24h=0.0
     )
 
 @app.put("/assets/{symbol}/notes")
@@ -883,46 +976,81 @@ async def get_hidden_assets():
         for h in hidden_assets
     ]
 
-async def update_portfolio_data():
-    """Background task to update portfolio data"""
+async def update_portfolio_data_new():
+    """New background task using chain-agnostic fetchers"""
     conn = sqlite3.connect('crypto_fund.db')
     cursor = conn.cursor()
 
     try:
+        print("🚀 Starting portfolio update with new chain-agnostic system...")
+        
         # Clear existing assets
         cursor.execute("DELETE FROM assets")
 
-        # Get all wallets
+        # Get all wallets grouped by network
         cursor.execute("SELECT id, address, network FROM wallets")
         wallets = cursor.fetchall()
 
-        all_token_addresses = set()
-        all_assets = []
-
-        # Fetch assets for each wallet
+        # Group wallets by network for optimized processing
+        wallets_by_network = {}
         for wallet_id, address, network in wallets:
-            assets = await get_wallet_assets(address, network)
-            for asset in assets:
-                asset['wallet_id'] = wallet_id
-                all_assets.append(asset)
-                all_token_addresses.add(asset['token_address'])
+            if network not in wallets_by_network:
+                wallets_by_network[network] = []
+            wallets_by_network[network].append((wallet_id, address))
 
-        # Get prices for all tokens
-        price_map = await get_token_prices(list(all_token_addresses))
+        all_assets = []
+        token_addresses_by_network = {}
+
+        # Fetch assets for each network
+        for network, network_wallets in wallets_by_network.items():
+            print(f"🔗 Processing {len(network_wallets)} {network} wallets...")
+            
+            token_addresses_by_network[network] = set()
+            
+            for wallet_id, address in network_wallets:
+                try:
+                    # Use new chain-agnostic asset fetcher
+                    assets = await get_wallet_assets_new(address, network)
+                    
+                    for asset in assets:
+                        asset_dict = {
+                            'wallet_id': wallet_id,
+                            'token_address': asset.token_address,
+                            'symbol': asset.symbol,
+                            'name': asset.name,
+                            'balance': asset.balance,
+                            'balance_formatted': asset.balance_formatted,
+                            'decimals': asset.decimals,
+                            'is_nft': asset.is_nft,
+                            'token_ids': asset.token_ids,
+                            'network': network
+                        }
+                        all_assets.append(asset_dict)
+                        token_addresses_by_network[network].add(asset.token_address)
+                        
+                except Exception as e:
+                    print(f"❌ Error fetching assets for {network} wallet {address}: {e}")
+
+        # Convert sets to lists for price fetching
+        for network in token_addresses_by_network:
+            token_addresses_by_network[network] = list(token_addresses_by_network[network])
+
+        print(f"📊 Total assets fetched: {len(all_assets)}")
+        print(f"🪙 Token addresses by network: {dict((k, len(v)) for k, v in token_addresses_by_network.items())}")
+
+        # Get prices using new chain-agnostic price fetcher
+        price_map = await get_token_prices_new(token_addresses_by_network)
 
         # Insert assets with prices
         total_portfolio_value = 0
         zero_value_assets = []
-        
-        print(f"🔢 Processing {len(all_assets)} total assets...")
         
         for asset in all_assets:
             is_nft = asset.get('is_nft', False)
             token_address = asset['token_address']
             
             if is_nft:
-                # NFTs typically don't have USD prices, but can have floor prices
-                price_usd = 0  # Could be enhanced to fetch floor prices from OpenSea
+                price_usd = 0
                 value_usd = 0
                 nft_metadata = json.dumps({
                     "token_ids": asset.get('token_ids', []),
@@ -930,7 +1058,7 @@ async def update_portfolio_data():
                 })
                 print(f"🖼️ NFT Asset: {asset['symbol']} - {asset['balance']} items")
             else:
-                # Look up price in multiple ways for better accuracy
+                # Look up price with multiple fallbacks
                 price_usd = price_map.get(token_address.lower(), 0)
                 if price_usd == 0:
                     price_usd = price_map.get(token_address, 0)
@@ -938,9 +1066,9 @@ async def update_portfolio_data():
                 value_usd = asset['balance'] * price_usd
                 nft_metadata = None
                 
-                print(f"💰 Asset: {asset['symbol']} - Balance: {asset['balance']:.6f}, Price: ${price_usd:.6f}, Value: ${value_usd:.2f}")
+                print(f"💰 {asset['network']} Asset: {asset['symbol']} - Balance: {asset['balance']:.6f}, Price: ${price_usd:.6f}, Value: ${value_usd:.2f}")
                 
-                # Track zero-value assets for auto-hiding (but don't hide yet)
+                # Track zero-value assets for auto-hiding
                 if value_usd == 0 and asset['balance'] > 0:
                     zero_value_assets.append({
                         'token_address': token_address,
@@ -962,20 +1090,18 @@ async def update_portfolio_data():
                 price_usd, value_usd, is_nft, nft_metadata
             ))
 
-        # Auto-hide zero-value assets AFTER inserting all assets
+        # Auto-hide zero-value assets
         if zero_value_assets:
-            print(f"🔍 Found {len(zero_value_assets)} zero-value assets to auto-hide:")
+            print(f"🔍 Auto-hiding {len(zero_value_assets)} zero-value assets...")
             for zero_asset in zero_value_assets:
                 try:
                     cursor.execute("""
                         INSERT OR REPLACE INTO hidden_assets (token_address, symbol, name)
                         VALUES (?, ?, ?)
                     """, (zero_asset['token_address'].lower(), zero_asset['symbol'], zero_asset['name']))
-                    print(f"🙈 Auto-hidden zero-value asset: {zero_asset['symbol']} (Balance: {zero_asset['balance']:.6f}, Token: {zero_asset['token_address']})")
+                    print(f"🙈 Auto-hidden: {zero_asset['symbol']}")
                 except sqlite3.Error as e:
                     print(f"❌ Error auto-hiding asset {zero_asset['symbol']}: {e}")
-        else:
-            print(f"✅ No zero-value assets found to auto-hide")
 
         # Record portfolio history
         cursor.execute(
@@ -984,10 +1110,13 @@ async def update_portfolio_data():
         )
 
         conn.commit()
-        print(f"Portfolio updated: {len(all_assets)} assets, ${total_portfolio_value:,.2f} total value")
+        print(f"✅ Portfolio updated successfully!")
+        print(f"📈 {len(all_assets)} assets processed, ${total_portfolio_value:,.2f} total value")
 
     except Exception as e:
-        print(f"Error updating portfolio: {e}")
+        print(f"❌ Error updating portfolio: {e}")
+        import traceback
+        print(f"📋 Full traceback: {traceback.format_exc()}")
         conn.rollback()
     finally:
         conn.close()
