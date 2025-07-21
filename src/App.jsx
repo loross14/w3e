@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
 import Chart from "chart.js/auto";
-import { Alchemy, Network } from "alchemy-sdk";
 import { jsPDF } from "jspdf";
 
 // Portfolio Chart Component
