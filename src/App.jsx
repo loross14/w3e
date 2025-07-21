@@ -1,8 +1,9 @@
+
 import React, { useEffect, useState, useRef } from "react";
 import Chart from "chart.js/auto";
 import { jsPDF } from "jspdf";
 
-// Portfolio Chart Component
+// Portfolio Chart Component with Dune-style styling
 const PortfolioChart = ({ data }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
@@ -21,19 +22,44 @@ const PortfolioChart = ({ data }) => {
           {
             label: "Portfolio Value",
             data: data.map((item) => item.value),
-            borderColor: "rgb(16, 185, 129)",
-            backgroundColor: "rgba(16, 185, 129, 0.1)",
+            borderColor: "#8B5CF6",
+            backgroundColor: "rgba(139, 92, 246, 0.1)",
             fill: true,
+            tension: 0.4,
+            borderWidth: 3,
+            pointBackgroundColor: "#8B5CF6",
+            pointBorderColor: "#ffffff",
+            pointBorderWidth: 2,
+            pointRadius: 6,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          },
+        },
         scales: {
+          x: {
+            grid: {
+              color: "rgba(255, 255, 255, 0.1)",
+              borderColor: "rgba(255, 255, 255, 0.1)",
+            },
+            ticks: {
+              color: "#9CA3AF",
+            },
+          },
           y: {
             beginAtZero: false,
+            grid: {
+              color: "rgba(255, 255, 255, 0.1)",
+              borderColor: "rgba(255, 255, 255, 0.1)",
+            },
             ticks: {
+              color: "#9CA3AF",
               callback: (value) => `$${value.toLocaleString()}`,
             },
           },
@@ -51,7 +77,7 @@ const PortfolioChart = ({ data }) => {
   return <canvas ref={chartRef} />;
 };
 
-// Asset Details Modal
+// Asset Details Modal with Dune styling
 const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
   const [notes, setNotes] = useState(asset?.notes || "");
 
@@ -63,43 +89,47 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg max-w-md w-full m-4">
-        <h2 className="text-xl font-bold mb-4">{asset.name}</h2>
-        <div className="space-y-2 mb-4">
-          <p>
-            <strong>Balance:</strong> {asset.balance} {asset.symbol}
-          </p>
-          <p>
-            <strong>Value:</strong> ${asset.valueUSD.toLocaleString()}
-          </p>
-          <p>
-            <strong>Price:</strong> ${asset.priceUSD.toFixed(4)}
-          </p>
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+      <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl max-w-md w-full m-4">
+        <h2 className="text-xl font-bold mb-4 text-white">{asset.name}</h2>
+        <div className="space-y-3 mb-4">
+          <div className="flex justify-between">
+            <span className="text-gray-400">Balance:</span>
+            <span className="text-white font-mono">{asset.balance} {asset.symbol}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Value:</span>
+            <span className="text-green-400 font-mono">${asset.valueUSD.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Price:</span>
+            <span className="text-white font-mono">${asset.priceUSD.toFixed(4)}</span>
+          </div>
         </div>
         {isEditor && (
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Notes:</label>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Notes:</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full p-2 border rounded"
+              className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
               rows="3"
+              placeholder="Add your notes here..."
             />
           </div>
         )}
-        <div className="flex space-x-2">
+        <div className="flex space-x-3">
           {isEditor && (
             <button
               onClick={handleSave}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors font-medium"
             >
               Save
             </button>
           )}
           <button
             onClick={onClose}
-            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+            className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium"
           >
             Close
           </button>
@@ -109,7 +139,7 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
   );
 };
 
-// Report Generator Component
+// Report Generator Component with Dune styling
 const ReportGenerator = ({ portfolioData }) => {
   const periods = ["1 Week", "1 Month", "1 Quarter", "1 Year"];
 
@@ -140,16 +170,16 @@ const ReportGenerator = ({ portfolioData }) => {
         <button
           key={period}
           onClick={() => generateReport(period)}
-          className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm"
+          className="bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
         >
-          Generate {period} Report
+          Export {period}
         </button>
       ))}
     </div>
   );
 };
 
-// Main App Component
+// Main App Component with Dune.com styling
 const App = () => {
   const [isEditor, setIsEditor] = useState(false);
   const [password, setPassword] = useState("");
@@ -196,7 +226,6 @@ const App = () => {
     ],
   });
 
-  // Simple password check for "bullrun"
   const correctPassword = "bullrun";
 
   const checkPassword = () => {
@@ -241,120 +270,189 @@ const App = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <div className="container mx-auto px-4 py-8">
-        <header className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">
-            🏦 Crypto Fund Portfolio Dashboard
-          </h1>
-          <p className="text-gray-400">
-            Professional crypto asset management interface
-          </p>
-        </header>
+    <div className="min-h-screen bg-gray-950 text-white">
+      {/* Header */}
+      <div className="border-b border-gray-800 bg-gray-900/50">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">D</span>
+              </div>
+              <h1 className="text-2xl font-bold">Crypto Fund Analytics</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button className="text-gray-400 hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7H4l5-5v5z" />
+                </svg>
+              </button>
+              <button className="text-gray-400 hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
+      <div className="container mx-auto px-6 py-6">
+        {/* Editor Access */}
         {!isEditor && (
-          <div className="bg-gray-800 p-6 rounded-lg mb-6 max-w-md">
-            <h2 className="text-xl font-semibold mb-4">Editor Access</h2>
+          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl mb-6 max-w-md">
+            <h2 className="text-lg font-semibold mb-4 text-purple-400">🔐 Editor Access</h2>
             <div className="space-y-4">
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+                placeholder="Enter access key"
+                className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
                 onKeyPress={(e) => e.key === "Enter" && checkPassword()}
               />
               <button
                 onClick={checkPassword}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
               >
-                Access Editor Mode
+                Unlock Dashboard
               </button>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gray-800 p-6 rounded-lg">
-            <h3 className="text-lg font-semibold mb-2">Total Portfolio Value</h3>
-            <p className="text-3xl font-bold text-emerald-400">
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide">Total Value</h3>
+              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+            </div>
+            <p className="text-2xl font-bold text-white font-mono">
               ${totalValue.toLocaleString()}
             </p>
+            <p className="text-sm text-green-400 mt-1">+2.4% (24h)</p>
           </div>
-          <div className="bg-gray-800 p-6 rounded-lg">
-            <h3 className="text-lg font-semibold mb-2">Active Assets</h3>
-            <p className="text-3xl font-bold text-blue-400">
+          
+          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide">Assets</h3>
+              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+            </div>
+            <p className="text-2xl font-bold text-white font-mono">
               {visibleAssets.length}
             </p>
+            <p className="text-sm text-gray-400 mt-1">Active positions</p>
           </div>
-          <div className="bg-gray-800 p-6 rounded-lg">
-            <h3 className="text-lg font-semibold mb-2">24h Change</h3>
-            <p className="text-3xl font-bold text-green-400">+2.4%</p>
+
+          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide">Top Asset</h3>
+              <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+            </div>
+            <p className="text-2xl font-bold text-white">
+              ETH
+            </p>
+            <p className="text-sm text-gray-400 mt-1">83.6% of portfolio</p>
+          </div>
+
+          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide">Performance</h3>
+              <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+            </div>
+            <p className="text-2xl font-bold text-green-400 font-mono">
+              +5.6%
+            </p>
+            <p className="text-sm text-gray-400 mt-1">Since inception</p>
           </div>
         </div>
 
-        <div className="bg-gray-800 p-6 rounded-lg mb-8">
-          <h3 className="text-xl font-semibold mb-4">Portfolio Performance</h3>
+        {/* Chart Section */}
+        <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-white">Portfolio Performance</h3>
+            <div className="flex space-x-2">
+              <button className="px-3 py-1 text-xs bg-purple-600 text-white rounded-md">7D</button>
+              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600">30D</button>
+              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600">90D</button>
+              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600">1Y</button>
+            </div>
+          </div>
           <div className="chart-container">
             <PortfolioChart data={portfolioData.balanceHistory} />
           </div>
         </div>
 
-        <div className="bg-gray-800 p-6 rounded-lg mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-semibold">Asset Holdings</h3>
+        {/* Assets Table */}
+        <div className="bg-gray-900 border border-gray-700 rounded-xl overflow-hidden mb-8">
+          <div className="flex justify-between items-center p-6 border-b border-gray-700">
+            <h3 className="text-lg font-semibold text-white">Asset Holdings</h3>
             {isEditor && (
               <ReportGenerator portfolioData={portfolioData} />
             )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-700">
-                  <th className="text-left p-2">Asset</th>
-                  <th className="text-right p-2">Balance</th>
-                  <th className="text-right p-2">Price</th>
-                  <th className="text-right p-2">Value</th>
-                  <th className="text-right p-2">Actions</th>
+              <thead className="bg-gray-800">
+                <tr>
+                  <th className="text-left p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Asset</th>
+                  <th className="text-right p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Balance</th>
+                  <th className="text-right p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Price</th>
+                  <th className="text-right p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Value</th>
+                  <th className="text-right p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Weight</th>
+                  {isEditor && <th className="text-right p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {visibleAssets.map((asset) => (
+                {visibleAssets.map((asset, index) => (
                   <tr
                     key={asset.id}
-                    className="border-b border-gray-700 hover:bg-gray-700 cursor-pointer"
+                    className={`border-b border-gray-800 hover:bg-gray-800/50 cursor-pointer transition-colors ${
+                      index % 2 === 0 ? 'bg-gray-900/50' : ''
+                    }`}
                     onClick={() => setSelectedAsset(asset)}
                   >
-                    <td className="p-2">
-                      <div>
-                        <div className="font-semibold">{asset.name}</div>
-                        <div className="text-sm text-gray-400">
-                          {asset.symbol}
+                    <td className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                          <span className="text-white font-bold text-xs">{asset.symbol.slice(0, 2)}</span>
+                        </div>
+                        <div>
+                          <div className="font-medium text-white">{asset.name}</div>
+                          <div className="text-sm text-gray-400">{asset.symbol}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="text-right p-2">
-                      {asset.balance} {asset.symbol}
+                    <td className="text-right p-4">
+                      <div className="font-mono text-white">{asset.balance}</div>
+                      <div className="text-sm text-gray-400">{asset.symbol}</div>
                     </td>
-                    <td className="text-right p-2">
-                      ${asset.priceUSD.toLocaleString()}
+                    <td className="text-right p-4">
+                      <div className="font-mono text-white">${asset.priceUSD.toLocaleString()}</div>
                     </td>
-                    <td className="text-right p-2">
-                      ${asset.valueUSD.toLocaleString()}
+                    <td className="text-right p-4">
+                      <div className="font-mono text-white">${asset.valueUSD.toLocaleString()}</div>
                     </td>
-                    <td className="text-right p-2">
-                      {isEditor && (
+                    <td className="text-right p-4">
+                      <div className="font-mono text-gray-300">
+                        {((asset.valueUSD / totalValue) * 100).toFixed(1)}%
+                      </div>
+                    </td>
+                    {isEditor && (
+                      <td className="text-right p-4">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleHiddenAsset(asset.id);
                           }}
-                          className="text-sm bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+                          className="text-sm bg-red-600/20 text-red-400 px-3 py-1 rounded-md hover:bg-red-600/30 transition-colors border border-red-600/30"
                         >
                           Hide
                         </button>
-                      )}
-                    </td>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -362,21 +460,27 @@ const App = () => {
           </div>
         </div>
 
+        {/* Hidden Assets */}
         {hiddenAssets.length > 0 && isEditor && (
-          <div className="bg-gray-800 p-6 rounded-lg">
-            <h3 className="text-xl font-semibold mb-4">Hidden Assets</h3>
-            <div className="space-y-2">
+          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl">
+            <h3 className="text-lg font-semibold mb-4 text-white">Hidden Assets</h3>
+            <div className="space-y-3">
               {portfolioData.assets
                 .filter((asset) => hiddenAssets.includes(asset.id))
                 .map((asset) => (
                   <div
                     key={asset.id}
-                    className="flex justify-between items-center p-2 bg-gray-700 rounded"
+                    className="flex justify-between items-center p-3 bg-gray-800 rounded-lg border border-gray-700"
                   >
-                    <span>{asset.name}</span>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold text-xs">{asset.symbol.slice(0, 2)}</span>
+                      </div>
+                      <span className="text-white font-medium">{asset.name}</span>
+                    </div>
                     <button
                       onClick={() => toggleHiddenAsset(asset.id)}
-                      className="text-sm bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                      className="text-sm bg-green-600/20 text-green-400 px-3 py-1 rounded-md hover:bg-green-600/30 transition-colors border border-green-600/30"
                     >
                       Show
                     </button>
@@ -387,6 +491,7 @@ const App = () => {
         )}
       </div>
 
+      {/* Asset Modal */}
       {selectedAsset && (
         <AssetModal
           asset={selectedAsset}
