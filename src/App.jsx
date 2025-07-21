@@ -714,6 +714,7 @@ const App = () => {
   const [updateStatus, setUpdateStatus] = useState('');
   const [updateError, setUpdateError] = useState('');
   const [debugInfo, setDebugInfo] = useState([]);
+  const [walletStatus, setWalletStatus] = useState([]);
 
   // Debug logging function
   const addDebugInfo = (message, data = null) => {
@@ -824,6 +825,18 @@ const App = () => {
             setWalletAddresses(backendWallets);
             localStorage.setItem("fundWallets", JSON.stringify(backendWallets));
             addDebugInfo("✅ Local wallets synced with backend");
+          }
+
+          // Load wallet status information
+          try {
+            const statusResponse = await fetch(`${API_BASE_URL}/wallets/status`);
+            if (statusResponse.ok) {
+              const statusData = await statusResponse.json();
+              setWalletStatus(statusData);
+              addDebugInfo(`📊 Loaded wallet status for ${statusData.length} wallets`);
+            }
+          } catch (error) {
+            addDebugInfo("⚠️ Could not load wallet status", error.message);
           }
 
           // If backend is empty but we have local wallets, sync them
@@ -1046,7 +1059,20 @@ const App = () => {
         addDebugInfo("⚠️ Verification failed", verifyError.message);
       }
 
-      // Step 9: Complete
+      // Step 9: Load updated wallet status
+      setUpdateStatus('📊 Loading wallet status...');
+      try {
+        const statusResponse = await fetch(`${API_BASE_URL}/wallets/status`);
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+          setWalletStatus(statusData);
+          addDebugInfo(`📊 Updated wallet status for ${statusData.length} wallets`);
+        }
+      } catch (error) {
+        addDebugInfo("⚠️ Could not refresh wallet status", error.message);
+      }
+
+      // Step 10: Complete
       const assetCount = updatedAssets.length;
       const valueFormatted = newTotalValue.toLocaleString();
       setUpdateStatus(`✅ Updated ${assetCount} assets • $${valueFormatted}`);
@@ -1288,30 +1314,77 @@ const App = () => {
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
             <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">Fund Wallets</h3>
 
-            {/* Current Wallets */}
+            {/* Current Wallets with Status */}
             <div className="space-y-3 mb-6">
-              {walletAddresses.map((wallet) => (
-                <div key={wallet.id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg border border-gray-700">
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white font-bold text-xs">{wallet.network}</span>
+              {walletAddresses.map((wallet) => {
+                const status = walletStatus.find(s => s.wallet_id === wallet.id);
+                const statusColor = status?.status === 'success' ? 'bg-green-500' : 
+                                   status?.status === 'error' ? 'bg-red-500' :
+                                   status?.status === 'timeout' ? 'bg-yellow-500' : 'bg-gray-500';
+                const statusText = status?.status === 'success' ? '✅' :
+                                  status?.status === 'error' ? '❌' :
+                                  status?.status === 'timeout' ? '⏰' : '❓';
+
+                return (
+                  <div key={wallet.id} className="p-3 bg-gray-800 rounded-lg border border-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-bold text-xs">{wallet.network}</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center space-x-2">
+                            <p className="text-white font-medium text-sm">{wallet.label}</p>
+                            <span className="text-xs">{statusText}</span>
+                            <div className={`w-2 h-2 rounded-full ${statusColor} flex-shrink-0`}></div>
+                          </div>
+                          <p className="text-gray-400 text-xs font-mono break-all">{wallet.address}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeWallet(wallet.id)}
+                        className="text-red-400 hover:text-red-300 p-1 ml-2 flex-shrink-0"
+                        title="Remove wallet"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-white font-medium text-sm">{wallet.label}</p>
-                      <p className="text-gray-400 text-xs font-mono break-all">{wallet.address}</p>
-                    </div>
+
+                    {/* Wallet Status Details */}
+                    {status && (
+                      <div className="grid grid-cols-3 gap-2 text-xs text-gray-400 mt-2 pt-2 border-t border-gray-700">
+                        <div>
+                          <span className="block">Assets</span>
+                          <span className="text-white">{status.assets_found || 0}</span>
+                        </div>
+                        <div>
+                          <span className="block">Value</span>
+                          <span className="text-white">${(status.total_value || 0).toLocaleString()}</span>
+                        </div>
+                        <div>
+                          <span className="block">Status</span>
+                          <span className={`${
+                            status.status === 'success' ? 'text-green-400' :
+                            status.status === 'error' ? 'text-red-400' :
+                            status.status === 'timeout' ? 'text-yellow-400' : 'text-gray-400'
+                          }`}>
+                            {status.status}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Error Message */}
+                    {status?.error_message && (
+                      <div className="mt-2 p-2 bg-red-900/30 border border-red-700/50 rounded text-xs text-red-300">
+                        <strong>Error:</strong> {status.error_message}
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => removeWallet(wallet.id)}
-                    className="text-red-400 hover:text-red-300 p-1 ml-2 flex-shrink-0"
-                    title="Remove wallet"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Add New Wallet Form */}

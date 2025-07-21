@@ -1050,6 +1050,42 @@ async def get_wallet_details(wallet_id: int):
         performance_24h=0.0
     )
 
+@app.get("/wallets/status")
+async def get_wallet_status():
+    """Get status of all wallets including success/failure information"""
+    conn = sqlite3.connect('crypto_fund.db')
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT w.id, w.address, w.label, w.network,
+               COALESCE(ws.status, 'unknown') as status,
+               COALESCE(ws.assets_found, 0) as assets_found,
+               COALESCE(ws.total_value, 0) as total_value,
+               ws.error_message,
+               ws.last_updated
+        FROM wallets w
+        LEFT JOIN wallet_status ws ON w.id = ws.wallet_id
+        ORDER BY w.id
+    """)
+    
+    wallet_status_data = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "wallet_id": w[0],
+            "address": w[1],
+            "label": w[2],
+            "network": w[3],
+            "status": w[4],
+            "assets_found": w[5],
+            "total_value": w[6],
+            "error_message": w[7],
+            "last_updated": w[8]
+        }
+        for w in wallet_status_data
+    ]
+
 @app.put("/assets/{symbol}/notes")
 async def update_asset_notes(symbol: str, notes: str):
     conn = sqlite3.connect('crypto_fund.db')
@@ -1124,7 +1160,7 @@ async def get_hidden_assets():
     ]
 
 async def update_portfolio_data_new():
-    """New background task using chain-agnostic fetchers"""
+    """New background task using chain-agnostic fetchers with comprehensive error handling"""
     conn = sqlite3.connect('crypto_fund.db')
     cursor = conn.cursor()
 
@@ -1135,30 +1171,47 @@ async def update_portfolio_data_new():
         cursor.execute("DELETE FROM assets")
 
         # Get all wallets grouped by network
-        cursor.execute("SELECT id, address, network FROM wallets")
+        cursor.execute("SELECT id, address, network, label FROM wallets")
         wallets = cursor.fetchall()
 
         # Group wallets by network for optimized processing
         wallets_by_network = {}
-        for wallet_id, address, network in wallets:
+        wallet_status = {}  # Track individual wallet success/failure
+        
+        for wallet_id, address, network, label in wallets:
             if network not in wallets_by_network:
                 wallets_by_network[network] = []
-            wallets_by_network[network].append((wallet_id, address))
+            wallets_by_network[network].append((wallet_id, address, label))
+            wallet_status[wallet_id] = {
+                'address': address,
+                'label': label,
+                'network': network,
+                'status': 'pending',
+                'assets_found': 0,
+                'total_value': 0,
+                'error': None
+            }
 
         all_assets = []
         token_addresses_by_network = {}
 
-        # Fetch assets for each network
+        # Fetch assets for each network with individual wallet error handling
         for network, network_wallets in wallets_by_network.items():
             print(f"🔗 Processing {len(network_wallets)} {network} wallets...")
 
             token_addresses_by_network[network] = set()
 
-            for wallet_id, address in network_wallets:
+            for wallet_id, address, label in network_wallets:
                 try:
-                    # Use new chain-agnostic asset fetcher
-                    assets = await get_wallet_assets_new(address, network)
+                    print(f"📡 Fetching assets for {network} wallet: {label} ({address[:10]}...)")
+                    
+                    # Use new chain-agnostic asset fetcher with timeout
+                    assets = await asyncio.wait_for(
+                        get_wallet_assets_new(address, network), 
+                        timeout=60.0  # 60 second timeout per wallet
+                    )
 
+                    wallet_assets_count = 0
                     for asset in assets:
                         asset_dict = {
                             'wallet_id': wallet_id,
@@ -1174,9 +1227,29 @@ async def update_portfolio_data_new():
                         }
                         all_assets.append(asset_dict)
                         token_addresses_by_network[network].add(asset.token_address)
+                        wallet_assets_count += 1
 
+                    # Update wallet status
+                    wallet_status[wallet_id].update({
+                        'status': 'success',
+                        'assets_found': wallet_assets_count
+                    })
+                    print(f"✅ Successfully fetched {wallet_assets_count} assets from {label}")
+
+                except asyncio.TimeoutError:
+                    error_msg = f"Timeout after 60 seconds"
+                    print(f"⏰ {error_msg} for {network} wallet {label} ({address[:10]}...)")
+                    wallet_status[wallet_id].update({
+                        'status': 'timeout',
+                        'error': error_msg
+                    })
                 except Exception as e:
-                    print(f"❌ Error fetching assets for {network} wallet {address}: {e}")
+                    error_msg = str(e)[:200]  # Limit error message length
+                    print(f"❌ Error fetching assets for {network} wallet {label} ({address[:10]}...): {error_msg}")
+                    wallet_status[wallet_id].update({
+                        'status': 'error',
+                        'error': error_msg
+                    })
 
         # Convert sets to lists for price fetching
         for network in token_addresses_by_network:
@@ -1185,16 +1258,29 @@ async def update_portfolio_data_new():
         print(f"📊 Total assets fetched: {len(all_assets)}")
         print(f"🪙 Token addresses by network: {dict((k, len(v)) for k, v in token_addresses_by_network.items())}")
 
-        # Get prices using new chain-agnostic price fetcher
-        price_map = await get_token_prices_new(token_addresses_by_network)
+        # Print wallet status summary
+        successful_wallets = sum(1 for s in wallet_status.values() if s['status'] == 'success')
+        failed_wallets = sum(1 for s in wallet_status.values() if s['status'] in ['error', 'timeout'])
+        print(f"📋 Wallet Status: {successful_wallets} successful, {failed_wallets} failed")
 
-        # Insert assets with prices
+        # Get prices using new chain-agnostic price fetcher
+        try:
+            price_map = await asyncio.wait_for(
+                get_token_prices_new(token_addresses_by_network), 
+                timeout=30.0
+            )
+        except Exception as e:
+            print(f"❌ Error fetching prices: {e}")
+            price_map = {}
+
+        # Insert assets with prices and calculate wallet values
         total_portfolio_value = 0
-        zero_value_assets = []
+        auto_hide_candidates = []
 
         for asset in all_assets:
             is_nft = asset.get('is_nft', False)
             token_address = asset['token_address']
+            wallet_id = asset['wallet_id']
 
             if is_nft:
                 price_usd = 0
@@ -1215,22 +1301,31 @@ async def update_portfolio_data_new():
 
                 print(f"💰 {asset['network']} Asset: {asset['symbol']} - Balance: {asset['balance']:.6f}, Price: ${price_usd:.6f}, Value: ${value_usd:.2f}")
 
-                # Track zero-value assets for auto-hiding (only spam/scam tokens)
-                if value_usd == 0 and asset['balance'] > 0 and (
-                    "visit" in asset['name'].lower() or 
-                    "claim" in asset['name'].lower() or 
-                    "rewards" in asset['name'].lower() or
-                    "gift" in asset['name'].lower() or
-                    asset['symbol'] == "" or
-                    asset['name'] == ""
-                ):
-                    zero_value_assets.append({
+                # Identify spam/scam tokens for auto-hiding (be very specific to avoid hiding legitimate assets)
+                is_spam_token = (
+                    value_usd == 0 and 
+                    asset['balance'] > 0 and 
+                    (
+                        "visit" in asset['name'].lower() or 
+                        "claim" in asset['name'].lower() or 
+                        "rewards" in asset['name'].lower() or
+                        "gift" in asset['name'].lower() or
+                        "airdrop" in asset['name'].lower() or
+                        (asset['symbol'] == "" and asset['name'] == "") or
+                        len(asset['name']) > 50  # Suspiciously long names
+                    )
+                )
+
+                if is_spam_token:
+                    auto_hide_candidates.append({
                         'token_address': token_address,
                         'symbol': asset['symbol'],
                         'name': asset['name'],
                         'balance': asset['balance']
                     })
 
+            # Update wallet status with value
+            wallet_status[wallet_id]['total_value'] += value_usd
             total_portfolio_value += value_usd
 
             # Insert asset into database
@@ -1239,23 +1334,39 @@ async def update_portfolio_data_new():
                 (wallet_id, token_address, symbol, name, balance, balance_formatted, price_usd, value_usd, is_nft, nft_metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                asset['wallet_id'], token_address, asset['symbol'], 
+                wallet_id, token_address, asset['symbol'], 
                 asset['name'], asset['balance'], asset['balance_formatted'], 
                 price_usd, value_usd, is_nft, nft_metadata
             ))
 
-        # Auto-hide zero-value assets
-        if zero_value_assets:
-            print(f"🔍 Auto-hiding {len(zero_value_assets)} zero-value assets...")
-            for zero_asset in zero_value_assets:
+        # CRITICAL FIX: Clean up hidden assets table to remove legitimate tokens
+        print("🧹 Cleaning up hidden assets table...")
+        
+        # Get current valuable assets (assets with significant value)
+        cursor.execute("""
+            SELECT DISTINCT token_address, symbol, name 
+            FROM assets 
+            WHERE value_usd > 10
+        """)
+        valuable_assets = cursor.fetchall()
+
+        # Remove valuable assets from hidden list
+        for token_address, symbol, name in valuable_assets:
+            cursor.execute("DELETE FROM hidden_assets WHERE LOWER(token_address) = LOWER(?)", (token_address,))
+            print(f"🔓 Unhid valuable asset: {symbol} (${cursor.rowcount} rows removed)")
+
+        # Auto-hide only confirmed spam/scam tokens
+        if auto_hide_candidates:
+            print(f"🔍 Auto-hiding {len(auto_hide_candidates)} confirmed spam tokens...")
+            for spam_asset in auto_hide_candidates:
                 try:
                     cursor.execute("""
                         INSERT OR REPLACE INTO hidden_assets (token_address, symbol, name)
                         VALUES (?, ?, ?)
-                    """, (zero_asset['token_address'].lower(), zero_asset['symbol'], zero_asset['name']))
-                    print(f"🙈 Auto-hidden: {zero_asset['symbol']}")
+                    """, (spam_asset['token_address'].lower(), spam_asset['symbol'], spam_asset['name']))
+                    print(f"🙈 Auto-hidden spam: {spam_asset['symbol'] or 'unnamed'}")
                 except sqlite3.Error as e:
-                    print(f"❌ Error auto-hiding asset {zero_asset['symbol']}: {e}")
+                    print(f"❌ Error auto-hiding asset {spam_asset['symbol']}: {e}")
 
         # Record portfolio history
         cursor.execute(
@@ -1263,12 +1374,50 @@ async def update_portfolio_data_new():
             (total_portfolio_value,)
         )
 
+        # Store wallet status for frontend consumption
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS wallet_status (
+                wallet_id INTEGER PRIMARY KEY,
+                status TEXT,
+                assets_found INTEGER,
+                total_value REAL,
+                error_message TEXT,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (wallet_id) REFERENCES wallets (id)
+            )
+        """)
+        
+        cursor.execute("DELETE FROM wallet_status")  # Clear old status
+        for wallet_id, status_info in wallet_status.items():
+            cursor.execute("""
+                INSERT INTO wallet_status (wallet_id, status, assets_found, total_value, error_message)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                wallet_id, 
+                status_info['status'],
+                status_info['assets_found'],
+                status_info['total_value'],
+                status_info['error']
+            ))
+
         conn.commit()
+        
+        # Final success summary
+        successful_count = sum(1 for s in wallet_status.values() if s['status'] == 'success')
+        total_count = len(wallet_status)
         print(f"✅ Portfolio updated successfully!")
         print(f"📈 {len(all_assets)} assets processed, ${total_portfolio_value:,.2f} total value")
+        print(f"🏦 {successful_count}/{total_count} wallets processed successfully")
+        
+        # Print any failed wallets
+        failed_wallets = [(s['label'], s['error']) for s in wallet_status.values() if s['status'] in ['error', 'timeout']]
+        if failed_wallets:
+            print("⚠️  Failed wallets:")
+            for label, error in failed_wallets:
+                print(f"   - {label}: {error}")
 
     except Exception as e:
-        print(f"❌ Error updating portfolio: {e}")
+        print(f"❌ Critical error updating portfolio: {e}")
         import traceback
         print(f"📋 Full traceback: {traceback.format_exc()}")
         conn.rollback()
