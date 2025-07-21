@@ -1,0 +1,90 @@
+🚀 Starting portfolio update with new chain-agnostic system...
+🔗 Processing 1 ETH wallets...
+✅ Fetched 3 assets for ETH wallet 0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98
+📊 Total assets fetched: 3
+🪙 Token addresses by network: {'ETH': 3}
+💵 Fetching Ethereum prices for 3 tokens...
+✅ ETH price: $3761.15
+✅ Found known Ethereum token: WBTC -> wrapped-bitcoin
+✅ Found known Ethereum token: PENDLE -> pendle
+✅ Got Ethereum price: 0x808507121b80c02388fad14726482e061b8da827 = $4.71
+✅ Got Ethereum price: 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599 = $118175
+✅ Fetched 3 prices for ETH
+💰 ETH Asset: ETH - Balance: 18.349432, Price: $3761.150000, Value: $69014.97
+💰 ETH Asset: WBTC - Balance: 0.152524, Price: $118175.000000, Value: $18024.56
+💰 ETH Asset: PENDLE - Balance: 2500.000010, Price: $4.710000, Value: $11775.00
+✅ Portfolio updated successfully!
+📈 3 assets processed, $98,814.53 total value
+INFO:     172.31.128.113:51156 - "GET /portfolio HTTP/1.1" 200 OK
+INFO:     172.31.128.113:51156 - "GET /wallets/1/details HTTP/1.1" 200 OK
+INFO:     172.31.128.113:51156 - "GET /wallets/2/details HTTP/1.1" 404 Not Found
+INFO:     172.31.128.113:51156 - "GET / HTTP/1.1" 200 OK
+INFO:     172.31.128.113:33354 - "GET / HTTP/1.1" 200 OK
+INFO:     172.31.128.113:33354 - "POST /portfolio/update HTTP/1.1" 200 OK
+🚀 Starting portfolio update with new chain-agnostic system...
+🔗 Processing 1 ETH wallets...
+INFO:     172.31.128.113:33354 - "GET / HTTP/1.1" 200 OK
+INFO:     172.31.128.113:33354 - "GET /assets/hidden HTTP/1.1" 200 OK
+INFO:     172.31.128.113:33354 - "GET /assets/hidden HTTP/1.1" 200 OK
+INFO:     172.31.128.113:33354 - "GET /portfolio HTTP/1.1" 200 OK
+INFO:     172.31.128.113:33354 - "GET /wallets HTTP/1.1" 200 OK
+✅ Fetched 3 assets for ETH wallet 0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98
+📊 Total assets fetched: 3
+🪙 Token addresses by network: {'ETH': 3}
+💵 Fetching Ethereum prices for 3 tokens...
+✅ ETH price: $3760.24
+✅ Found known Ethereum token: WBTC -> wrapped-bitcoin
+✅ Found known Ethereum token: PENDLE -> pendle
+✅ Fetched 1 prices for ETH
+💰 ETH Asset: ETH - Balance: 18.349432, Price: $3760.240000, Value: $68998.27
+💰 ETH Asset: WBTC - Balance: 0.152524, Price: $0.000000, Value: $0.00
+💰 ETH Asset: PENDLE - Balance: 2500.000010, Price: $0.000000, Value: $0.00
+🔍 Auto-hiding 2 zero-value assets...
+🙈 Auto-hidden: WBTC
+🙈 Auto-hidden: PENDLE
+✅ Portfolio updated successfully!
+📈 3 assets processed, $68,998.27 total value
+INFO:     172.31.128.113:33354 - "GET /portfolio HTTP/1.1" 200 OK
+INFO:     172.31.128.113:33354 - "GET /wallets/1/details HTTP/1.1" 200 OK
+INFO:     172.31.128.113:33354 - "GET /wallets/2/details HTTP/1.1" 404 Not Found
+INFO:     172.31.128.113:35494 - "GET / HTTP/1.1" 200 OK
+INFO:     172.31.128.113:35494 - "POST /portfolio/update HTTP/1.1" 200 OK
+🚀 Starting portfolio update with new chain-agnostic system...
+🔗 Processing 1 ETH wallets...
+✅ Fetched 1 assets for ETH wallet 0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98
+📊 Total assets fetched: 1
+🪙 Token addresses by network: {'ETH': 1}
+💵 Fetching Ethereum prices for 1 tokens...
+✅ Fetched 0 prices for ETH
+💰 ETH Asset: ETH - Balance: 18.349432, Price: $0.000000, Value: $0.00
+🔍 Auto-hiding 1 zero-value assets...
+🙈 Auto-hidden: ETH
+✅ Portfolio updated successfully!
+📈 1 assets processed, $0.00 total value
+INFO:     172.31.128.113:35496 - "GET /portfolio HTTP/1.1" 200 OK
+INFO:     172.31.128.113:35496 - "GET /wallets/1/details HTTP/1.1" 200 OK
+INFO:     172.31.128.113:35496 - "GET /wallets/2/details HTTP/1.1" 404 Not Found
+INFO:     172.31.128.113:35496 - "GET / HTTP/1.1" 200 OK
+INFO:     172.31.128.113:35496 - "POST /portfolio/update HTTP/1.1" 200 OK
+🚀 Starting portfolio update with new chain-agnostic system...
+🔗 Processing 1 ETH wallets...
+✅ Fetched 0 assets for ETH wallet 0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98
+📊 Total assets fetched: 0
+🪙 Token addresses by network: {'ETH': 0}
+✅ Portfolio updated successfully!
+📈 0 assets processed, $0.00 total value
+INFO:     172.31.128.113:42382 - "GET /portfolio HTTP/1.1" 200 OK
+INFO:     172.31.128.113:42382 - "GET /wallets/1/details HTTP/1.1" 200 OK
+INFO:     172.31.128.113:42382 - "GET /wallets/2/details HTTP/1.1" 404 Not Found
+INFO:     172.31.128.113:52138 - "GET / HTTP/1.1" 200 OK
+INFO:     172.31.128.113:52138 - "POST /portfolio/update HTTP/1.1" 200 OK
+🚀 Starting portfolio update with new chain-agnostic system...
+🔗 Processing 1 ETH wallets...
+✅ Fetched 0 assets for ETH wallet 0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98
+📊 Total assets fetched: 0
+🪙 Token addresses by network: {'ETH': 0}
+✅ Portfolio updated successfully!
+📈 0 assets processed, $0.00 total value
+INFO:     172.31.128.113:51978 - "GET /portfolio HTTP/1.1" 200 OK
+INFO:     172.31.128.113:51978 - "GET /wallets/1/details HTTP/1.1" 200 OK
+INFO:     172.31.128.113:51978 - "GET /wallets/2/details HTTP/1.1" 404 Not Found
