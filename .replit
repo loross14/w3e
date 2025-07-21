@@ -11,8 +11,9 @@ language = "nodejs"
 
 [deployment]
 deploymentTarget = "static"
-build = ["npm", "run", "build"]
+build = ["sh", "-c", "npm run build"]
 publicDir = "dist"
+run = ["sh", "-c", "python3 start_services.py"]
 
 [[ports]]
 localPort = 5173
