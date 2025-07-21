@@ -1438,7 +1438,7 @@ const App = () => {
           symbol: asset.symbol,
           balance: asset.balance_formatted || asset.balance,
           priceUSD: asset.price_usd || 0,
-          valueUSD: asset.value_usd || 0,```python
+          valueUSD: asset.value_usd || 0,
           purchase_price: asset.purchase_price || 0,
           total_invested: asset.total_invested || 0,
           realized_pnl: asset.realized_pnl || 0,
