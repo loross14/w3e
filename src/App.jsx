@@ -635,7 +635,7 @@ const App = () => {
   // API Configuration for Replit environment
   const API_BASE_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:8000' 
-    : `https://${window.location.hostname.split('-').slice(0, -1).join('-')}-8000.${window.location.hostname.split('.').slice(1).join('.')}`;
+    : window.location.origin.replace(/:\d+/, ':8000');
 
   // Status tracking state
   const [updateStatus, setUpdateStatus] = useState('');
