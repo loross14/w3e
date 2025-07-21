@@ -888,7 +888,7 @@ async def get_portfolio():
         FROM assets a
         LEFT JOIN asset_notes n ON a.symbol = n.symbol
         LEFT JOIN hidden_assets h ON LOWER(a.token_address) = LOWER(h.token_address)
-        WHERE h.token_address IS NULL AND a.value_usd > 0
+        WHERE h.token_address IS NULL
         ORDER BY a.value_usd DESC
     """)
     assets_data = cursor.fetchall()
