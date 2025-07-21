@@ -1697,6 +1697,8 @@ async def get_portfolio():
                 print(f"✅ [PORTFOLIO DEBUG] Created asset: {asset.symbol} = ${asset.value_usd:.2f} (Return: {asset.total_return_pct:.1f}%)")
         except Exception as e:
             print(f"❌ [PORTFOLIO DEBUG] Error creating asset from {a}: {e}")
+            import traceback
+            print(f"📋 [PORTFOLIO DEBUG] Full error traceback: {traceback.format_exc()}")
             continue
 
     # Get the most recent saved total value from portfolio_history
@@ -1772,14 +1774,14 @@ async def get_wallet_details(wallet_id: int):
     for a in assets_data:
         try:
             asset = AssetResponse(
-                id=a[0] if a[0] else a[1],  # Use token_address as id
-                symbol=a[1] or "Unknown",
-                name=a[2] or "Unknown Token", 
-                balance=float(a[3]) if a[3] else 0.0,
-                balance_formatted=a[4] or "0.000000",
-                price_usd=float(a[5]) if a[5] else 0.0,
-                value_usd=float(a[6]) if a[6] else 0.0,
-                notes=a[7] or ""
+                id=a['token_address'] if a['token_address'] else a['symbol'],  # Use token_address as id
+                symbol=a['symbol'] or "Unknown",
+                name=a['name'] or "Unknown Token", 
+                balance=float(a['balance']) if a['balance'] else 0.0,
+                balance_formatted=a['balance_formatted'] or "0.000000",
+                price_usd=float(a['price_usd']) if a['price_usd'] else 0.0,
+                value_usd=float(a['value_usd']) if a['value_usd'] else 0.0,
+                notes=a['notes'] or ""
             )
             assets.append(asset)
         except Exception as e:
@@ -1820,15 +1822,15 @@ async def get_wallet_status():
 
     return [
         {
-            "wallet_id": w[0],
-            "address": w[1],
-            "label": w[2],
-            "network": w[3],
-            "status": w[4],
-            "assets_found": w[5],
-            "total_value": w[6],
-            "error_message": w[7],
-            "last_updated": w[8]
+            "wallet_id": w['id'],
+            "address": w['address'],
+            "label": w['label'],
+            "network": w['network'],
+            "status": w['status'],
+            "assets_found": w['assets_found'],
+            "total_value": w['total_value'],
+            "error_message": w['error_message'],
+            "last_updated": w['last_updated']
         }
         for w in wallet_status_data
     ]
@@ -1900,10 +1902,10 @@ async def get_hidden_assets():
 
     return [
         {
-            "token_address": h[0],
-            "symbol": h[1], 
-            "name": h[2],
-            "hidden_at": h[3]
+            "token_address": h['token_address'],
+            "symbol": h['symbol'], 
+            "name": h['name'],
+            "hidden_at": h['hidden_at']
         }
         for h in hidden_assets
     ]
@@ -2039,36 +2041,41 @@ async def get_portfolio_returns():
         """)
         worst_performers = cursor.fetchall()
 
-        total_invested, total_current_value, total_unrealized_pnl, total_realized_pnl, avg_return_pct = portfolio_metrics or (0, 0, 0, 0, 0)
+        portfolio_data = portfolio_metrics or {}
+        total_invested = portfolio_data.get('total_invested', 0) or 0
+        total_current_value = portfolio_data.get('total_current_value', 0) or 0
+        total_unrealized_pnl = portfolio_data.get('total_unrealized_pnl', 0) or 0
+        total_realized_pnl = portfolio_data.get('total_realized_pnl', 0) or 0
+        avg_return_pct = portfolio_data.get('avg_return_pct', 0) or 0
 
         overall_return_pct = ((total_current_value - total_invested) / total_invested * 100) if total_invested > 0 else 0
 
         return {
             "portfolio_metrics": {
-                "total_invested": total_invested or 0,
-                "total_current_value": total_current_value or 0,
-                "total_unrealized_pnl": total_unrealized_pnl or 0,
-                "total_realized_pnl": total_realized_pnl or 0,
+                "total_invested": total_invested,
+                "total_current_value": total_current_value,
+                "total_unrealized_pnl": total_unrealized_pnl,
+                "total_realized_pnl": total_realized_pnl,
                 "overall_return_pct": overall_return_pct,
-                "average_return_pct": avg_return_pct or 0
+                "average_return_pct": avg_return_pct
             },
             "top_performers": [
                 {
-                    "symbol": tp[0],
-                    "name": tp[1],
-                    "return_pct": tp[2],
-                    "unrealized_pnl": tp[3],
-                    "current_value": tp[4]
+                    "symbol": tp['symbol'],
+                    "name": tp['name'],
+                    "return_pct": tp['total_return_pct'],
+                    "unrealized_pnl": tp['unrealized_pnl'],
+                    "current_value": tp['value_usd']
                 }
                 for tp in top_performers
             ],
             "worst_performers": [
                 {
-                    "symbol": wp[0],
-                    "name": wp[1],
-                    "return_pct": wp[2],
-                    "unrealized_pnl": wp[3],
-                    "current_value": wp[4]
+                    "symbol": wp['symbol'],
+                    "name": wp['name'],
+                    "return_pct": wp['total_return_pct'],
+                    "unrealized_pnl": wp['unrealized_pnl'],
+                    "current_value": wp['value_usd']
                 }
                 for wp in worst_performers
             ]
