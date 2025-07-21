@@ -217,9 +217,9 @@ const WalletCard = ({ wallet, onClick, walletData }) => {
   const assetCount = walletData?.assets?.length || 0;
   const performance = walletData?.performance || 0;
   
-  // Check if this is the Solana wallet and show error state
+  // Check if wallet has errors or no data (especially Solana wallets)
   const isSolanaWallet = wallet.network === 'SOL';
-  const hasError = isSolanaWallet; // For now, show error for all Solana wallets
+  const hasError = walletData?.hasError || (isSolanaWallet && assetCount === 0) || (!walletData?.assets && wallet.network === 'SOL');
 
   return (
     <div 
@@ -1539,7 +1539,7 @@ const App = () => {
           <div className="flex justify-between items-center mb-4 sm:mb-6">
             <h3 className="text-base sm:text-lg font-semibold text-white">Fund Wallets</h3>
             <span className="text-xs sm:text-sm text-gray-400">
-              {walletAddresses.length} wallets • {Object.keys(walletData).length} active
+              {walletAddresses.length} wallets • {Object.keys(walletData).length} with data
             </span>
           </div>
 
@@ -1565,14 +1565,21 @@ const App = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {walletAddresses.map((wallet) => (
-                <WalletCard
-                  key={wallet.id}
-                  wallet={wallet}
-                  onClick={() => setSelectedWallet(wallet)}
-                  walletData={walletData[wallet.id]}
-                />
-              ))}
+              {walletAddresses.map((wallet) => {
+                // Check if wallet has status info to determine if there's an error
+                const status = walletStatus.find(s => s.wallet_id === wallet.id);
+                const hasData = walletData[wallet.id];
+                const hasError = status?.status === 'error' || (!hasData && wallet.network === 'SOL');
+                
+                return (
+                  <WalletCard
+                    key={wallet.id}
+                    wallet={wallet}
+                    onClick={() => setSelectedWallet(wallet)}
+                    walletData={walletData[wallet.id] || { assets: [], performance: 0, hasError }}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
