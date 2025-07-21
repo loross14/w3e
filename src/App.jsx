@@ -636,6 +636,7 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
                       <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()} profit</div>
                     </div>
                   ))}
+                  </div>
                 </div>
               </div>
 
@@ -899,7 +900,7 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
 // API Configuration for Replit environment
 const API_BASE_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:8000' 
-  : `${window.location.protocol}//${window.location.hostname}:8000`;
+  : `https://${window.location.hostname}`;
 
 // Main App Component
 const App = () => {
@@ -1130,7 +1131,7 @@ const App = () => {
   // API Configuration for Replit environment
   const API_BASE_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:8000' 
-    : `${window.location.protocol}//${window.location.hostname}:8000`;
+    : `https://${window.location.hostname}`;
 
   // Status tracking state
   const [updateStatus, setUpdateStatus] = useState('');
@@ -1425,7 +1426,8 @@ const App = () => {
         addDebugInfo("🎉 Portfolio load completed successfully");
 
       } catch (error) {
-        addDebugInfo(`❌ Portfolio load error (attempt ${retryCount + 1}/${maxRetries + 1})`, error.message);
+        ```
+addDebugInfo(`❌ Portfolio load error (attempt ${retryCount + 1}/${maxRetries + 1})`, error.message);
 
         // Retry with exponential backoff if backend isn't ready yet
         if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('Backend not ready'))) {
