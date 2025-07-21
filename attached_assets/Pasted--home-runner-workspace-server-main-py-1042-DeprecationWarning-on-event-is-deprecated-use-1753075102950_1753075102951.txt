@@ -1,0 +1,38 @@
+/home/runner/workspace/server/main.py:1042: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [3386]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     172.31.128.113:58670 - "GET / HTTP/1.1" 200 OKCTRL+C to quit)
+INFO:     172.31.128.113:58670 - "GET / HTTP/1.1" 200 OK
+INFO:     172.31.128.113:58670 - "GET /assets/hidden HTTP/1.1" 200 OK
+🔍 [PORTFOLIO DEBUG] Total assets in database: 25
+🔍 [PORTFOLIO DEBUG] Hidden assets: [('58', ''), ('59', 'Visit https://usd-coin.net to claim rewards'), ('60', ''), ('61', 'olas.gift'), ('63', 'Visit usdgift.net to claim rewards'), ('64', 'Visit liquidETH.net to claim rewards'), ('65', 'Visit website wbtc.gifts to claim rewards'), ('67', ''), ('0x0f2e0a2323683dd67a0a98550cacd1a2b68c762d', 'Visit https://usd-coin.net to claim rewards'), ('0x5d9713c32d979b860447a8585669f148aa051bbc', 'Visit liquidETH.net to claim rewards'), ('0x0a527683c3154f5f9e1b4203ef4d05962b2411bf', ''), ('0x1b6714f60ca290b95d674b5e20b71a85adf95527', ''), ('0x1ba7d1a528e540ee6b84f7e4cc20f92c49921717', 'olas.gift'), ('0x570ec272f07c563860477dcafb04a04ffd2979a1', 'Visit usdgift.net to claim rewards'), ('0x7b2e238fb48ee7322664b9c26bb3acedbfcc1f70', 'Visit website wbtc.gifts to claim rewards'), ('0xcc1a6f65e643ebaba65ce919f459c18c3c5f3b46', '')]
+🔍 [PORTFOLIO DEBUG] All assets before filtering: [('0x0000000000000000000000000000000000000000', 'ETH', 'Ethereum', 69011.84656552249), ('0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', 'WBTC', 'Wrapped Bitcoin', 18036.917168480002), ('solana', 'SOL', 'Solana', 16361.289084601241), ('0x808507121b80c02388fad14726482e061b8da827', 'PENDLE', 'Pendle', 11725.00004730134), ('0x0a527683c3154f5f9e1b4203ef4d05962b2411bf', '', '', 0.0), ('0x0f2e0a2323683dd67a0a98550cacd1a2b68c762d', 'Visit https://usd-coin.net to claim rewards', '# usd-coin.net', 0.0), ('0x1b6714f60ca290b95d674b5e20b71a85adf95527', '', '', 0.0), ('0x1ba7d1a528e540ee6b84f7e4cc20f92c49921717', 'olas.gift', 'olas.gift', 0.0), ('0x570ec272f07c563860477dcafb04a04ffd2979a1', 'Visit usdgift.net to claim rewards', '# usdgift.net', 0.0), ('0x5d9713c32d979b860447a8585669f148aa051bbc', 'Visit liquidETH.net to claim rewards', '$ liquidETH.net', 0.0), ('0x7b2e238fb48ee7322664b9c26bb3acedbfcc1f70', 'Visit website wbtc.gifts to claim rewards', '! wbtc.gifts', 0.0), ('0xcc1a6f65e643ebaba65ce919f459c18c3c5f3b46', '', '', 0.0), ('fjMJh8GxSQh9tfivVnX3uNbLe7vDELyj53dY8Be4pYQ', 'SPL-fjMJh8', 'SPL Token (fjMJh8Gx...)', 0.0), ('CboMcTUYUcy9E6B3yGdFn6aEsGUnYV6yWeoeukw6pump', 'SPL-CboMcT', 'SPL Token (CboMcTUY...)', 0.0), ('MNDEFzGvMt87ueuHvVU9VcTqsAP5b3fTGPsHuuPA5ey', 'SPL-MNDEFz', 'SPL Token (MNDEFzGv...)', 0.0), ('3m1K8LSukPtzyHHeaYn7JQrwuFSHYeLLZ7qij4Rupump', 'SPL-3m1K8L', 'SPL Token (3m1K8LSu...)', 0.0), ('4YeEtV4ioCP94jSuaietw3PT1fcBf14QSnqXNtVtpump', 'SPL-4YeEtV', 'SPL Token (4YeEtV4i...)', 0.0), ('6Fdt49yteedYnxwjgjryStLF7DWQdPqXRXrfEJij2PGv', 'SPL-6Fdt49', 'SPL Token (6Fdt49yt...)', 0.0), ('3sJsVyTynExLnwoaJZprzz9GAdnm41SaFJGkyS8CBSmr', 'SPL-3sJsVy', 'SPL Token (3sJsVyTy...)', 0.0), ('H9y7VvjSN1JNLNLRgN1PN3phyXW4C62sLf7XxTDm84dH', 'SPL-H9y7Vv', 'SPL Token (H9y7VvjS...)', 0.0), ('7bnb1SreDGcCJrAHiWaiFo7gwrNWWyuFvP2uNs2fKCRb', 'SPL-7bnb1S', 'SPL Token (7bnb1Sre...)', 0.0), ('9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump', 'SPL-9BB6NF', 'SPL Token (9BB6NFEc...)', 0.0), ('2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv', 'SPL-2zMMhc', 'SPL Token (2zMMhcVQ...)', 0.0), ('9ik9osHwGcURV9oJv7iMsRwrkLNWRYra5MXpAAAHxNQd', 'SPL-9ik9os', 'SPL Token (9ik9osHw...)', 0.0), ('7atgF8KQo4wJrD5ATGX7t1V2zVvykPJbFfNeVf1icFv1', 'SPL-7atgF8', 'SPL Token (7atgF8KQ...)', 0.0)]
+🔍 [PORTFOLIO DEBUG] Assets after filtering: 17 assets
+🔍 [PORTFOLIO DEBUG] Sample asset: ('0x0000000000000000000000000000000000000000', 'ETH', 'Ethereum', 18.34943194739735, '18.349432', 3760.98, 69011.84656552249, '')
+✅ [PORTFOLIO DEBUG] Created asset: ETH = $69011.85
+✅ [PORTFOLIO DEBUG] Created asset: WBTC = $18036.92
+✅ [PORTFOLIO DEBUG] Created asset: SOL = $16361.29
+✅ [PORTFOLIO DEBUG] Created asset: PENDLE = $11725.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-fjMJh8 = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-CboMcT = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-MNDEFz = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-3m1K8L = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-4YeEtV = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-6Fdt49 = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-3sJsVy = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-H9y7Vv = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-7bnb1S = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-9BB6NF = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-2zMMhc = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-9ik9os = $0.00
+✅ [PORTFOLIO DEBUG] Created asset: SPL-7atgF8 = $0.00
+INFO:     172.31.128.113:58670 - "GET /portfolio HTTP/1.1" 200 OK
+INFO:     172.31.128.113:58670 - "GET /wallets HTTP/1.1" 200 OK
+INFO:     172.31.128.113:58670 - "GET /wallets/status HTTP/1.1" 200 OK
