@@ -1606,7 +1606,8 @@ async def get_portfolio():
 
     # Debug: Check what's in the assets table
     cursor.execute("SELECT COUNT(*) FROM assets")
-    total_assets_count = cursor.fetchone()[0]
+    result = cursor.fetchone()
+    total_assets_count = result[0] if result else 0
     print(f"🔍 [PORTFOLIO DEBUG] Total assets in database: {total_assets_count}")
 
     # Debug: Check hidden assets
@@ -1708,7 +1709,8 @@ async def get_portfolio():
 
     # Get wallet count
     cursor.execute("SELECT COUNT(*) FROM wallets")
-    wallet_count = cursor.fetchone()[0]
+    result = cursor.fetchone()
+    wallet_count = result[0] if result else 0
 
     # Calculate 24h performance using saved history
     cursor.execute("""
