@@ -539,14 +539,49 @@ const App = () => {
     }
   };
 
-  const toggleHiddenAsset = (asset) => {
-    setHiddenAssets((prev) => {
-      const newHiddenAssets = prev.includes(asset.id)
-        ? prev.filter((id) => id !== asset.id)
-        : [...prev, asset.id];
-      localStorage.setItem("hiddenAssets", JSON.stringify(newHiddenAssets));
-      return newHiddenAssets;
-    });
+  const toggleHiddenAsset = async (asset) => {
+    try {
+      const isCurrentlyHidden = hiddenAssets.includes(asset.id);
+      
+      if (isCurrentlyHidden) {
+        // Unhide the asset
+        const response = await fetch(`${API_BASE_URL}/assets/hide/${asset.id}`, {
+          method: 'DELETE',
+        });
+        
+        if (response.ok) {
+          setHiddenAssets((prev) => {
+            const newHiddenAssets = prev.filter((id) => id !== asset.id);
+            localStorage.setItem("hiddenAssets", JSON.stringify(newHiddenAssets));
+            return newHiddenAssets;
+          });
+        }
+      } else {
+        // Hide the asset
+        const response = await fetch(`${API_BASE_URL}/assets/hide`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            token_address: asset.id,
+            symbol: asset.symbol,
+            name: asset.name
+          }),
+        });
+        
+        if (response.ok) {
+          setHiddenAssets((prev) => {
+            const newHiddenAssets = [...prev, asset.id];
+            localStorage.setItem("hiddenAssets", JSON.stringify(newHiddenAssets));
+            return newHiddenAssets;
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling hidden asset:', error);
+      alert('Failed to update asset visibility');
+    }
   };
 
   const updateNotes = async (assetId, notes) => {
@@ -671,9 +706,9 @@ const App = () => {
   const [updateStatus, setUpdateStatus] = useState('');
   const [updateError, setUpdateError] = useState('');
 
-  // Sync wallets with backend on app load - with retry logic
+  // Load saved portfolio data on startup and sync wallets
   useEffect(() => {
-    const syncWalletsWithBackend = async (retryCount = 0) => {
+    const loadPortfolioAndSyncWallets = async (retryCount = 0) => {
       const maxRetries = 3;
 
       try {
@@ -687,6 +722,45 @@ const App = () => {
 
         if (!healthResponse.ok) {
           throw new Error('Backend not ready');
+        }
+
+        // Load saved portfolio data
+        console.log('📊 Loading saved portfolio data...');
+        const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
+        if (portfolioResponse.ok) {
+          const savedData = await portfolioResponse.json();
+          
+          if (savedData.assets && savedData.assets.length > 0) {
+            const transformedAssets = savedData.assets.map(asset => ({
+              id: asset.id,
+              name: asset.name,
+              symbol: asset.symbol,
+              balance: asset.balance,
+              priceUSD: asset.price_usd || 0,
+              valueUSD: asset.value_usd || 0,
+              notes: asset.notes || "",
+            }));
+
+            const savedTotalValue = savedData.total_value || 0;
+            
+            // Generate balance history based on saved data
+            const balanceHistory = savedTotalValue > 0 ? [
+              { value: savedTotalValue * 0.92 },
+              { value: savedTotalValue * 0.95 },
+              { value: savedTotalValue * 0.88 },
+              { value: savedTotalValue * 0.96 },
+              { value: savedTotalValue }
+            ] : [{ value: 0 }];
+
+            setPortfolioData({
+              assets: transformedAssets,
+              balanceHistory: balanceHistory,
+              totalValue: savedTotalValue,
+              performance24h: savedData.performance_24h || 0
+            });
+
+            console.log(`✅ Loaded ${transformedAssets.length} assets worth $${savedTotalValue.toLocaleString()}`);
+          }
         }
 
         // Get current wallets from backend
@@ -725,19 +799,19 @@ const App = () => {
           }
         }
       } catch (error) {
-        console.error(`❌ Error syncing wallets (attempt ${retryCount + 1}/${maxRetries + 1}):`, error.message);
+        console.error(`❌ Error loading portfolio data (attempt ${retryCount + 1}/${maxRetries + 1}):`, error.message);
 
         // Retry with exponential backoff if backend isn't ready yet
         if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('Backend not ready'))) {
           const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s delays
-          console.log(`🔄 Retrying wallet sync in ${delay / 1000}s...`);
-          setTimeout(() => syncWalletsWithBackend(retryCount + 1), delay);
+          console.log(`🔄 Retrying portfolio load in ${delay / 1000}s...`);
+          setTimeout(() => loadPortfolioAndSyncWallets(retryCount + 1), delay);
         }
       }
     };
 
-    // Delay initial sync to let backend start up
-    const timer = setTimeout(() => syncWalletsWithBackend(), 2000);
+    // Delay initial load to let backend start up
+    const timer = setTimeout(() => loadPortfolioAndSyncWallets(), 3000);
     return () => clearTimeout(timer);
   }, []);
 

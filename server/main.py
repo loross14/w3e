@@ -92,12 +92,21 @@ def init_db():
             balance_formatted TEXT NOT NULL,
             price_usd REAL,
             value_usd REAL,
-            is_nft BOOLEAN DEFAULT FALSE,
-            nft_metadata TEXT,
             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (wallet_id) REFERENCES wallets (id)
         )
     ''')
+    
+    # Add missing columns if they don't exist
+    try:
+        cursor.execute('ALTER TABLE assets ADD COLUMN is_nft BOOLEAN DEFAULT FALSE')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    try:
+        cursor.execute('ALTER TABLE assets ADD COLUMN nft_metadata TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     
     # Portfolio history table
     cursor.execute('''
@@ -179,7 +188,8 @@ async def get_token_prices(token_addresses: List[str]) -> Dict[str, float]:
     known_tokens = {
         "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": {"symbol": "WBTC", "coingecko_id": "wrapped-bitcoin"},  # WBTC
         "0x808507121b80c02388fad14726482e061b8da827": {"symbol": "PENDLE", "coingecko_id": "pendle"},  # PENDLE
-        "0xa0b86a33e6776dbf0c73809f0c7d6c0d5c0b9c5c1": {"symbol": "USDC", "coingecko_id": "usd-coin"},  # USDC
+        "0xa0b86a33e6776dbf0c73809f0c7d6c0d5c0b9c5c1": {"symbol": "USDC", "coingecko_id": "usd-coin"},  # USDC (fix)
+        "0xa0b73e1ff0b80914ab6fe136c72b47cb5ed05b81": {"symbol": "USDC", "coingecko_id": "usd-coin"},  # USDC (real)
         "0xdac17f958d2ee523a2206206994597c13d831ec7": {"symbol": "USDT", "coingecko_id": "tether"},  # USDT
         "0x6b175474e89094c44da98b954eedeac495271d0f": {"symbol": "DAI", "coingecko_id": "dai"},  # DAI
         "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984": {"symbol": "UNI", "coingecko_id": "uniswap"},  # UNI
@@ -596,12 +606,14 @@ async def get_portfolio():
     conn = sqlite3.connect('crypto_fund.db')
     cursor = conn.cursor()
     
-    # Get all assets with notes
+    # Get all assets with notes, excluding hidden ones
     cursor.execute("""
         SELECT a.id, a.symbol, a.name, a.balance, a.balance_formatted, 
                a.price_usd, a.value_usd, COALESCE(n.notes, '') as notes
         FROM assets a
         LEFT JOIN asset_notes n ON a.symbol = n.symbol
+        LEFT JOIN hidden_assets h ON LOWER(a.token_address) = LOWER(h.token_address)
+        WHERE h.token_address IS NULL
         ORDER BY a.value_usd DESC
     """)
     assets_data = cursor.fetchall()
