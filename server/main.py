@@ -1644,43 +1644,43 @@ async def get_portfolio():
     assets_data = cursor.fetchall()
     print(f"🔍 [PORTFOLIO DEBUG] Assets after filtering: {len(assets_data)} assets")
 
-    # Check for NFTs in the result
-    nft_count = sum(1 for a in assets_data if len(a) > 13 and bool(a[13]))
+    # Check for NFTs in the result using dictionary keys
+    nft_count = sum(1 for a in assets_data if bool(a.get('is_nft', False)))
     print(f"🖼️ [PORTFOLIO DEBUG] NFTs found in filtered results: {nft_count}")
 
     if nft_count > 0:
         for a in assets_data:
-            if len(a) > 13 and bool(a[13]):
-                print(f"🖼️ [PORTFOLIO DEBUG] Found NFT: {a[1]} - {a[2]} - Floor: ${a[14] if len(a) > 14 else 0} - Image: {a[15] if len(a) > 15 else None}")
+            if bool(a.get('is_nft', False)):
+                print(f"🖼️ [PORTFOLIO DEBUG] Found NFT: {a['symbol']} - {a['name']} - Floor: ${a.get('floor_price', 0)} - Image: {a.get('image_url')}")
 
     if len(assets_data) > 0:
-        print(f"🔍 [PORTFOLIO DEBUG] Sample asset: {assets_data[0]}")
+        print(f"🔍 [PORTFOLIO DEBUG] Sample asset: {dict(assets_data[0])}")
     else:
         print(f"❌ [PORTFOLIO DEBUG] No assets returned by query!")
 
     assets = []
     for a in assets_data:
         try:
-            is_nft = bool(a[13]) if len(a) > 13 else False
-            floor_price = float(a[14]) if len(a) > 14 and a[14] else 0.0
-            image_url = a[15] if len(a) > 15 else None
-            nft_metadata = a[16] if len(a) > 16 else None
-            price_change_24h = float(a[17]) if len(a) > 17 and a[17] else 0.0
+            is_nft = bool(a.get('is_nft', False))
+            floor_price = float(a.get('floor_price', 0)) if a.get('floor_price') else 0.0
+            image_url = a.get('image_url')
+            nft_metadata = a.get('nft_metadata')
+            price_change_24h = float(a.get('price_change_24h', 0)) if a.get('price_change_24h') else 0.0
 
             asset_dict = {
-                "id": a[0] if a[0] else a[1],  # Use token_address as id
-                "symbol": a[1] or "Unknown",
-                "name": a[2] or "Unknown Token",
-                "balance": float(a[3]) if a[3] else 0.0,
-                "balance_formatted": a[4] or "0.000000",
-                "price_usd": float(a[5]) if a[5] else 0.0,
-                "value_usd": float(a[6]) if a[6] else 0.0,
-                "purchase_price": float(a[7]) if a[7] else 0.0,
-                "total_invested": float(a[8]) if a[8] else 0.0,
-                "realized_pnl": float(a[9]) if a[9] else 0.0,
-                "unrealized_pnl": float(a[10]) if a[10] else 0.0,
-                "total_return_pct": float(a[11]) if a[11] else 0.0,
-                "notes": a[12] or "",
+                "id": a['token_address'] if a['token_address'] else a['symbol'],  # Use token_address as id
+                "symbol": a['symbol'] or "Unknown",
+                "name": a['name'] or "Unknown Token",
+                "balance": float(a['balance']) if a['balance'] else 0.0,
+                "balance_formatted": a['balance_formatted'] or "0.000000",
+                "price_usd": float(a['price_usd']) if a['price_usd'] else 0.0,
+                "value_usd": float(a['value_usd']) if a['value_usd'] else 0.0,
+                "purchase_price": float(a['purchase_price']) if a['purchase_price'] else 0.0,
+                "total_invested": float(a['total_invested']) if a['total_invested'] else 0.0,
+                "realized_pnl": float(a['realized_pnl']) if a['realized_pnl'] else 0.0,
+                "unrealized_pnl": float(a['unrealized_pnl']) if a['unrealized_pnl'] else 0.0,
+                "total_return_pct": float(a['total_return_pct']) if a['total_return_pct'] else 0.0,
+                "notes": a['notes'] or "",
                 "is_nft": is_nft,
                 "floor_price": floor_price,
                 "image_url": image_url,
