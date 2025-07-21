@@ -1,4 +1,3 @@
-
 import os
 import asyncio
 from datetime import datetime, timedelta
@@ -91,10 +90,10 @@ class EthereumAssetFetcher(AssetFetcher):
     def __init__(self, alchemy_api_key: str):
         self.alchemy_url = f"https://eth-mainnet.g.alchemy.com/v2/{alchemy_api_key}"
         self.w3 = Web3(Web3.HTTPProvider(self.alchemy_url))
-    
+
     async def fetch_assets(self, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
         assets = []
-        
+
         try:
             # Get ETH balance
             eth_token_address = "0x0000000000000000000000000000000000000000"
@@ -114,18 +113,18 @@ class EthereumAssetFetcher(AssetFetcher):
 
             # Get ERC-20 tokens
             assets.extend(await self._fetch_erc20_tokens(wallet_address, hidden_addresses))
-            
+
             # Get NFTs
             assets.extend(await self._fetch_nfts(wallet_address, hidden_addresses))
-            
+
         except Exception as e:
             print(f"❌ Ethereum asset fetching error: {e}")
-            
+
         return assets
-    
+
     async def _fetch_erc20_tokens(self, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
         assets = []
-        
+
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
@@ -180,12 +179,12 @@ class EthereumAssetFetcher(AssetFetcher):
                                 print(f"❌ Error processing Ethereum token {contract_address}: {e}")
         except Exception as e:
             print(f"❌ Error fetching Ethereum ERC-20 tokens: {e}")
-            
+
         return assets
-    
+
     async def _fetch_nfts(self, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
         assets = []
-        
+
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 nft_response = await client.post(
@@ -242,7 +241,7 @@ class EthereumAssetFetcher(AssetFetcher):
 
         except Exception as e:
             print(f"❌ Error fetching Ethereum NFTs: {e}")
-            
+
         return assets
 
 class EthereumPriceFetcher(PriceFetcher):
@@ -255,13 +254,13 @@ class EthereumPriceFetcher(PriceFetcher):
             "0x6b175474e89094c44da98b954eedeac495271d0f": {"symbol": "DAI", "coingecko_id": "dai"},
             "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984": {"symbol": "UNI", "coingecko_id": "uniswap"},
         }
-    
+
     async def fetch_prices(self, token_addresses: List[str]) -> Dict[str, float]:
         price_map = {}
         eth_address = "0x0000000000000000000000000000000000000000"
-        
+
         print(f"💵 Fetching Ethereum prices for {len(token_addresses)} tokens...")
-        
+
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 # Get ETH price first
@@ -322,7 +321,7 @@ class EthereumPriceFetcher(PriceFetcher):
 
         except Exception as e:
             print(f"❌ Error fetching Ethereum prices: {e}")
-            
+
         return price_map
 
 # Solana-specific implementations
@@ -338,19 +337,19 @@ class SolanaAssetFetcher(AssetFetcher):
         }
         self.spl_token_program = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         self.spl_token_2022_program = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-    
+
     async def fetch_assets(self, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
         assets = []
-        
+
         print(f"🔍 [SOLANA DEBUG] Starting asset fetch for wallet: {wallet_address}")
         print(f"🔍 [SOLANA DEBUG] Solana RPC URL: {self.solana_url}")
         print(f"🔍 [SOLANA DEBUG] Hidden addresses: {list(hidden_addresses)}")
-        
+
         # Validate Solana address format
         if not self._is_valid_solana_address(wallet_address):
             print(f"❌ [SOLANA DEBUG] Invalid Solana address format: {wallet_address}")
             return assets
-            
+
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 # Get SOL balance
@@ -364,21 +363,21 @@ class SolanaAssetFetcher(AssetFetcher):
                         print(f"⚠️ [SOLANA DEBUG] No SOL balance found or balance is zero")
                 else:
                     print(f"🙈 [SOLANA DEBUG] SOL is hidden, skipping")
-                
+
                 # Get SPL tokens (both old and new program)
                 print(f"🪙 [SOLANA DEBUG] Fetching SPL token accounts...")
                 spl_assets = await self._fetch_spl_tokens(client, wallet_address, hidden_addresses)
                 assets.extend(spl_assets)
                 print(f"✅ [SOLANA DEBUG] Added {len(spl_assets)} SPL token assets")
-                
+
         except Exception as e:
             print(f"❌ [SOLANA DEBUG] Major error in asset fetching: {e}")
             import traceback
             print(f"📋 [SOLANA DEBUG] Full traceback: {traceback.format_exc()}")
-            
+
         print(f"🎯 [SOLANA DEBUG] Final result: {len(assets)} total assets found")
         return assets
-    
+
     def _is_valid_solana_address(self, address: str) -> bool:
         """Basic Solana address validation - should be 32-44 chars, base58"""
         import re
@@ -387,20 +386,20 @@ class SolanaAssetFetcher(AssetFetcher):
         # Check if it's valid base58 (no 0, O, I, l characters)
         base58_pattern = r'^[1-9A-HJ-NP-Za-km-z]+$'
         return bool(re.match(base58_pattern, address))
-    
+
     async def _fetch_sol_balance(self, client: httpx.AsyncClient, wallet_address: str) -> Optional[AssetData]:
         try:
             print(f"📊 [SOL BALANCE] Starting SOL balance fetch for {wallet_address}")
-            
+
             rpc_payload = {
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "getBalance",
                 "params": [wallet_address]
             }
-            
+
             print(f"🌐 [SOL BALANCE] RPC payload: {rpc_payload}")
-            
+
             response = await client.post(
                 self.solana_url,
                 json=rpc_payload,
@@ -409,15 +408,15 @@ class SolanaAssetFetcher(AssetFetcher):
 
             print(f"🌐 [SOL BALANCE] Response status: {response.status_code}")
             print(f"🌐 [SOL BALANCE] Response headers: {dict(response.headers)}")
-            
+
             if response.status_code == 200:
                 data = response.json()
                 print(f"📈 [SOL BALANCE] Full response data: {data}")
-                
+
                 if "error" in data:
                     print(f"❌ [SOL BALANCE] RPC Error: {data['error']}")
                     return None
-                
+
                 if "result" in data and "value" in data["result"]:
                     sol_balance_lamports = data["result"]["value"]
                     sol_balance = sol_balance_lamports / 1_000_000_000  # Convert lamports to SOL
@@ -439,24 +438,24 @@ class SolanaAssetFetcher(AssetFetcher):
             else:
                 error_text = response.text
                 print(f"❌ [SOL BALANCE] HTTP error {response.status_code}: {error_text}")
-                
+
         except Exception as e:
             print(f"❌ [SOL BALANCE] Exception: {e}")
             import traceback
             print(f"📋 [SOL BALANCE] Traceback: {traceback.format_exc()}")
-            
+
         return None
-    
+
     async def _fetch_spl_tokens(self, client: httpx.AsyncClient, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
         assets = []
-        
+
         # Fetch from both SPL Token program and SPL Token 2022 program
         program_ids = [self.spl_token_program, self.spl_token_2022_program]
-        
+
         for program_id in program_ids:
             try:
                 print(f"🪙 [SPL TOKENS] Fetching from program: {program_id}")
-                
+
                 rpc_payload = {
                     "jsonrpc": "2.0",
                     "id": 1,
@@ -467,9 +466,9 @@ class SolanaAssetFetcher(AssetFetcher):
                         {"encoding": "jsonParsed"}
                     ]
                 }
-                
+
                 print(f"🌐 [SPL TOKENS] RPC payload: {rpc_payload}")
-                
+
                 response = await client.post(
                     self.solana_url,
                     json=rpc_payload,
@@ -477,15 +476,15 @@ class SolanaAssetFetcher(AssetFetcher):
                 )
 
                 print(f"🌐 [SPL TOKENS] Response status: {response.status_code}")
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     print(f"📊 [SPL TOKENS] Full response: {data}")
-                    
+
                     if "error" in data:
                         print(f"❌ [SPL TOKENS] RPC Error: {data['error']}")
                         continue
-                    
+
                     if "result" in data and "value" in data["result"]:
                         token_accounts = data["result"]["value"]
                         print(f"📊 [SPL TOKENS] Found {len(token_accounts)} token accounts from {program_id}")
@@ -494,13 +493,13 @@ class SolanaAssetFetcher(AssetFetcher):
                             try:
                                 print(f"🔍 [SPL TOKENS] Processing account {i+1}/{len(token_accounts)}")
                                 print(f"🔍 [SPL TOKENS] Account data: {token_account}")
-                                
+
                                 # Navigate through the nested structure
                                 account_data = token_account.get("account", {})
                                 parsed_data = account_data.get("data", {})
                                 parsed_info = parsed_data.get("parsed", {})
                                 token_info = parsed_info.get("info", {})
-                                
+
                                 token_amount = token_info.get("tokenAmount", {})
                                 mint_address = token_info.get("mint", "")
 
@@ -558,7 +557,7 @@ class SolanaAssetFetcher(AssetFetcher):
                 print(f"❌ [SPL TOKENS] Major error fetching from {program_id}: {e}")
                 import traceback
                 print(f"📋 [SPL TOKENS] Major error traceback: {traceback.format_exc()}")
-        
+
         print(f"🎯 [SPL TOKENS] Final result: {len(assets)} SPL tokens found")
         return assets
 
@@ -569,12 +568,12 @@ class SolanaPriceFetcher(PriceFetcher):
             "es9vmfrzacermjfrf4h2fyd4kconky11mce8benwnyb": {"symbol": "USDT", "coingecko_id": "tether"},
             "so11111111111111111111111111111111111111112": {"symbol": "WSOL", "coingecko_id": "wrapped-solana"},
         }
-    
+
     async def fetch_prices(self, token_addresses: List[str]) -> Dict[str, float]:
         price_map = {}
-        
+
         print(f"💵 Fetching Solana prices for {len(token_addresses)} tokens...")
-        
+
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 # Get SOL price first
@@ -627,7 +626,7 @@ class SolanaPriceFetcher(PriceFetcher):
 
         except Exception as e:
             print(f"❌ Error fetching Solana prices: {e}")
-            
+
         return price_map
 
 # Chain factory
@@ -640,7 +639,7 @@ class ChainFactory:
             return SolanaAssetFetcher(alchemy_api_key)
         else:
             raise ValueError(f"Unsupported network: {network}")
-    
+
     @staticmethod
     def create_price_fetcher(network: str) -> PriceFetcher:
         if network.upper() == "ETH":
@@ -764,24 +763,20 @@ class WalletDetailsResponse(BaseModel):
 # New chain-agnostic asset fetching function
 async def get_wallet_assets_new(wallet_address: str, network: str) -> List[AssetData]:
     """New chain-agnostic asset fetching using dedicated fetchers"""
-    
-    # Get hidden assets from database
-    conn = sqlite3.connect('crypto_fund.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT token_address FROM hidden_assets")
-    hidden_addresses = set(row[0].lower() for row in cursor.fetchall())
-    conn.close()
-    
+
+    # Don't pre-filter assets during fetching - let the database filtering handle display
+    hidden_addresses = set()
+
     try:
         # Create appropriate asset fetcher for the network
         asset_fetcher = ChainFactory.create_asset_fetcher(network, ALCHEMY_API_KEY)
-        
+
         # Fetch assets using chain-specific logic
         assets = await asset_fetcher.fetch_assets(wallet_address, hidden_addresses)
-        
+
         print(f"✅ Fetched {len(assets)} assets for {network} wallet {wallet_address}")
         return assets
-        
+
     except Exception as e:
         print(f"❌ Error fetching assets for {network} wallet {wallet_address}: {e}")
         return []
@@ -789,28 +784,28 @@ async def get_wallet_assets_new(wallet_address: str, network: str) -> List[Asset
 # New chain-agnostic price fetching function
 async def get_token_prices_new(token_addresses_by_network: Dict[str, List[str]]) -> Dict[str, float]:
     """New chain-agnostic price fetching using dedicated fetchers"""
-    
+
     all_prices = {}
-    
+
     for network, token_addresses in token_addresses_by_network.items():
         if not token_addresses:
             continue
-            
+
         try:
             # Create appropriate price fetcher for the network
             price_fetcher = ChainFactory.create_price_fetcher(network)
-            
+
             # Fetch prices using chain-specific logic
             network_prices = await price_fetcher.fetch_prices(token_addresses)
-            
+
             # Merge into all_prices
             all_prices.update(network_prices)
-            
+
             print(f"✅ Fetched {len(network_prices)} prices for {network}")
-            
+
         except Exception as e:
             print(f"❌ Error fetching prices for {network}: {e}")
-    
+
     return all_prices
 
 # API endpoints
@@ -1075,7 +1070,7 @@ async def update_portfolio_data_new():
 
     try:
         print("🚀 Starting portfolio update with new chain-agnostic system...")
-        
+
         # Clear existing assets
         cursor.execute("DELETE FROM assets")
 
@@ -1096,14 +1091,14 @@ async def update_portfolio_data_new():
         # Fetch assets for each network
         for network, network_wallets in wallets_by_network.items():
             print(f"🔗 Processing {len(network_wallets)} {network} wallets...")
-            
+
             token_addresses_by_network[network] = set()
-            
+
             for wallet_id, address in network_wallets:
                 try:
                     # Use new chain-agnostic asset fetcher
                     assets = await get_wallet_assets_new(address, network)
-                    
+
                     for asset in assets:
                         asset_dict = {
                             'wallet_id': wallet_id,
@@ -1119,7 +1114,7 @@ async def update_portfolio_data_new():
                         }
                         all_assets.append(asset_dict)
                         token_addresses_by_network[network].add(asset.token_address)
-                        
+
                 except Exception as e:
                     print(f"❌ Error fetching assets for {network} wallet {address}: {e}")
 
@@ -1136,11 +1131,11 @@ async def update_portfolio_data_new():
         # Insert assets with prices
         total_portfolio_value = 0
         zero_value_assets = []
-        
+
         for asset in all_assets:
             is_nft = asset.get('is_nft', False)
             token_address = asset['token_address']
-            
+
             if is_nft:
                 price_usd = 0
                 value_usd = 0
@@ -1154,12 +1149,12 @@ async def update_portfolio_data_new():
                 price_usd = price_map.get(token_address.lower(), 0)
                 if price_usd == 0:
                     price_usd = price_map.get(token_address, 0)
-                
+
                 value_usd = asset['balance'] * price_usd
                 nft_metadata = None
-                
+
                 print(f"💰 {asset['network']} Asset: {asset['symbol']} - Balance: {asset['balance']:.6f}, Price: ${price_usd:.6f}, Value: ${value_usd:.2f}")
-                
+
                 # Track zero-value assets for auto-hiding
                 if value_usd == 0 and asset['balance'] > 0:
                     zero_value_assets.append({
