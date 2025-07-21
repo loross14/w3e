@@ -765,7 +765,7 @@ const App = () => {
         // Load saved portfolio data
         addDebugInfo("Loading portfolio data...");
         const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
-        
+
         if (!portfolioResponse.ok) {
           throw new Error(`Portfolio fetch failed: ${portfolioResponse.status} ${portfolioResponse.statusText}`);
         }
@@ -970,7 +970,7 @@ const App = () => {
         try {
           setUpdateStatus(`💼 Processing ${wallet.label} (${++walletCount}/${currentWallets.length})...`);
           const walletResponse = await fetch(`${API_BASE_URL}/wallets/${wallet.id}/details`);
-          
+
           if (walletResponse.ok) {
             const walletDetails = await walletResponse.json();
             const walletAssets = walletDetails.assets.map(asset => ({
@@ -1024,7 +1024,7 @@ const App = () => {
         performance24h: portfolioData.performance_24h || 0
       };
       setPortfolioData(newPortfolioData);
-      
+
       addDebugInfo("💾 Portfolio data updated after fetch", {
         assetCount: updatedAssets.length,
         totalValue: newTotalValue,
@@ -1444,7 +1444,7 @@ const App = () => {
         {/* Hidden Assets */}
         {hiddenAssets.length > 0 && isEditor && (
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
-            <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">Hidden Assets</h3>
+            <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">HiddenAssets</h3>
             <div className="space-y-3">
               {portfolioData.assets
                 .filter((asset) => hiddenAssets.includes(asset.id))
@@ -1454,7 +1454,7 @@ const App = () => {
                     className="flex justify-between items-center p-3 bg-gray-800 rounded-lg border border-gray-700"
                   >
                     <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
                         <span className="text-white font-bold text-xs">{asset.symbol.slice(0, 2)}</span>
                       </div>
                       <span className="text-white font-medium truncate">{asset.name}</span>

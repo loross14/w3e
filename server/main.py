@@ -748,7 +748,8 @@ class AssetResponse(BaseModel):
     value_usd: Optional[float]
     notes: Optional[str] = ""
 
-class PortfolioResponse(BaseModel):total_value: float
+class PortfolioResponse(BaseModel):
+    total_value: float
     assets: List[AssetResponse]
     wallet_count: int
     performance_24h: float
@@ -815,6 +816,43 @@ async def startup_event():
 @app.get("/")
 async def root():
     return {"message": "Crypto Fund API", "status": "running"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for debugging"""
+    conn = sqlite3.connect('crypto_fund.db')
+    cursor = conn.cursor()
+    
+    try:
+        # Test database connection
+        cursor.execute("SELECT COUNT(*) FROM wallets")
+        wallet_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM assets")
+        asset_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM hidden_assets")
+        hidden_count = cursor.fetchone()[0]
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "tables": {
+                "wallets": wallet_count,
+                "assets": asset_count,
+                "hidden_assets": hidden_count
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+    finally:
+        conn.close()
 
 @app.post("/wallets", response_model=WalletResponse)
 async def create_wallet(wallet: WalletCreate):
