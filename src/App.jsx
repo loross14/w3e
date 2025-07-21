@@ -387,25 +387,47 @@ const App = () => {
     }));
   };
 
+  // Wallet addresses for the fund
+  const walletAddresses = [
+    "0x742d35Cc6648C8532C16ef16bfB8e6d9c4b3D5f1", // Main ETH wallet
+    "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"  // Main BTC wallet
+  ];
+
   const updatePortfolio = async () => {
     setIsLoading(true);
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('Querying wallets:', walletAddresses);
       
-      // Simulate real-time price updates
+      // Simulate API calls to query wallet balances
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Simulate fetching real wallet data and price updates
+      const updatedAssets = portfolioData.assets.map(asset => {
+        const priceChange = 0.95 + Math.random() * 0.1; // ±5% price change
+        const newPrice = asset.priceUSD * priceChange;
+        const balanceChange = 0.98 + Math.random() * 0.04; // ±2% balance change
+        const newBalance = asset.balance * balanceChange;
+        
+        return {
+          ...asset,
+          priceUSD: newPrice,
+          balance: parseFloat(newBalance.toFixed(6)),
+          valueUSD: newBalance * newPrice
+        };
+      });
+
+      const newTotalValue = updatedAssets.reduce((sum, asset) => sum + asset.valueUSD, 0);
+      
       setPortfolioData(prev => ({
         ...prev,
-        assets: prev.assets.map(asset => ({
-          ...asset,
-          priceUSD: asset.priceUSD * (0.95 + Math.random() * 0.1), // ±5% price change
-          valueUSD: asset.balance * (asset.priceUSD * (0.95 + Math.random() * 0.1))
-        })),
+        assets: updatedAssets,
         balanceHistory: [
           ...prev.balanceHistory.slice(1),
-          { value: prev.balanceHistory[prev.balanceHistory.length - 1].value * (0.98 + Math.random() * 0.04) }
+          { value: newTotalValue }
         ]
       }));
+      
+      console.log('Portfolio updated successfully');
     } catch (error) {
       console.error('Error updating portfolio:', error);
       alert('Failed to update portfolio. Please try again.');
@@ -455,28 +477,17 @@ const App = () => {
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        {/* Editor Access */}
-        {!isEditor && (
-          <div className="mb-6">
-            <ActionCard
-              title="🔐 Editor Access"
-              description="Enter access key to unlock dashboard editing features"
-              buttonText="Unlock Dashboard"
-              onAction={checkPassword}
-            >
-              <div className="mb-4">
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter access key"
-                  className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-sm"
-                  onKeyPress={(e) => e.key === "Enter" && checkPassword()}
-                />
-              </div>
-            </ActionCard>
-          </div>
-        )}
+        {/* Database Update Button */}
+        <div className="mb-6">
+          <ActionCard
+            title="🔄 Update Portfolio Database"
+            description="Query all wallets and fetch current balances & history"
+            buttonText={isLoading ? <LoadingSpinner /> : "Update Database"}
+            onAction={updatePortfolio}
+            variant="primary"
+            disabled={isLoading}
+          />
+        </div>
 
         {/* Key Metrics - Mobile responsive grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
@@ -574,7 +585,7 @@ const App = () => {
 
         {/* Hidden Assets */}
         {hiddenAssets.length > 0 && isEditor && (
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
             <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">Hidden Assets</h3>
             <div className="space-y-3">
               {portfolioData.assets
@@ -599,6 +610,29 @@ const App = () => {
                   </div>
                 ))}
             </div>
+          </div>
+        )}
+
+        {/* Editor Access */}
+        {!isEditor && (
+          <div className="mb-6">
+            <ActionCard
+              title="🔐 Editor Access"
+              description="Enter access key to unlock dashboard editing features"
+              buttonText="Unlock Dashboard"
+              onAction={checkPassword}
+            >
+              <div className="mb-4">
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter access key"
+                  className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-sm"
+                  onKeyPress={(e) => e.key === "Enter" && checkPassword()}
+                />
+              </div>
+            </ActionCard>
           </div>
         )}
       </div>
