@@ -608,7 +608,7 @@ async def get_portfolio():
     
     # Get all assets with notes, excluding hidden ones
     cursor.execute("""
-        SELECT a.id, a.symbol, a.name, a.balance, a.balance_formatted, 
+        SELECT a.token_address, a.symbol, a.name, a.balance, a.balance_formatted, 
                a.price_usd, a.value_usd, COALESCE(n.notes, '') as notes
         FROM assets a
         LEFT JOIN asset_notes n ON a.symbol = n.symbol
@@ -686,7 +686,7 @@ async def get_wallet_details(wallet_id: int):
     
     # Get wallet assets
     cursor.execute("""
-        SELECT a.id, a.symbol, a.name, a.balance, a.balance_formatted, 
+        SELECT a.token_address, a.symbol, a.name, a.balance, a.balance_formatted, 
                a.price_usd, a.value_usd, COALESCE(n.notes, '') as notes
         FROM assets a
         LEFT JOIN asset_notes n ON a.symbol = n.symbol

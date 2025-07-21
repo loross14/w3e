@@ -748,6 +748,20 @@ const App = () => {
 
         // Load saved portfolio data
         console.log('📊 Loading saved portfolio data...');
+        // Load hidden assets from backend first
+        try {
+          const hiddenResponse = await fetch(`${API_BASE_URL}/assets/hidden`);
+          if (hiddenResponse.ok) {
+            const hiddenData = await hiddenResponse.json();
+            const hiddenIds = hiddenData.map(asset => asset.token_address);
+            setHiddenAssets(hiddenIds);
+            localStorage.setItem("hiddenAssets", JSON.stringify(hiddenIds));
+            console.log(`📋 Loaded ${hiddenIds.length} hidden assets from backend`);
+          }
+        } catch (error) {
+          console.error('Error loading hidden assets:', error);
+        }
+
         const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
         if (portfolioResponse.ok) {
           const savedData = await portfolioResponse.json();
