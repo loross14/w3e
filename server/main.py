@@ -205,7 +205,7 @@ class EthereumAssetFetcher(AssetFetcher):
             async with httpx.AsyncClient(timeout=30.0) as client:
                 print(f"🖼️ [ETH NFT QUERY] Starting NFT query for wallet: {wallet_address}")
                 print(f"🖼️ [ETH NFT QUERY] Alchemy URL: {self.alchemy_url}")
-                
+
                 # Enhanced NFT fetch with metadata
                 nft_query_payload = {
                     "id": 1,
@@ -219,9 +219,9 @@ class EthereumAssetFetcher(AssetFetcher):
                         }
                     ]
                 }
-                
+
                 print(f"🖼️ [ETH NFT QUERY] Request payload: {nft_query_payload}")
-                
+
                 nft_response = await client.post(
                     self.alchemy_url,
                     json=nft_query_payload
@@ -232,17 +232,17 @@ class EthereumAssetFetcher(AssetFetcher):
                 if nft_response.status_code == 200:
                     nft_data = nft_response.json()
                     print(f"🖼️ [ETH NFT QUERY] Raw response keys: {list(nft_data.keys())}")
-                    
+
                     if "error" in nft_data:
                         print(f"❌ [ETH NFT QUERY] API Error: {nft_data['error']}")
                         return assets
-                    
+
                     result = nft_data.get("result", {})
                     print(f"🖼️ [ETH NFT QUERY] Result keys: {list(result.keys())}")
-                    
+
                     owned_nfts = result.get("ownedNfts", [])
                     total_count = result.get("totalCount", 0)
-                    
+
                     print(f"🖼️ [ETH NFT QUERY] ============ NFT QUERY RESULTS ============")
                     print(f"🖼️ [ETH NFT QUERY] Total NFTs found: {total_count}")
                     print(f"🖼️ [ETH NFT QUERY] NFTs in result array: {len(owned_nfts)}")
@@ -260,12 +260,12 @@ class EthereumAssetFetcher(AssetFetcher):
                     # Group NFTs by collection with enhanced metadata
                     nft_collections = {}
                     print(f"🖼️ [ETH NFT] Processing {len(owned_nfts)} owned NFTs for wallet {wallet_address[:10]}...")
-                    
+
                     for i, nft in enumerate(owned_nfts):
                         contract_info = nft.get("contract", {})
                         contract_address = contract_info.get("address", "").lower()
                         token_id = nft.get("tokenId", "")
-                        
+
                         print(f"🖼️ [ETH NFT] NFT #{i+1}: Contract {contract_address[:10]}... Token #{token_id}")
 
                         if contract_address in hidden_addresses:
@@ -274,7 +274,7 @@ class EthereumAssetFetcher(AssetFetcher):
 
                         collection_name = contract_info.get("name", "Unknown NFT Collection")
                         collection_symbol = contract_info.get("symbol", "NFT")
-                        
+
                         print(f"🖼️ [ETH NFT] Found NFT: {collection_name} ({collection_symbol}) - Contract: {contract_address[:10]}...")
 
                         # Extract image from metadata
@@ -1411,7 +1411,8 @@ class AssetResponse(BaseModel):
     purchase_price: Optional[float] = 0
     total_invested: Optional[float] = 0
     realized_pnl: Optional[float] = 0
-    unrealized_pnl: Optional[float] = 0
+    unrealized_pnl: Optional[```python
+float] = 0
     total_return_pct: Optional[float] = 0
     notes: Optional[str] = ""
     is_nft: Optional[bool] = False
@@ -1601,7 +1602,7 @@ async def update_portfolio(background_tasks: BackgroundTasks):
 
 @app.get("/portfolio", response_model=PortfolioResponse)
 async def get_portfolio():
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     # Debug: Check what's in the assets table
@@ -1638,11 +1639,11 @@ async def get_portfolio():
     """)
     assets_data = cursor.fetchall()
     print(f"🔍 [PORTFOLIO DEBUG] Assets after filtering: {len(assets_data)} assets")
-    
+
     # Check for NFTs in the result
     nft_count = sum(1 for a in assets_data if len(a) > 13 and bool(a[13]))
     print(f"🖼️ [PORTFOLIO DEBUG] NFTs found in filtered results: {nft_count}")
-    
+
     if nft_count > 0:
         for a in assets_data:
             if len(a) > 13 and bool(a[13]):
@@ -1682,10 +1683,10 @@ async def get_portfolio():
                 "nft_metadata": nft_metadata,
                 "price_change_24h": price_change_24h
             }
-            
+
             asset = AssetResponse(**asset_dict)
             assets.append(asset)
-            
+
             if is_nft:
                 print(f"🖼️ [PORTFOLIO DEBUG] Created NFT asset: {asset.symbol} = ${asset.value_usd:.2f} (Floor: ${floor_price})")
             else:
@@ -1736,19 +1737,19 @@ async def get_portfolio():
 
 @app.get("/wallets/{wallet_id}/details", response_model=WalletDetailsResponse)
 async def get_wallet_details(wallet_id: int):
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     # Get wallet info
-    cursor.execute("SELECT id, address, label, network FROM wallets WHERE id = ?", (wallet_id,))
+    cursor.execute("SELECT id, address, label, network FROM wallets WHERE id = %s", (wallet_id,))
     wallet_data = cursor.fetchone()
     if not wallet_data:
         conn.close()
         raise HTTPException(status_code=404, detail="Wallet not found")
 
     wallet = WalletResponse(
-        id=wallet_data[0], address=wallet_data[1], 
-        label=wallet_data[2], network=wallet_data[3]
+        id=wallet_data['id'], address=wallet_data['address'], 
+        label=wallet_data['label'], network=wallet_data['network']
     )
 
     # Get wallet assets
@@ -1757,7 +1758,7 @@ async def get_wallet_details(wallet_id: int):
                a.price_usd, a.value_usd, COALESCE(n.notes, '') as notes
         FROM assets a
         LEFT JOIN asset_notes n ON a.symbol = n.symbol
-        WHERE a.wallet_id = ?
+        WHERE a.wallet_id = %s
         ORDER BY a.value_usd DESC
     """, (wallet_id,))
     assets_data = cursor.fetchall()
@@ -1794,7 +1795,7 @@ async def get_wallet_details(wallet_id: int):
 @app.get("/wallets/status")
 async def get_wallet_status():
     """Get status of all wallets including success/failure information"""
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -1829,12 +1830,14 @@ async def get_wallet_status():
 
 @app.put("/assets/{symbol}/notes")
 async def update_asset_notes(symbol: str, notes: str):
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT OR REPLACE INTO asset_notes (symbol, notes, updated_at)
-        VALUES (?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO asset_notes (symbol, notes, updated_at)
+        VALUES (%s, %s, CURRENT_TIMESTAMP)
+        ON CONFLICT (symbol) DO UPDATE SET
+        notes = EXCLUDED.notes, updated_at = CURRENT_TIMESTAMP
     """, (symbol, notes))
 
     conn.commit()
@@ -1845,19 +1848,19 @@ async def update_asset_notes(symbol: str, notes: str):
 @app.post("/assets/hide")
 async def hide_asset(token_address: str, symbol: str, name: str):
     """Hide an asset from portfolio calculations"""
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
         cursor.execute("""
-            INSERT OR REPLACE INTO hidden_assets (token_address, symbol, name)
-            VALUES (?, ?, ?)
+            INSERT INTO hidden_assets (token_address, symbol, name)
+            VALUES (%s, %s, %s)
         """, (token_address.lower(), symbol, name))
 
         conn.commit()
         print(f"✅ Hidden asset: {symbol} ({token_address})")
         return {"message": f"Asset {symbol} hidden successfully"}
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         conn.rollback()
         print(f"❌ Error hiding asset: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
@@ -1867,10 +1870,10 @@ async def hide_asset(token_address: str, symbol: str, name: str):
 @app.delete("/assets/hide/{token_address}")
 async def unhide_asset(token_address: str):
     """Unhide an asset to include in portfolio calculations"""
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM hidden_assets WHERE token_address = ?", (token_address.lower(),))
+    cursor.execute("DELETE FROM hidden_assets WHERE token_address = %s", (token_address.lower(),))
 
     if cursor.rowcount == 0:
         conn.close()
@@ -1883,7 +1886,7 @@ async def unhide_asset(token_address: str):
 @app.get("/assets/hidden")
 async def get_hidden_assets():
     """Get list of hidden assets"""
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT token_address, symbol, name, hidden_at FROM hidden_assets")
@@ -1905,13 +1908,13 @@ async def debug_nft_query(wallet_address: str):
     """Debug endpoint to manually test NFT queries"""
     try:
         print(f"🔍 [DEBUG NFT] Manual NFT query for wallet: {wallet_address}")
-        
+
         # Create Ethereum asset fetcher
         eth_fetcher = EthereumAssetFetcher(ALCHEMY_API_KEY)
-        
+
         # Fetch only NFTs
         nft_assets = await eth_fetcher._fetch_nfts(wallet_address, set())
-        
+
         return {
             "wallet_address": wallet_address,
             "nft_count": len(nft_assets),
@@ -1936,7 +1939,7 @@ async def debug_nft_query(wallet_address: str):
 @app.get("/portfolio/returns")
 async def get_portfolio_returns():
     """Get comprehensive portfolio returns analysis"""
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
@@ -1985,7 +1988,7 @@ async def get_portfolio_returns():
         worst_performers = cursor.fetchall()
 
         total_invested, total_current_value, total_unrealized_pnl, total_realized_pnl, avg_return_pct = portfolio_metrics or (0, 0, 0, 0, 0)
-        
+
         overall_return_pct = ((total_current_value - total_invested) / total_invested * 100) if total_invested > 0 else 0
 
         return {
@@ -2027,52 +2030,56 @@ async def get_portfolio_returns():
 @app.post("/assets/{symbol}/purchase")
 async def add_purchase_record(symbol: str, quantity: float, price_per_token: float, notes: str = ""):
     """Add a purchase record for manual tracking"""
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
         # Get token details
-        cursor.execute("SELECT token_address, name FROM assets WHERE symbol = ? LIMIT 1", (symbol,))
+        cursor.execute("SELECT token_address, name FROM assets WHERE symbol = %s LIMIT 1", (symbol,))
         asset_data = cursor.fetchone()
-        
+
         if not asset_data:
             raise HTTPException(status_code=404, detail="Asset not found")
-        
-        token_address, name = asset_data
+
+        token_address, name = asset_data[0], asset_data[1]
         total_value = quantity * price_per_token
 
         # Insert purchase record
         cursor.execute("""
             INSERT INTO purchase_history 
             (wallet_id, token_address, symbol, transaction_type, quantity, price_per_token, total_value, notes)
-            VALUES (1, ?, ?, 'BUY', ?, ?, ?, ?)
+            VALUES (1, %s, %s, 'BUY', %s, %s, %s, %s)
         """, (token_address, symbol, quantity, price_per_token, total_value, notes))
 
         # Update cost basis
         cursor.execute("""
             SELECT total_quantity_purchased, total_invested 
             FROM asset_cost_basis 
-            WHERE token_address = ?
+            WHERE token_address = %s
         """, (token_address,))
-        
+
         existing_basis = cursor.fetchone()
-        
+
         if existing_basis:
-            old_quantity, old_invested = existing_basis
+            old_quantity, old_invested = existing_basis[0], existing_basis[1]
             new_quantity = old_quantity + quantity
             new_invested = old_invested + total_value
             new_avg_price = new_invested / new_quantity
-            
+
             cursor.execute("""
                 UPDATE asset_cost_basis 
-                SET total_quantity_purchased = ?, total_invested = ?, average_purchase_price = ?
-                WHERE token_address = ?
+                SET total_quantity_purchased = %s, total_invested = %s, average_purchase_price = %s
+                WHERE token_address = %s
             """, (new_quantity, new_invested, new_avg_price, token_address))
         else:
             cursor.execute("""
                 INSERT INTO asset_cost_basis 
                 (token_address, symbol, average_purchase_price, total_quantity_purchased, total_invested)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (token_address) DO UPDATE SET
+                average_purchase_price = EXCLUDED.average_purchase_price,
+                total_quantity_purchased = EXCLUDED.total_quantity_purchased,
+                total_invested = EXCLUDED.total_invested
             """, (token_address, symbol, price_per_token, quantity, total_value))
 
         conn.commit()
@@ -2089,12 +2096,12 @@ async def estimate_purchase_prices_and_calculate_returns():
     Estimate purchase prices for existing assets and calculate returns.
     This uses various heuristics to estimate when assets were likely purchased.
     """
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     try:
         print("💰 Starting purchase price estimation and returns calculation...")
-        
+
         # Get all current assets
         cursor.execute("""
             SELECT token_address, symbol, name, balance, price_usd, value_usd
@@ -2102,44 +2109,48 @@ async def estimate_purchase_prices_and_calculate_returns():
             WHERE balance > 0 AND price_usd > 0
         """)
         current_assets = cursor.fetchall()
-        
+
         for token_address, symbol, name, balance, current_price, current_value in current_assets:
             try:
                 # Estimate purchase price based on asset type and historical context
                 estimated_purchase_price = await estimate_asset_purchase_price(symbol, name, current_price)
-                
+
                 # Calculate total invested (estimated)
                 total_invested = balance * estimated_purchase_price
-                
+
                 # Calculate unrealized P&L
                 unrealized_pnl = current_value - total_invested
-                
+
                 # Calculate return percentage
                 total_return_pct = ((current_value - total_invested) / total_invested * 100) if total_invested > 0 else 0
-                
+
                 # Update asset with calculated values
                 cursor.execute("""
                     UPDATE assets 
-                    SET purchase_price = ?, total_invested = ?, unrealized_pnl = ?, total_return_pct = ?
-                    WHERE token_address = ? AND balance > 0
+                    SET purchase_price = %s, total_invested = %s, unrealized_pnl = %s, total_return_pct = %s
+                    WHERE token_address = %s AND balance > 0
                 """, (estimated_purchase_price, total_invested, unrealized_pnl, total_return_pct, token_address))
-                
+
                 # Insert into cost basis table
                 cursor.execute("""
-                    INSERT OR REPLACE INTO asset_cost_basis 
+                    INSERT INTO asset_cost_basis 
                     (token_address, symbol, average_purchase_price, total_quantity_purchased, total_invested)
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (token_address) DO UPDATE SET
+                    average_purchase_price = EXCLUDED.average_purchase_price,
+                    total_quantity_purchased = EXCLUDED.total_quantity_purchased,
+                    total_invested = EXCLUDED.total_invested
                 """, (token_address, symbol, estimated_purchase_price, balance, total_invested))
-                
+
                 print(f"✅ Updated {symbol}: Purchase ${estimated_purchase_price:.4f}, Return {total_return_pct:.1f}%")
-                
+
             except Exception as e:
                 print(f"❌ Error processing {symbol}: {e}")
                 continue
-        
+
         conn.commit()
         print(f"🎯 Purchase price estimation completed for {len(current_assets)} assets")
-        
+
     except Exception as e:
         print(f"❌ Error in purchase price estimation: {e}")
         conn.rollback()
@@ -2151,43 +2162,43 @@ async def estimate_asset_purchase_price(symbol: str, name: str, current_price: f
     Estimate purchase price based on asset characteristics and market timing.
     Uses conservative estimates based on typical crypto fund entry strategies.
     """
-    
+
     # Fund likely entry points based on asset type and market conditions
     if symbol == "ETH":
         # Ethereum - likely accumulated during multiple market cycles
         return current_price * 0.65  # Estimated 35% gains
-    
+
     elif symbol == "WBTC" or "Bitcoin" in name:
         # Bitcoin/WBTC - likely accumulated during bear markets
         return current_price * 0.55  # Estimated 82% gains
-    
+
     elif symbol == "SOL":
         # Solana - likely accumulated during 2023-2024 cycle
         return current_price * 0.45  # Estimated 122% gains
-    
+
     elif symbol == "PENDLE":
         # PENDLE - likely accumulated during DeFi summer or early growth
         return current_price * 0.4   # Estimated 150% gains
-    
+
     elif symbol in ["USDC", "USDT", "DAI"]:
         # Stablecoins - purchase price should be close to $1
         return 1.0
-    
+
     elif "PENGU" in symbol or "Pudgy" in name:
         # PENGU - likely purchased during meme season or airdrop
         return current_price * 0.2   # Estimated 400% gains (early meme entry)
-    
+
     elif "Fartcoin" in name or symbol.startswith("SPL-"):
         # Meme coins and other SPL tokens - high risk, high reward entries
         if current_price > 1:
             return current_price * 0.15  # Estimated 567% gains
         else:
             return current_price * 0.25  # More conservative for smaller tokens
-    
+
     elif symbol in ["UNI", "LINK", "AAVE", "CRV"]:
         # Blue chip DeFi tokens
         return current_price * 0.6   # Estimated 67% gains
-    
+
     else:
         # Generic altcoins - conservative estimate
         return current_price * 0.5   # Estimated 100% gains
@@ -2388,10 +2399,10 @@ async def update_portfolio_data_new():
             cursor.execute("""
                 SELECT average_purchase_price, total_invested, realized_gains 
                 FROM asset_cost_basis 
-                WHERE token_address = ?
+                WHERE token_address = %s
             """, (token_address,))
             cost_basis_data = cursor.fetchone()
-            
+
             if cost_basis_data:
                 purchase_price, total_invested, realized_pnl = cost_basis_data
                 unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
@@ -2418,7 +2429,7 @@ async def update_portfolio_data_new():
                 asset.get('floor_price', 0), asset.get('image_url'),
                 purchase_price, total_invested, realized_pnl, unrealized_pnl, total_return_pct
             ))
-            
+
             # Debug NFT insertion
             if is_nft:
                 print(f"🖼️ [DATABASE] Inserted NFT: {asset['symbol']} - {asset['name']} - Count: {asset['balance']} - Floor: ${asset.get('floor_price', 0)}")
@@ -2438,7 +2449,7 @@ async def update_portfolio_data_new():
 
         # Remove valuable assets from hidden list
         for token_address, symbol, name in valuable_assets:
-            cursor.execute("DELETE FROM hidden_assets WHERE LOWER(token_address) = LOWER(?)", (token_address,))
+            cursor.execute("DELETE FROM hidden_assets WHERE LOWER(token_address) = LOWER(%s)", (token_address,))
             print(f"🔓 Unhid valuable asset: {symbol} (${cursor.rowcount} rows removed)")
 
         # Auto-hide spam/scam tokens and low-value tokens
