@@ -65,7 +65,9 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
     unrealized_pnl: asset?.unrealized_pnl || 0,
     total_return_pct: asset?.total_return_pct || 0,
     notes: asset?.notes || '',
-    isNFT: asset?.isNFT === true || asset?.symbol?.includes('NFT') || asset?.name?.includes('Collection')
+    isNFT: asset?.isNFT === true || asset?.symbol?.includes('NFT') || asset?.name?.includes('Collection'),
+    floorPrice: asset?.floorPrice || 0,
+    imageUrl: asset?.imageUrl || null
   };
 
   const safeTotalValue = totalValue || 1; // Avoid division by zero
@@ -77,28 +79,42 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
 
   return (
     <div 
-      className="bg-gradient-to-b from-gray-900 to-gray-950 border border-gray-700 rounded-xl overflow-hidden hover:border-gray-500 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10"
+      className={`border rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg ${
+        isNFTCollection 
+          ? 'bg-gradient-to-br from-purple-900/20 via-pink-900/20 to-gray-900 border-purple-500/30 hover:border-purple-400 hover:shadow-purple-500/20' 
+          : 'bg-gradient-to-b from-gray-900 to-gray-950 border-gray-700 hover:border-gray-500 hover:shadow-purple-500/10'
+      }`}
       onClick={onClick}
     >
       <div className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center space-x-3 min-w-0 flex-1">
-            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg ${
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden ${
               isNFTCollection 
-                ? 'bg-gradient-to-r from-pink-500 to-purple-500' 
-                : safeAsset.total_return_pct >= 0
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-500'
-                  : 'bg-gradient-to-r from-red-500 to-red-600'
+                ? 'rounded-lg bg-gradient-to-r from-pink-500 to-purple-500' 
+                : 'rounded-full bg-gradient-to-r ' + (safeAsset.total_return_pct >= 0 ? 'from-green-500 to-emerald-500' : 'from-red-500 to-red-600')
             }`}>
-              <span className="text-white font-bold text-sm">
-                {isNFTCollection ? '🖼️' : safeAsset.symbol.slice(0, 2)}
-              </span>
+              {isNFTCollection && safeAsset.imageUrl ? (
+                <img src={safeAsset.imageUrl} alt={safeAsset.name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white font-bold text-sm">
+                  {isNFTCollection ? '🖼️' : safeAsset.symbol.slice(0, 2)}
+                </span>
+              )}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-medium text-white text-sm sm:text-base truncate">{safeAsset.name}</h3>
-              <p className="text-xs sm:text-sm text-gray-400 truncate">
-                {safeAsset.symbol}
-                {isNFTCollection && <span className=" ml-1 text-pink-400">NFT Collection</span>}
+              <h3 className={`font-medium text-sm sm:text-base truncate ${
+                isNFTCollection ? 'text-purple-100' : 'text-white'
+              }`}>
+                {safeAsset.name}
+              </h3>
+              <p className="text-xs sm:text-sm text-gray-400 truncate flex items-center">
+                <span>{safeAsset.symbol}</span>
+                {isNFTCollection && (
+                  <span className="ml-2 px-2 py-0.5 bg-pink-500/20 text-pink-300 rounded-full text-xs border border-pink-500/30">
+                    NFT
+                  </span>
+                )}
                 {!isNFTCollection && safeAsset.total_return_pct !== 0 && (
                   <span className={`ml-2 font-bold ${returnColor}`}>
                     {returnIcon} {safeAsset.total_return_pct >= 0 ? '+' : ''}{safeAsset.total_return_pct.toFixed(0)}%
@@ -122,56 +138,92 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
 
         <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm mb-3">
           <div>
-            <span className="text-gray-400 block">{isNFTCollection ? 'Count' : 'Balance'}</span>
-            <span className="text-white font-mono">
+            <span className={`block ${isNFTCollection ? 'text-purple-300' : 'text-gray-400'}`}>
+              {isNFTCollection ? 'Items' : 'Balance'}
+            </span>
+            <span className={`font-mono ${isNFTCollection ? 'text-purple-100' : 'text-white'}`}>
               {isNFTCollection ? `${Math.floor(safeAsset.balance)} NFTs` : safeAsset.balance}
             </span>
           </div>
           <div>
-            <span className="text-gray-400 block">{isNFTCollection ? 'Floor Price' : 'Current Price'}</span>
-            <span className="text-white font-mono">
-              {isNFTCollection ? 'Coming Soon' : `$${safeAsset.priceUSD.toLocaleString()}`}
+            <span className={`block ${isNFTCollection ? 'text-purple-300' : 'text-gray-400'}`}>
+              {isNFTCollection ? 'Floor Price' : 'Current Price'}
+            </span>
+            <span className={`font-mono ${isNFTCollection ? 'text-purple-100' : 'text-white'}`}>
+              {isNFTCollection 
+                ? (safeAsset.floorPrice > 0 ? `◎ ${safeAsset.floorPrice}` : 'Coming Soon')
+                : `$${safeAsset.priceUSD.toLocaleString()}`
+              }
             </span>
           </div>
           <div>
-            <span className="text-gray-400 block">{isNFTCollection ? 'Est. Value' : 'Current Value'}</span>
-            <span className="text-white font-mono">
-              {isNFTCollection ? 'TBD' : `$${safeAsset.valueUSD.toLocaleString()}`}
+            <span className={`block ${isNFTCollection ? 'text-purple-300' : 'text-gray-400'}`}>
+              {isNFTCollection ? 'Est. Value' : 'Current Value'}
+            </span>
+            <span className={`font-mono ${isNFTCollection ? 'text-purple-100' : 'text-white'}`}>
+              {isNFTCollection 
+                ? (safeAsset.floorPrice > 0 ? `$${(safeAsset.floorPrice * safeAsset.balance * 185).toLocaleString()}` : 'TBD')
+                : `$${safeAsset.valueUSD.toLocaleString()}`
+              }
             </span>
           </div>
           <div>
-            <span className="text-gray-400 block">{isNFTCollection ? 'Weight' : 'Purchase Price'}</span>
-            <span className="text-blue-400 font-mono">
-              {isNFTCollection ? 'N/A' : `$${safeAsset.purchase_price.toFixed(4)}`}
+            <span className={`block ${isNFTCollection ? 'text-purple-300' : 'text-gray-400'}`}>
+              {isNFTCollection ? 'Portfolio %' : 'Purchase Price'}
+            </span>
+            <span className={`font-mono ${isNFTCollection ? 'text-purple-100' : 'text-blue-400'}`}>
+              {isNFTCollection 
+                ? `${weight}%`
+                : `$${safeAsset.purchase_price.toFixed(4)}`
+              }
             </span>
           </div>
         </div>
       </div>
 
-      {/* Enhanced P&L section with gradient background */}
-      {!isNFTCollection && safeAsset.total_invested > 0 && (
-        <div className={`px-4 py-3 ${
-          safeAsset.unrealized_pnl >= 0 
-            ? 'bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-t border-green-700/50' 
-            : 'bg-gradient-to-r from-red-900/40 to-red-800/40 border-t border-red-700/50'
-        }`}>
+      {/* Enhanced P&L section for tokens, NFT status for collections */}
+      {isNFTCollection ? (
+        <div className="px-4 py-3 bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-t border-purple-700/50">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-2">
-              <span className={`w-2 h-2 rounded-full ${
-                safeAsset.unrealized_pnl >= 0 ? 'bg-green-400' : 'bg-red-400'
-              }`}></span>
-              <span className="text-xs sm:text-sm font-medium text-gray-300">P&L</span>
+              <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+              <span className="text-xs sm:text-sm font-medium text-purple-200">Collection Status</span>
             </div>
             <div className="text-right">
-              <div className={`text-sm sm:text-base font-bold ${returnColor}`}>
-                {safeAsset.unrealized_pnl >= 0 ? '+' : ''}${safeAsset.unrealized_pnl.toLocaleString()}
+              <div className="text-sm sm:text-base font-bold text-purple-300">
+                {safeAsset.floorPrice > 0 ? 'Active' : 'Tracking'}
               </div>
-              <div className={`text-xs ${returnColor} opacity-80`}>
-                {safeAsset.total_return_pct >= 0 ? '+' : ''}{safeAsset.total_return_pct.toFixed(1)}%
+              <div className="text-xs text-purple-400 opacity-80">
+                {Math.floor(safeAsset.balance)} items
               </div>
             </div>
           </div>
         </div>
+      ) : (
+        safeAsset.total_invested > 0 && (
+          <div className={`px-4 py-3 ${
+            safeAsset.unrealized_pnl >= 0 
+              ? 'bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-t border-green-700/50' 
+              : 'bg-gradient-to-r from-red-900/40 to-red-800/40 border-t border-red-700/50'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <span className={`w-2 h-2 rounded-full ${
+                  safeAsset.unrealized_pnl >= 0 ? 'bg-green-400' : 'bg-red-400'
+                }`}></span>
+                <span className="text-xs sm:text-sm font-medium text-gray-300">P&L</span>
+              </div>
+              <div className="text-right">
+                <div className={`text-sm sm:text-base font-bold ${returnColor}`}>
+                  {safeAsset.unrealized_pnl >= 0 ? '+' : ''}${safeAsset.unrealized_pnl.toLocaleString()}
+                </div>
+                <div className={`text-xs ${returnColor} opacity-80`}>
+                  {safeAsset.total_return_pct >= 0 ? '+' : ''}{safeAsset.total_return_pct.toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          </div>
+        )
       )}
     </div>
   );
@@ -1848,108 +1900,18 @@ const App = () => {
           </div>
         </div>
 
-        {/* NFT Collections */}
-        {(() => {
-          // Enhanced NFT detection - check both is_nft flag and symbol/name patterns
-          const nfts = visibleAssets.filter(asset => {
-            const isMarkedAsNFT = asset.isNFT === true;
-            const hasNFTInSymbol = asset.symbol && asset.symbol.includes('NFT');
-            const hasNFTInName = asset.name && (asset.name.includes('Collection') || asset.name.includes('NFT'));
-            const isNFT = isMarkedAsNFT || hasNFTInSymbol || hasNFTInName;
-            
-            console.log(`🖼️ [NFT DEBUG] Asset ${asset.symbol}: isMarkedAsNFT=${isMarkedAsNFT}, hasNFTInSymbol=${hasNFTInSymbol}, hasNFTInName=${hasNFTInName}, finalIsNFT=${isNFT}`);
-            return isNFT;
-          });
-          
-          console.log("🖼️ [NFT DEBUG] Total NFTs found:", nfts.length, nfts);
-          return nfts.length > 0;
-        })() && (
-          <div className="mb-6 sm:mb-8">
-            <div className="flex justify-between items-center mb-4 sm:mb-6">
-              <h3 className="text-base sm:text-lg font-semibold text-white">🖼️ NFT Collections</h3>
-              <span className="text-xs sm:text-sm text-gray-400">
-                {visibleAssets.filter(asset => {
-                  const isMarkedAsNFT = asset.isNFT === true;
-                  const hasNFTInSymbol = asset.symbol && asset.symbol.includes('NFT');
-                  const hasNFTInName = asset.name && (asset.name.includes('Collection') || asset.name.includes('NFT'));
-                  return isMarkedAsNFT || hasNFTInSymbol || hasNFTInName;
-                }).length} collections
-              </span>
-            </div>
+        
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {visibleAssets.filter(asset => {
-                const isMarkedAsNFT = asset.isNFT === true;
-                const hasNFTInSymbol = asset.symbol && asset.symbol.includes('NFT');
-                const hasNFTInName = asset.name && (asset.name.includes('Collection') || asset.name.includes('NFT'));
-                return isMarkedAsNFT || hasNFTInSymbol || hasNFTInName;
-              }).map((nft) => (
-                  <div
-                    key={nft.id}
-                    className="bg-gray-900 border border-gray-700 rounded-xl p-4 hover:border-purple-500 cursor-pointer transition-all duration-200"
-                    onClick={() => setSelectedAsset(nft)}
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center space-x-3 min-w-0 flex-1">
-                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center">
-                          {nft.imageUrl ? (
-                            <img src={nft.imageUrl} alt={nft.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-white font-bold text-lg">🖼️</span>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-medium text-white text-sm truncate">{nft.name}</h3>
-                          <p className="text-xs text-pink-400">NFT Collection</p>
-                        </div>
-                      </div>
-                      {isEditor && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleHiddenAsset(nft);
-                          }}
-                          className="text-xs bg-red-600/20 text-red-400 px-2 py-1 rounded-md hover:bg-red-600/30 transition-colors border border-red-600/30 ml-2 flex-shrink-0"
-                        >
-                          Hide
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Items:</span>
-                        <span className="text-white font-mono">{Math.floor(nft.balance)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Floor Price:</span>
-                        <span className="text-purple-400 font-mono">
-                          {nft.floorPrice > 0 ? `◎ ${nft.floorPrice}` : 'Coming Soon'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Est. Value:</span>
-                        <span className="text-green-400 font-mono">
-                          {nft.floorPrice > 0 ? `$${(nft.floorPrice * nft.balance * 185).toLocaleString()}` : 'TBD'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
-
-        {/* Regular Assets Grid - Mobile responsive */}
+        {/* Current Positions Grid - Mobile responsive */}
         <div className="mb-6 sm:mb-8">
           <div className="flex justify-between items-center mb-4 sm:mb-6">
             <h3 className="text-base sm:text-lg font-semibold text-white">💰 Current Positions</h3>
             <span className="text-xs sm:text-sm text-gray-400">
-              {visibleAssets.filter(asset => !asset.isNFT).length} tokens • ${visibleAssets.filter(asset => !asset.isNFT).reduce((sum, asset) => sum + asset.valueUSD, 0).toLocaleString()}
+              {visibleAssets.length} positions • ${visibleAssets.reduce((sum, asset) => sum + asset.valueUSD, 0).toLocaleString()}
             </span>
           </div>
 
-          {visibleAssets.filter(asset => !asset.isNFT).length === 0 ? (
+          {visibleAssets.length === 0 ? (
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 text-center">
               <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1970,25 +1932,16 @@ const App = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-              {visibleAssets
-                .filter(asset => {
-                  const isMarkedAsNFT = asset.isNFT === true;
-                  const hasNFTInSymbol = asset.symbol && asset.symbol.includes('NFT');
-                  const hasNFTInName = asset.name && (asset.name.includes('Collection') || asset.name.includes('NFT'));
-                  const isNFT = isMarkedAsNFT || hasNFTInSymbol || hasNFTInName;
-                  console.log(`💰 [TOKENS DEBUG] Asset ${asset.symbol}: isNFT=${isNFT}, will include=${!isNFT}`);
-                  return !isNFT; // Exclude NFTs from regular token section
-                })
-                .map((asset) => (
-                  <AssetCard
-                    key={asset.id}
-                    asset={asset}
-                    onClick={() => setSelectedAsset(asset)}
-                    onHide={() => toggleHiddenAsset(asset)}
-                    isEditor={isEditor}
-                    totalValue={totalValue}
-                  />
-                ))}
+              {visibleAssets.map((asset) => (
+                <AssetCard
+                  key={asset.id}
+                  asset={asset}
+                  onClick={() => setSelectedAsset(asset)}
+                  onHide={() => toggleHiddenAsset(asset)}
+                  isEditor={isEditor}
+                  totalValue={totalValue}
+                />
+              ))}
             </div>
           )}
         </div>
