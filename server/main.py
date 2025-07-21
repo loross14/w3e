@@ -1630,7 +1630,7 @@ async def get_portfolio():
                a.price_usd, a.value_usd, COALESCE(a.purchase_price, 0) as purchase_price,
                COALESCE(a.total_invested, 0) as total_invested, COALESCE(a.realized_pnl, 0) as realized_pnl,
                COALESCE(a.unrealized_pnl, 0) as unrealized_pnl, COALESCE(a.total_return_pct, 0) as total_return_pct,
-               COALESCE(n.notes, '') as notes, COALESCE(a.is_nft, 0) as is_nft,
+               COALESCE(n.notes, '') as notes, COALESCE(a.is_nft, FALSE) as is_nft,
                COALESCE(a.floor_price, 0) as floor_price, a.image_url, a.nft_metadata,
                COALESCE(a.price_change_24h, 0) as price_change_24h
         FROM assets a

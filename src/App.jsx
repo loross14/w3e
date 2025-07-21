@@ -1025,6 +1025,8 @@ const App = () => {
     }
 
     try {
+      addDebugInfo(`Adding wallet: ${newWalletLabel} (${newWalletNetwork})`);
+      
       const response = await fetch(`${API_BASE_URL}/wallets`, {
         method: 'POST',
         headers: {
@@ -1038,23 +1040,39 @@ const App = () => {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to add wallet');
+        const errorText = await response.text();
+        let errorMessage;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.detail || 'Failed to add wallet';
+        } catch {
+          errorMessage = `HTTP ${response.status}: ${errorText}`;
+        }
+        throw new Error(errorMessage);
       }
 
       const newWallet = await response.json();
+      addDebugInfo(`✅ Wallet added to backend: ${newWallet.id} - ${newWallet.label}`);
 
+      // Update local state
       const updatedWallets = [...walletAddresses, newWallet];
       setWalletAddresses(updatedWallets);
       localStorage.setItem("fundWallets", JSON.stringify(updatedWallets));
 
+      // Clear form
       setNewWalletAddress("");
       setNewWalletLabel("");
       setNewWalletNetwork("ETH");
 
-      alert("Wallet added successfully!");
+      addDebugInfo(`✅ Wallet "${newWallet.label}" added successfully`);
+      
+      // Show success message
+      setUpdateStatus(`✅ Added wallet: ${newWallet.label}`);
+      setTimeout(() => setUpdateStatus(''), 3000);
+
     } catch (error) {
       console.error('Error adding wallet:', error);
+      addDebugInfo(`❌ Error adding wallet: ${error.message}`);
       alert(`Failed to add wallet: ${error.message}`);
     }
   };
@@ -1271,26 +1289,52 @@ const App = () => {
           const backendWallets = await walletsResponse.json();
           addDebugInfo(`📋 Backend has ${backendWallets.length} wallets`, backendWallets);
 
-            // Update local wallet state to match backend, but preserve default wallets
-            if (backendWallets.length > 0) {
-              // Merge backend wallets with local state, ensuring important wallets aren't lost
-              const currentWallets = [...walletAddresses];
-              const mergedWallets = [...backendWallets];
-
-              // Check if Solana wallet exists in backend, if not preserve it
-              const hasSolanaWallet = backendWallets.some(w => w.network === "SOL");
-              if (!hasSolanaWallet) {
-                const localSolanaWallet = currentWallets.find(w => w.network === "SOL");
-                if (localSolanaWallet) {
-                  mergedWallets.push(localSolanaWallet);
-                  addDebugInfo("🔄 Preserved Solana wallet in sync");
+          // Update local wallet state to match backend, but preserve default wallets
+          if (backendWallets.length > 0) {
+            // Use backend wallets as source of truth
+            setWalletAddresses(backendWallets);
+            localStorage.setItem("fundWallets", JSON.stringify(backendWallets));
+            addDebugInfo("✅ Using backend wallets as source of truth");
+          } else {
+            // Backend is empty, sync local wallets to backend
+            addDebugInfo("Backend has no wallets, syncing local wallets...");
+            const currentWallets = [...walletAddresses];
+            const syncPromises = currentWallets.map(async (wallet) => {
+              try {
+                const response = await fetch(`${API_BASE_URL}/wallets`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    address: wallet.address,
+                    label: wallet.label,
+                    network: wallet.network
+                  }),
+                });
+                
+                if (response.ok) {
+                  const newWallet = await response.json();
+                  addDebugInfo(`✅ Synced wallet to backend: ${wallet.label}`);
+                  return newWallet;
+                } else {
+                  addDebugInfo(`❌ Failed to sync wallet: ${wallet.label}`);
+                  return null;
                 }
+              } catch (error) {
+                addDebugInfo(`❌ Error syncing wallet ${wallet.label}: ${error.message}`);
+                return null;
               }
+            });
 
-              setWalletAddresses(mergedWallets);
-              localStorage.setItem("fundWallets", JSON.stringify(mergedWallets));
-              addDebugInfo("✅ Local wallets synced with backend (with preservation)");
+            // Wait for all syncs to complete
+            const syncedWallets = await Promise.all(syncPromises);
+            const successfulWallets = syncedWallets.filter(w => w !== null);
+            
+            if (successfulWallets.length > 0) {
+              setWalletAddresses(successfulWallets);
+              localStorage.setItem("fundWallets", JSON.stringify(successfulWallets));
+              addDebugInfo(`✅ Synced ${successfulWallets.length} wallets to backend`);
             }
+          }
 
           // Load wallet status information
           try {
