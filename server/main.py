@@ -334,6 +334,7 @@ class SolanaAssetFetcher(AssetFetcher):
             "So11111111111111111111111111111111111111112": {"symbol": "WSOL", "name": "Wrapped SOL"},
             "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": {"symbol": "BONK", "name": "Bonk"},
             "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs": {"symbol": "ETH", "name": "Ether (Portal)"},
+            "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So": {"symbol": "mSOL", "name": "Marinade Staked SOL"},
         }
         self.spl_token_program = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         self.spl_token_2022_program = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
@@ -379,23 +380,37 @@ class SolanaAssetFetcher(AssetFetcher):
         return assets
 
     def _is_valid_solana_address(self, address: str) -> bool:
-        """Basic Solana address validation - should be 32-44 chars, base58"""
-        import re
-        if not address or len(address) < 32 or len(address) > 44:
-            return False
-        # Check if it's valid base58 (no 0, O, I, l characters)
-        base58_pattern = r'^[1-9A-HJ-NP-Za-km-z]+$'
-        return bool(re.match(base58_pattern, address))
+        """Proper Solana address validation using base58 decoding"""
+        try:
+            import base58
+            
+            if not address or len(address) < 32 or len(address) > 44:
+                return False
+            
+            # Decode base58 and check if it's 32 bytes (standard Solana pubkey length)
+            decoded = base58.b58decode(address)
+            return len(decoded) == 32
+        except:
+            # Fallback to regex if base58 module not available
+            import re
+            if not address or len(address) < 32 or len(address) > 44:
+                return False
+            base58_pattern = r'^[1-9A-HJ-NP-Za-km-z]+$'
+            return bool(re.match(base58_pattern, address))
 
     async def _fetch_sol_balance(self, client: httpx.AsyncClient, wallet_address: str) -> Optional[AssetData]:
         try:
             print(f"📊 [SOL BALANCE] Starting SOL balance fetch for {wallet_address}")
 
+            # Use commitment level for more reliable results
             rpc_payload = {
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "getBalance",
-                "params": [wallet_address]
+                "params": [
+                    wallet_address,
+                    {"commitment": "confirmed"}  # Use confirmed commitment for reliability
+                ]
             }
 
             print(f"🌐 [SOL BALANCE] RPC payload: {rpc_payload}")
@@ -403,22 +418,38 @@ class SolanaAssetFetcher(AssetFetcher):
             response = await client.post(
                 self.solana_url,
                 json=rpc_payload,
-                headers={"Content-Type": "application/json"}
+                headers={
+                    "Content-Type": "application/json",
+                    "accept": "application/json"
+                },
+                timeout=30.0
             )
 
             print(f"🌐 [SOL BALANCE] Response status: {response.status_code}")
-            print(f"🌐 [SOL BALANCE] Response headers: {dict(response.headers)}")
-
+            
             if response.status_code == 200:
                 data = response.json()
-                print(f"📈 [SOL BALANCE] Full response data: {data}")
+                print(f"📈 [SOL BALANCE] Response data: {data}")
 
                 if "error" in data:
-                    print(f"❌ [SOL BALANCE] RPC Error: {data['error']}")
+                    error_info = data["error"]
+                    print(f"❌ [SOL BALANCE] RPC Error: {error_info}")
+                    # Check for specific error types
+                    if "Invalid param" in str(error_info):
+                        print(f"❌ [SOL BALANCE] Invalid address format: {wallet_address}")
                     return None
 
-                if "result" in data and "value" in data["result"]:
-                    sol_balance_lamports = data["result"]["value"]
+                if "result" in data:
+                    result = data["result"]
+                    if isinstance(result, dict) and "value" in result:
+                        sol_balance_lamports = result["value"]
+                    elif isinstance(result, int):
+                        # Sometimes Alchemy returns the balance directly as an integer
+                        sol_balance_lamports = result
+                    else:
+                        print(f"❌ [SOL BALANCE] Unexpected result format: {result}")
+                        return None
+                    
                     sol_balance = sol_balance_lamports / 1_000_000_000  # Convert lamports to SOL
                     print(f"💰 [SOL BALANCE] Success! {sol_balance} SOL ({sol_balance_lamports} lamports)")
 
@@ -433,18 +464,27 @@ class SolanaAssetFetcher(AssetFetcher):
                         )
                     else:
                         print(f"⚠️ [SOL BALANCE] Zero balance found")
+                        return None
                 else:
-                    print(f"❌ [SOL BALANCE] Unexpected response format: {data}")
+                    print(f"❌ [SOL BALANCE] No result field in response: {data}")
+                    return None
             else:
                 error_text = response.text
                 print(f"❌ [SOL BALANCE] HTTP error {response.status_code}: {error_text}")
+                if response.status_code == 401:
+                    print(f"❌ [SOL BALANCE] Authentication error - check ALCHEMY_API_KEY")
+                elif response.status_code == 429:
+                    print(f"❌ [SOL BALANCE] Rate limited - too many requests")
+                return None
 
+        except httpx.TimeoutException:
+            print(f"❌ [SOL BALANCE] Request timeout")
+            return None
         except Exception as e:
             print(f"❌ [SOL BALANCE] Exception: {e}")
             import traceback
             print(f"📋 [SOL BALANCE] Traceback: {traceback.format_exc()}")
-
-        return None
+            return None
 
     async def _fetch_spl_tokens(self, client: httpx.AsyncClient, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
         assets = []
@@ -463,7 +503,10 @@ class SolanaAssetFetcher(AssetFetcher):
                     "params": [
                         wallet_address,
                         {"programId": program_id},
-                        {"encoding": "jsonParsed"}
+                        {
+                            "encoding": "jsonParsed",
+                            "commitment": "confirmed"  # Use confirmed commitment
+                        }
                     ]
                 }
 
@@ -472,17 +515,24 @@ class SolanaAssetFetcher(AssetFetcher):
                 response = await client.post(
                     self.solana_url,
                     json=rpc_payload,
-                    headers={"Content-Type": "application/json"}
+                    headers={
+                        "Content-Type": "application/json",
+                        "accept": "application/json"
+                    },
+                    timeout=30.0
                 )
 
                 print(f"🌐 [SPL TOKENS] Response status: {response.status_code}")
 
                 if response.status_code == 200:
                     data = response.json()
-                    print(f"📊 [SPL TOKENS] Full response: {data}")
+                    print(f"📊 [SPL TOKENS] Response keys: {list(data.keys())}")
 
                     if "error" in data:
-                        print(f"❌ [SPL TOKENS] RPC Error: {data['error']}")
+                        error_info = data["error"]
+                        print(f"❌ [SPL TOKENS] RPC Error: {error_info}")
+                        if "Invalid param" in str(error_info):
+                            print(f"❌ [SPL TOKENS] Invalid parameters for {program_id}")
                         continue
 
                     if "result" in data and "value" in data["result"]:
@@ -492,43 +542,72 @@ class SolanaAssetFetcher(AssetFetcher):
                         for i, token_account in enumerate(token_accounts):
                             try:
                                 print(f"🔍 [SPL TOKENS] Processing account {i+1}/{len(token_accounts)}")
-                                print(f"🔍 [SPL TOKENS] Account data: {token_account}")
 
-                                # Navigate through the nested structure
-                                account_data = token_account.get("account", {})
-                                parsed_data = account_data.get("data", {})
-                                parsed_info = parsed_data.get("parsed", {})
-                                token_info = parsed_info.get("info", {})
+                                # Parse the token account structure
+                                account_info = token_account.get("account", {})
+                                if not account_info:
+                                    print(f"⚠️ [SPL TOKENS] No account info in token_account")
+                                    continue
 
-                                token_amount = token_info.get("tokenAmount", {})
+                                account_data = account_info.get("data", {})
+                                if not isinstance(account_data, dict):
+                                    print(f"⚠️ [SPL TOKENS] Account data is not a dict: {type(account_data)}")
+                                    continue
+
+                                parsed_data = account_data.get("parsed", {})
+                                if not parsed_data:
+                                    print(f"⚠️ [SPL TOKENS] No parsed data found")
+                                    continue
+
+                                token_info = parsed_data.get("info", {})
+                                if not token_info:
+                                    print(f"⚠️ [SPL TOKENS] No token info found")
+                                    continue
+
+                                # Extract mint address and token amount
                                 mint_address = token_info.get("mint", "")
+                                token_amount = token_info.get("tokenAmount", {})
+
+                                if not mint_address:
+                                    print(f"⚠️ [SPL TOKENS] No mint address found")
+                                    continue
 
                                 print(f"🔍 [SPL TOKENS] Mint: {mint_address}")
-                                print(f"🔍 [SPL TOKENS] Token amount info: {token_amount}")
+                                print(f"🔍 [SPL TOKENS] Token amount: {token_amount}")
 
                                 # Skip if this token is hidden
                                 if mint_address.lower() in hidden_addresses:
                                     print(f"🙈 [SPL TOKENS] Token {mint_address} is hidden, skipping")
                                     continue
 
-                                # Get balance and decimals
+                                # Extract balance information
                                 ui_amount = token_amount.get("uiAmount")
-                                balance = float(ui_amount) if ui_amount is not None else 0
+                                amount_string = token_amount.get("amount", "0")
                                 decimals = token_amount.get("decimals", 0)
+
+                                # Handle balance calculation
+                                if ui_amount is not None and ui_amount != 0:
+                                    balance = float(ui_amount)
+                                elif amount_string and amount_string != "0":
+                                    # Calculate from raw amount if uiAmount not available
+                                    raw_amount = int(amount_string)
+                                    balance = raw_amount / (10 ** decimals) if decimals > 0 else raw_amount
+                                else:
+                                    balance = 0
 
                                 print(f"💰 [SPL TOKENS] Balance: {balance}, Decimals: {decimals}")
 
-                                if balance > 0:  # Include all non-zero balances
+                                if balance > 0:  # Only include tokens with positive balance
                                     # Get token metadata
-                                    symbol = mint_address[:8] + "..."  # Fallback
-                                    name = f"SPL Token {mint_address[:12]}..."
-
                                     if mint_address in self.known_tokens:
                                         symbol = self.known_tokens[mint_address]["symbol"]
                                         name = self.known_tokens[mint_address]["name"]
                                         print(f"✅ [SPL TOKENS] Found known token: {symbol}")
                                     else:
-                                        print(f"⚠️ [SPL TOKENS] Unknown token, using fallback name")
+                                        # Create fallback names for unknown tokens
+                                        symbol = f"SPL-{mint_address[:6]}"
+                                        name = f"SPL Token ({mint_address[:8]}...)"
+                                        print(f"⚠️ [SPL TOKENS] Unknown token, using fallback: {symbol}")
 
                                     asset = AssetData(
                                         token_address=mint_address,
@@ -539,24 +618,35 @@ class SolanaAssetFetcher(AssetFetcher):
                                         decimals=decimals
                                     )
                                     assets.append(asset)
-                                    print(f"✅ [SPL TOKENS] Added token: {symbol} - {balance:.6f} ({mint_address[:12]}...)")
+                                    print(f"✅ [SPL TOKENS] Added token: {symbol} - {balance:.6f}")
                                 else:
-                                    print(f"⚠️ [SPL TOKENS] Zero balance, skipping: {mint_address}")
+                                    print(f"⚠️ [SPL TOKENS] Zero balance, skipping: {mint_address[:12]}...")
 
                             except Exception as e:
                                 print(f"❌ [SPL TOKENS] Error processing token account {i+1}: {e}")
                                 import traceback
-                                print(f"📋 [SPL TOKENS] Token processing traceback: {traceback.format_exc()}")
+                                print(f"📋 [SPL TOKENS] Processing error traceback: {traceback.format_exc()}")
+                                continue
                     else:
-                        print(f"❌ [SPL TOKENS] Unexpected response format: {data}")
+                        print(f"❌ [SPL TOKENS] Unexpected response structure: {data}")
+                elif response.status_code == 401:
+                    print(f"❌ [SPL TOKENS] Authentication error for {program_id} - check ALCHEMY_API_KEY")
+                    break  # Don't try other programs if auth fails
+                elif response.status_code == 429:
+                    print(f"❌ [SPL TOKENS] Rate limited for {program_id}")
+                    await asyncio.sleep(1)  # Brief delay before continuing
                 else:
                     error_text = response.text
-                    print(f"❌ [SPL TOKENS] HTTP error {response.status_code}: {error_text}")
+                    print(f"❌ [SPL TOKENS] HTTP error {response.status_code} for {program_id}: {error_text}")
 
+            except httpx.TimeoutException:
+                print(f"❌ [SPL TOKENS] Timeout fetching from {program_id}")
+                continue
             except Exception as e:
                 print(f"❌ [SPL TOKENS] Major error fetching from {program_id}: {e}")
                 import traceback
                 print(f"📋 [SPL TOKENS] Major error traceback: {traceback.format_exc()}")
+                continue
 
         print(f"🎯 [SPL TOKENS] Final result: {len(assets)} SPL tokens found")
         return assets

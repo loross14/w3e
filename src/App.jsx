@@ -219,7 +219,7 @@ const WalletCard = ({ wallet, onClick, walletData }) => {
   
   // Check if wallet has errors or no data (especially Solana wallets)
   const isSolanaWallet = wallet.network === 'SOL';
-  const hasError = walletData?.hasError || (isSolanaWallet && assetCount === 0) || (!walletData?.assets && wallet.network === 'SOL');
+  const hasError = walletData?.hasError || walletData?.error || (isSolanaWallet && assetCount === 0 && walletData?.status !== 'loading');
 
   return (
     <div 
@@ -253,9 +253,12 @@ const WalletCard = ({ wallet, onClick, walletData }) => {
 
       {hasError ? (
         <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
-          <div className="text-red-400 text-xs font-medium mb-1">⚠️ Data Fetch Error</div>
+          <div className="text-red-400 text-xs font-medium mb-1">⚠️ Solana Fetch Error</div>
           <div className="text-red-300 text-xs">
-            Unable to fetch Solana wallet data. Solana integration is currently experiencing issues.
+            {walletData?.errorMessage || 'Unable to fetch Solana data. This could be due to API limits, network issues, or wallet address format problems.'}
+          </div>
+          <div className="text-red-400 text-xs mt-1">
+            💡 Try updating the portfolio again or check if the Solana address is valid.
           </div>
         </div>
       ) : (
