@@ -387,16 +387,50 @@ const App = () => {
     }));
   };
 
-  // Wallet addresses for the fund
-  const walletAddresses = [
-    "0x742d35Cc6648C8532C16ef16bfB8e6d9c4b3D5f1", // Main ETH wallet
-    "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"  // Main BTC wallet
-  ];
+  // Wallet addresses for the fund - stored in state for dynamic management
+  const [walletAddresses, setWalletAddresses] = useState(() => {
+    const saved = localStorage.getItem("fundWallets");
+    return saved ? JSON.parse(saved) : [
+      { id: 1, address: "0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98", label: "Ethereum Safe Multisig", network: "ETH" },
+      { id: 2, address: "4ZE7D7ecU7tSvA5iJVCVp6MprguDqy7tvXguE64T9Twb", label: "Solana EOA", network: "SOL" }
+    ];
+  });
+  const [newWalletAddress, setNewWalletAddress] = useState("");
+  const [newWalletLabel, setNewWalletLabel] = useState("");
+  const [newWalletNetwork, setNewWalletNetwork] = useState("ETH");
+
+  const addWallet = () => {
+    if (!newWalletAddress.trim() || !newWalletLabel.trim()) {
+      alert("Please enter both wallet address and label");
+      return;
+    }
+    
+    const newWallet = {
+      id: Date.now(),
+      address: newWalletAddress.trim(),
+      label: newWalletLabel.trim(),
+      network: newWalletNetwork
+    };
+    
+    const updatedWallets = [...walletAddresses, newWallet];
+    setWalletAddresses(updatedWallets);
+    localStorage.setItem("fundWallets", JSON.stringify(updatedWallets));
+    
+    setNewWalletAddress("");
+    setNewWalletLabel("");
+    setNewWalletNetwork("ETH");
+  };
+
+  const removeWallet = (walletId) => {
+    const updatedWallets = walletAddresses.filter(wallet => wallet.id !== walletId);
+    setWalletAddresses(updatedWallets);
+    localStorage.setItem("fundWallets", JSON.stringify(updatedWallets));
+  };
 
   const updatePortfolio = async () => {
     setIsLoading(true);
     try {
-      console.log('Querying wallets:', walletAddresses);
+      console.log('Querying wallets:', walletAddresses.map(w => `${w.label} (${w.network}): ${w.address}`));
       
       // Simulate API calls to query wallet balances
       await new Promise(resolve => setTimeout(resolve, 3000));
@@ -556,6 +590,77 @@ const App = () => {
               <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">Generate Reports</h3>
               <p className="text-sm text-gray-400 mb-4">Export performance reports</p>
               <ReportGenerator portfolioData={{ ...portfolioData, totalValue }} />
+            </div>
+          </div>
+        )}
+
+        {/* Wallet Management Section */}
+        {isEditor && (
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
+            <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">Fund Wallets</h3>
+            
+            {/* Current Wallets */}
+            <div className="space-y-3 mb-6">
+              {walletAddresses.map((wallet) => (
+                <div key={wallet.id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg border border-gray-700">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-bold text-xs">{wallet.network}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-white font-medium text-sm">{wallet.label}</p>
+                      <p className="text-gray-400 text-xs font-mono break-all">{wallet.address}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeWallet(wallet.id)}
+                    className="text-red-400 hover:text-red-300 p-1 ml-2 flex-shrink-0"
+                    title="Remove wallet"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add New Wallet Form */}
+            <div className="border-t border-gray-700 pt-4">
+              <h4 className="text-sm font-medium text-gray-300 mb-3">Add New Wallet</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <input
+                  type="text"
+                  value={newWalletLabel}
+                  onChange={(e) => setNewWalletLabel(e.target.value)}
+                  placeholder="Wallet label"
+                  className="col-span-1 p-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-sm"
+                />
+                <select
+                  value={newWalletNetwork}
+                  onChange={(e) => setNewWalletNetwork(e.target.value)}
+                  className="col-span-1 p-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-sm"
+                >
+                  <option value="ETH">Ethereum</option>
+                  <option value="SOL">Solana</option>
+                  <option value="BTC">Bitcoin</option>
+                  <option value="MATIC">Polygon</option>
+                  <option value="AVAX">Avalanche</option>
+                </select>
+                <input
+                  type="text"
+                  value={newWalletAddress}
+                  onChange={(e) => setNewWalletAddress(e.target.value)}
+                  placeholder="Wallet address"
+                  className="col-span-1 sm:col-span-1 p-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-sm font-mono"
+                />
+                <button
+                  onClick={addWallet}
+                  className="col-span-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                >
+                  Add Wallet
+                </button>
+              </div>
             </div>
           </div>
         )}
