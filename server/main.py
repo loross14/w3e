@@ -26,7 +26,8 @@ app.add_middleware(
 # Alchemy configuration
 ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
 if not ALCHEMY_API_KEY:
-    raise RuntimeError("ALCHEMY_API_KEY environment variable is required")
+    print("⚠️ ALCHEMY_API_KEY not found - some features may not work")
+    ALCHEMY_API_KEY = "dummy_key"  # Allow startup without API key for basic functionality
 
 # ERC-20 ABI for token interactions
 ERC20_ABI = [
@@ -1256,7 +1257,8 @@ class ChainFactory:
 
 # Database initialization
 def init_db():
-    conn = sqlite3.connect('crypto_fund.db', timeout=30.0)
+    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
+    conn = sqlite3.connect(db_path, timeout=30.0)
     conn.execute('PRAGMA journal_mode=WAL;')  # Better concurrency
     cursor = conn.cursor()
 
@@ -1524,7 +1526,8 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for debugging"""
-    conn = sqlite3.connect('crypto_fund.db')
+    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     try:
@@ -2212,7 +2215,8 @@ async def estimate_asset_purchase_price(symbol: str, name: str, current_price: f
 
 async def update_portfolio_data_new():
     """New background task using chain-agnostic fetchers with comprehensive error handling"""
-    conn = sqlite3.connect('crypto_fund.db', timeout=30.0)
+    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
+    conn = sqlite3.connect(db_path, timeout=30.0)
     conn.execute('PRAGMA journal_mode=WAL;')
     cursor = conn.cursor()
 
