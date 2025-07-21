@@ -1445,7 +1445,7 @@ const App = () => {
                         </div>
                       </div>
                       <button
-                        onClick={(){() => removeWallet(wallet.id)}
+                        onClick={() => removeWallet(wallet.id)}
                         className="text-red-400 hover:text-red-300 p-1 ml-2 flex-shrink-0"
                         title="Remove wallet"
                       >
