@@ -1411,8 +1411,7 @@ class AssetResponse(BaseModel):
     purchase_price: Optional[float] = 0
     total_invested: Optional[float] = 0
     realized_pnl: Optional[float] = 0
-    unrealized_pnl: Optional[```python
-float] = 0
+    unrealized_pnl: Optional[float] = 0
     total_return_pct: Optional[float] = 0
     notes: Optional[str] = ""
     is_nft: Optional[bool] = False
