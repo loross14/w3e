@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 from web3 import Web3
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import json
 import requests
 from abc import ABC, abstractmethod
@@ -23,10 +24,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Alchemy configuration
+# Database and Alchemy configuration
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is required")
+
 ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
 if not ALCHEMY_API_KEY:
     raise RuntimeError("ALCHEMY_API_KEY environment variable is required")
+
+def get_db_connection():
+    """Get a PostgreSQL database connection"""
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 # ERC-20 ABI for token interactions
 ERC20_ABI = [
@@ -1256,171 +1265,128 @@ class ChainFactory:
 
 # Database initialization
 def init_db():
-    # Use absolute path to ensure database is created in a consistent location
-    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
-    conn = sqlite3.connect(db_path)
+    """Initialize PostgreSQL database with all required tables"""
+    conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Wallets table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS wallets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            address TEXT UNIQUE NOT NULL,
-            label TEXT NOT NULL,
-            network TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-
-    # Assets table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS assets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            wallet_id INTEGER,
-            token_address TEXT,
-            symbol TEXT NOT NULL,
-            name TEXT NOT NULL,
-            balance REAL NOT NULL,
-            balance_formatted TEXT NOT NULL,
-            price_usd REAL,
-            value_usd REAL,
-            purchase_price REAL DEFAULT 0,
-            total_invested REAL DEFAULT 0,
-            realized_pnl REAL DEFAULT 0,
-            unrealized_pnl REAL DEFAULT 0,
-            total_return_pct REAL DEFAULT 0,
-            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (wallet_id) REFERENCES wallets (id)
-        )
-    ''')
-
-    # Add missing columns if they don't exist
     try:
-        cursor.execute('ALTER TABLE assets ADD COLUMN is_nft BOOLEAN DEFAULT FALSE')
-    except sqlite3.OperationalError:
-        pass
+        # Wallets table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS wallets (
+                id SERIAL PRIMARY KEY,
+                address TEXT UNIQUE NOT NULL,
+                label TEXT NOT NULL,
+                network TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
-    try:
-        cursor.execute('ALTER TABLE assets ADD COLUMN nft_metadata TEXT')
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        cursor.execute('ALTER TABLE assets ADD COLUMN floor_price REAL DEFAULT 0')
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        cursor.execute('ALTER TABLE assets ADD COLUMN image_url TEXT')
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        cursor.execute('ALTER TABLE assets ADD COLUMN price_change_24h REAL DEFAULT 0')
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        cursor.execute('ALTER TABLE assets ADD COLUMN purchase_price REAL DEFAULT 0')
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        cursor.execute('ALTER TABLE assets ADD COLUMN total_invested REAL DEFAULT 0')
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        cursor.execute('ALTER TABLE assets ADD COLUMN realized_pnl REAL DEFAULT 0')
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        cursor.execute('ALTER TABLE assets ADD COLUMN unrealized_pnl REAL DEFAULT 0')
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        cursor.execute('ALTER TABLE assets ADD COLUMN total_return_pct REAL DEFAULT 0')
-    except sqlite3.OperationalError:
-        pass
+        # Assets table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS assets (
+                id SERIAL PRIMARY KEY,
+                wallet_id INTEGER REFERENCES wallets(id),
+                token_address TEXT,
+                symbol TEXT NOT NULL,
+                name TEXT NOT NULL,
+                balance REAL NOT NULL,
+                balance_formatted TEXT NOT NULL,
+                price_usd REAL,
+                value_usd REAL,
+                purchase_price REAL DEFAULT 0,
+                total_invested REAL DEFAULT 0,
+                realized_pnl REAL DEFAULT 0,
+                unrealized_pnl REAL DEFAULT 0,
+                total_return_pct REAL DEFAULT 0,
+                is_nft BOOLEAN DEFAULT FALSE,
+                nft_metadata TEXT,
+                floor_price REAL DEFAULT 0,
+                image_url TEXT,
+                price_change_24h REAL DEFAULT 0,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
     # Purchase history table for tracking all transactions
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS purchase_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            wallet_id INTEGER,
-            token_address TEXT NOT NULL,
-            symbol TEXT NOT NULL,
-            transaction_type TEXT NOT NULL,
-            quantity REAL NOT NULL,
-            price_per_token REAL NOT NULL,
-            total_value REAL NOT NULL,
-            transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            notes TEXT,
-            FOREIGN KEY (wallet_id) REFERENCES wallets (id)
-        )
-    ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS purchase_history (
+                id SERIAL PRIMARY KEY,
+                wallet_id INTEGER REFERENCES wallets(id),
+                token_address TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                transaction_type TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                price_per_token REAL NOT NULL,
+                total_value REAL NOT NULL,
+                transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                notes TEXT
+            )
+        ''')
 
-    # Asset cost basis table for FIFO/LIFO calculations
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS asset_cost_basis (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            token_address TEXT NOT NULL,
-            symbol TEXT NOT NULL,
-            average_purchase_price REAL NOT NULL,
-            total_quantity_purchased REAL NOT NULL,
-            total_invested REAL NOT NULL,
-            realized_gains REAL DEFAULT 0,
-            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+        # Asset cost basis table for FIFO/LIFO calculations
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS asset_cost_basis (
+                id SERIAL PRIMARY KEY,
+                token_address TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                average_purchase_price REAL NOT NULL,
+                total_quantity_purchased REAL NOT NULL,
+                total_invested REAL NOT NULL,
+                realized_gains REAL DEFAULT 0,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
-    # Portfolio history table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS portfolio_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            total_value_usd REAL NOT NULL,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+        # Portfolio history table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS portfolio_history (
+                id SERIAL PRIMARY KEY,
+                total_value_usd REAL NOT NULL,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
-    # Asset notes table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS asset_notes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol TEXT UNIQUE NOT NULL,
-            notes TEXT,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+        # Asset notes table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS asset_notes (
+                id SERIAL PRIMARY KEY,
+                symbol TEXT UNIQUE NOT NULL,
+                notes TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
-    # Hidden assets table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS hidden_assets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            token_address TEXT UNIQUE NOT NULL,
-            symbol TEXT NOT NULL,
-            name TEXT NOT NULL,
-            hidden_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+        # Hidden assets table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS hidden_assets (
+                id SERIAL PRIMARY KEY,
+                token_address TEXT UNIQUE NOT NULL,
+                symbol TEXT NOT NULL,
+                name TEXT NOT NULL,
+                hidden_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
-    # Wallet status table (for tracking individual wallet fetch success/failure)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS wallet_status (
-            wallet_id INTEGER PRIMARY KEY,
-            status TEXT,
-            assets_found INTEGER,
-            total_value REAL,
-            error_message TEXT,
-            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (wallet_id) REFERENCES wallets (id)
-        )
-    ''')
+        # Wallet status table (for tracking individual wallet fetch success/failure)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS wallet_status (
+                wallet_id INTEGER PRIMARY KEY REFERENCES wallets(id),
+                status TEXT,
+                assets_found INTEGER,
+                total_value REAL,
+                error_message TEXT,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    except Exception as e:
+        print(f"❌ Error initializing database: {e}")
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 # Pydantic models
 class WalletCreate(BaseModel):
@@ -1525,11 +1491,10 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for debugging"""
-    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
     try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
         # Test database connection
         cursor.execute("SELECT COUNT(*) FROM wallets")
         wallet_count = cursor.fetchone()[0]
@@ -1543,6 +1508,7 @@ async def health_check():
         return {
             "status": "healthy",
             "database": "connected",
+            "database_type": "PostgreSQL",
             "tables": {
                 "wallets": wallet_count,
                 "assets": asset_count,
@@ -1558,19 +1524,22 @@ async def health_check():
             "timestamp": datetime.now().isoformat()
         }
     finally:
-        conn.close()
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
 
 @app.post("/wallets", response_model=WalletResponse)
 async def create_wallet(wallet: WalletCreate):
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
         cursor.execute(
-            "INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)",
+            "INSERT INTO wallets (address, label, network) VALUES (%s, %s, %s) RETURNING id",
             (wallet.address, wallet.label, wallet.network)
         )
-        wallet_id = cursor.lastrowid
+        wallet_id = cursor.fetchone()[0]
         conn.commit()
 
         return WalletResponse(
@@ -1579,40 +1548,51 @@ async def create_wallet(wallet: WalletCreate):
             label=wallet.label,
             network=wallet.network
         )
-    except sqlite3.IntegrityError:
+    except psycopg2.IntegrityError:
+        conn.rollback()
         raise HTTPException(status_code=400, detail="Wallet address already exists")
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
     finally:
+        cursor.close()
         conn.close()
 
 @app.get("/wallets", response_model=List[WalletResponse])
 async def get_wallets():
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT id, address, label, network FROM wallets")
     wallets = cursor.fetchall()
+    cursor.close()
     conn.close()
 
     return [
-        WalletResponse(id=w[0], address=w[1], label=w[2], network=w[3])
+        WalletResponse(id=w['id'], address=w['address'], label=w['label'], network=w['network'])
         for w in wallets
     ]
 
 @app.delete("/wallets/{wallet_id}")
 async def delete_wallet(wallet_id: int):
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM assets WHERE wallet_id = ?", (wallet_id,))
-    cursor.execute("DELETE FROM wallets WHERE id = ?", (wallet_id,))
+    try:
+        cursor.execute("DELETE FROM assets WHERE wallet_id = %s", (wallet_id,))
+        cursor.execute("DELETE FROM wallets WHERE id = %s", (wallet_id,))
 
-    if cursor.rowcount == 0:
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Wallet not found")
+
+        conn.commit()
+        return {"message": "Wallet deleted successfully"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        cursor.close()
         conn.close()
-        raise HTTPException(status_code=404, detail="Wallet not found")
-
-    conn.commit()
-    conn.close()
-    return {"message": "Wallet deleted successfully"}
 
 @app.post("/portfolio/update")
 async def update_portfolio(background_tasks: BackgroundTasks):
@@ -2214,8 +2194,7 @@ async def estimate_asset_purchase_price(symbol: str, name: str, current_price: f
 
 async def update_portfolio_data_new():
     """New background task using chain-agnostic fetchers with comprehensive error handling"""
-    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
@@ -2232,7 +2211,8 @@ async def update_portfolio_data_new():
         wallets_by_network = {}
         wallet_status = {}  # Track individual wallet success/failure
 
-        for wallet_id, address, network, label in wallets:
+        for wallet_row in wallets:
+            wallet_id, address, network, label = wallet_row['id'], wallet_row['address'], wallet_row['network'], wallet_row['label']
             if network not in wallets_by_network:
                 wallets_by_network[network] = []
             wallets_by_network[network].append((wallet_id, address, label))
@@ -2430,7 +2410,7 @@ async def update_portfolio_data_new():
                 (wallet_id, token_address, symbol, name, balance, balance_formatted, price_usd, value_usd, 
                  is_nft, nft_metadata, floor_price, image_url, purchase_price, total_invested, 
                  realized_pnl, unrealized_pnl, total_return_pct)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 wallet_id, token_address, asset['symbol'], 
                 asset['name'], asset['balance'], asset['balance_formatted'], 
@@ -2467,37 +2447,27 @@ async def update_portfolio_data_new():
             for hide_asset in auto_hide_candidates:
                 try:
                     cursor.execute("""
-                        INSERT OR REPLACE INTO hidden_assets (token_address, symbol, name)
-                        VALUES (?, ?, ?)
+                        INSERT INTO hidden_assets (token_address, symbol, name) 
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (token_address) DO UPDATE SET
+                        symbol = EXCLUDED.symbol, name = EXCLUDED.name
                     """, (hide_asset['token_address'].lower(), hide_asset['symbol'], hide_asset['name']))
                     print(f"🙈 Auto-hidden {hide_asset['reason']}: {hide_asset['symbol'] or 'unnamed'} (${hide_asset.get('value_usd', 0):.6f})")
-                except sqlite3.Error as e:
+                except psycopg2.Error as e:
                     print(f"❌ Error auto-hiding asset {hide_asset['symbol']}: {e}")
 
         # Record portfolio history
         cursor.execute(
-            "INSERT INTO portfolio_history (total_value_usd) VALUES (?)",
+            "INSERT INTO portfolio_history (total_value_usd) VALUES (%s)",
             (total_portfolio_value,)
         )
 
-        # Store wallet status for frontend consumption
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS wallet_status (
-                wallet_id INTEGER PRIMARY KEY,
-                status TEXT,
-                assets_found INTEGER,
-                total_value REAL,
-                error_message TEXT,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (wallet_id) REFERENCES wallets (id)
-            )
-        """)
-
-        cursor.execute("DELETE FROM wallet_status")  # Clear old status
+        # Clear old wallet status and insert new ones
+        cursor.execute("DELETE FROM wallet_status")
         for wallet_id, status_info in wallet_status.items():
             cursor.execute("""
                 INSERT INTO wallet_status (wallet_id, status, assets_found, total_value, error_message)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
             """, (
                 wallet_id, 
                 status_info['status'],
