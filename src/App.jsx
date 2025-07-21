@@ -1143,12 +1143,7 @@ const App = () => {
               <h1 className="text-lg sm:text-2xl font-bold truncate">Web3Equities Portfolio</h1>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-              <button className="text-gray-400 hover:text-white transition-colors p-1">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7H4l5-5v5z" />
-                </svg>
-              </button>
+              {/* Reserved for future actions */}
             </div>
           </div>
         </div>
