@@ -773,17 +773,28 @@ const App = () => {
 
         const savedData = await portfolioResponse.json();
         addDebugInfo("📊 Raw portfolio data received", savedData);
+        
+        console.log("🔍 [FRONTEND DEBUG] Full backend response:", savedData);
+        console.log("🔍 [FRONTEND DEBUG] Assets array:", savedData.assets);
+        console.log("🔍 [FRONTEND DEBUG] Assets length:", savedData.assets?.length);
 
         if (savedData.assets && savedData.assets.length > 0) {
-          const transformedAssets = savedData.assets.map(asset => ({
-            id: asset.id,
-            name: asset.name,
-            symbol: asset.symbol,
-            balance: asset.balance_formatted || asset.balance,
-            priceUSD: asset.price_usd || 0,
-            valueUSD: asset.value_usd || 0,
-            notes: asset.notes || "",
-          }));
+          console.log("🔄 [FRONTEND DEBUG] Starting asset transformation...");
+          const transformedAssets = savedData.assets.map((asset, index) => {
+            console.log(`🔄 [FRONTEND DEBUG] Transforming asset ${index + 1}:`, asset);
+            const transformed = {
+              id: asset.id,
+              name: asset.name,
+              symbol: asset.symbol,
+              balance: asset.balance_formatted || asset.balance,
+              priceUSD: asset.price_usd || 0,
+              valueUSD: asset.value_usd || 0,
+              notes: asset.notes || "",
+            };
+            console.log(`✅ [FRONTEND DEBUG] Transformed to:`, transformed);
+            return transformed;
+          });
+          console.log("🎯 [FRONTEND DEBUG] Final transformed assets:", transformedAssets);
 
           const savedTotalValue = savedData.total_value || 0;
 

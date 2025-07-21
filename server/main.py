@@ -723,6 +723,19 @@ def init_db():
         )
     ''')
 
+    # Wallet status table (for tracking individual wallet fetch success/failure)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS wallet_status (
+            wallet_id INTEGER PRIMARY KEY,
+            status TEXT,
+            assets_found INTEGER,
+            total_value REAL,
+            error_message TEXT,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (wallet_id) REFERENCES wallets (id)
+        )
+    ''')
+
     conn.commit()
     conn.close()
 
@@ -953,14 +966,24 @@ async def get_portfolio():
     else:
         print(f"❌ [PORTFOLIO DEBUG] No assets returned by query!")
 
-    assets = [
-        AssetResponse(
-            id=a[0] or a[1],
-            symbol=a[1], name=a[2], balance=a[3],
-            balance_formatted=a[4], price_usd=a[5], value_usd=a[6], notes=a[7]
-        )
-        for a in assets_data
-    ]
+    assets = []
+    for a in assets_data:
+        try:
+            asset = AssetResponse(
+                id=a[0] if a[0] else a[1],  # Use token_address as id
+                symbol=a[1] or "Unknown",
+                name=a[2] or "Unknown Token",
+                balance=float(a[3]) if a[3] else 0.0,
+                balance_formatted=a[4] or "0.000000",
+                price_usd=float(a[5]) if a[5] else 0.0,
+                value_usd=float(a[6]) if a[6] else 0.0,
+                notes=a[7] or ""
+            )
+            assets.append(asset)
+            print(f"✅ [PORTFOLIO DEBUG] Created asset: {asset.symbol} = ${asset.value_usd:.2f}")
+        except Exception as e:
+            print(f"❌ [PORTFOLIO DEBUG] Error creating asset from {a}: {e}")
+            continue
 
     # Get the most recent saved total value from portfolio_history
     cursor.execute("""
@@ -1030,14 +1053,23 @@ async def get_wallet_details(wallet_id: int):
     """, (wallet_id,))
     assets_data = cursor.fetchall()
 
-    assets = [
-        AssetResponse(
-            id=a[0],
-            symbol=a[1], name=a[2], balance=a[3],
-            balance_formatted=a[4], price_usd=a[5], value_usd=a[6], notes=a[7]
-        )
-        for a in assets_data
-    ]
+    assets = []
+    for a in assets_data:
+        try:
+            asset = AssetResponse(
+                id=a[0] if a[0] else a[1],  # Use token_address as id
+                symbol=a[1] or "Unknown",
+                name=a[2] or "Unknown Token", 
+                balance=float(a[3]) if a[3] else 0.0,
+                balance_formatted=a[4] or "0.000000",
+                price_usd=float(a[5]) if a[5] else 0.0,
+                value_usd=float(a[6]) if a[6] else 0.0,
+                notes=a[7] or ""
+            )
+            assets.append(asset)
+        except Exception as e:
+            print(f"❌ [WALLET DEBUG] Error creating asset from {a}: {e}")
+            continue
 
     total_value = sum(asset.value_usd or 0 for asset in assets)
 
