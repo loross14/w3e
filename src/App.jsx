@@ -1530,23 +1530,139 @@ const App = () => {
           </div>
         )}
 
-        {/* Assets Grid - Mobile responsive */}
+        {/* Top Performing Assets Card */}
+        <div className="mb-6 sm:mb-8">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-white mb-4">🚀 Top 3 Performing Assets (24h)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {visibleAssets
+                .filter(asset => asset.performance24h !== undefined)
+                .sort((a, b) => (b.performance24h || 0) - (a.performance24h || 0))
+                .slice(0, 3)
+                .map((asset, index) => (
+                  <div key={asset.id} className="bg-gray-800 rounded-lg p-4">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold text-xs">#{index + 1}</span>
+                      </div>
+                      <div>
+                        <div className="font-medium text-white text-sm">{asset.symbol}</div>
+                        <div className="text-xs text-gray-400">{asset.name}</div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="text-xs text-gray-400">24h Change</div>
+                        <div className={`text-sm font-bold ${(asset.performance24h || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {(asset.performance24h || 0) >= 0 ? '+' : ''}{(asset.performance24h || 0).toFixed(2)}%
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-400">Value</div>
+                        <div className="text-sm font-mono text-white">${asset.valueUSD.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              
+              {/* Show placeholder if no performance data */}
+              {visibleAssets.filter(asset => asset.performance24h !== undefined).length === 0 && (
+                <div className="col-span-3 text-center py-8">
+                  <div className="text-gray-400 mb-2">📊 Performance data loading...</div>
+                  <div className="text-sm text-gray-500">24h performance data will appear here once available</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* NFT Collections */}
+        {visibleAssets.some(asset => asset.isNFT) && (
+          <div className="mb-6 sm:mb-8">
+            <div className="flex justify-between items-center mb-4 sm:mb-6">
+              <h3 className="text-base sm:text-lg font-semibold text-white">🖼️ NFT Collections</h3>
+              <span className="text-xs sm:text-sm text-gray-400">
+                {visibleAssets.filter(asset => asset.isNFT).length} collections
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {visibleAssets
+                .filter(asset => asset.isNFT)
+                .map((nft) => (
+                  <div
+                    key={nft.id}
+                    className="bg-gray-900 border border-gray-700 rounded-xl p-4 hover:border-purple-500 cursor-pointer transition-all duration-200"
+                    onClick={() => setSelectedAsset(nft)}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center">
+                          {nft.imageUrl ? (
+                            <img src={nft.imageUrl} alt={nft.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-white font-bold text-lg">🖼️</span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-medium text-white text-sm truncate">{nft.name}</h3>
+                          <p className="text-xs text-pink-400">NFT Collection</p>
+                        </div>
+                      </div>
+                      {isEditor && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleHiddenAsset(nft);
+                          }}
+                          className="text-xs bg-red-600/20 text-red-400 px-2 py-1 rounded-md hover:bg-red-600/30 transition-colors border border-red-600/30 ml-2 flex-shrink-0"
+                        >
+                          Hide
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Items:</span>
+                        <span className="text-white font-mono">{Math.floor(nft.balance)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Floor Price:</span>
+                        <span className="text-purple-400 font-mono">
+                          {nft.floorPrice > 0 ? `◎ ${nft.floorPrice}` : 'Coming Soon'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Est. Value:</span>
+                        <span className="text-green-400 font-mono">
+                          {nft.floorPrice > 0 ? `$${(nft.floorPrice * nft.balance * 185).toLocaleString()}` : 'TBD'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* Regular Assets Grid - Mobile responsive */}
         <div className="mb-6 sm:mb-8">
           <div className="flex justify-between items-center mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-semibold text-white">Asset Holdings</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-white">💰 Token Holdings</h3>
             <span className="text-xs sm:text-sm text-gray-400">
-              {visibleAssets.length} assets • ${totalValue.toLocaleString()}
+              {visibleAssets.filter(asset => !asset.isNFT).length} tokens • ${visibleAssets.filter(asset => !asset.isNFT).reduce((sum, asset) => sum + asset.valueUSD, 0).toLocaleString()}
             </span>
           </div>
 
-          {visibleAssets.length === 0 ? (
+          {visibleAssets.filter(asset => !asset.isNFT).length === 0 ? (
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 text-center">
               <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
               </div>
-              <h4 className="text-lg font-semibold text-white mb-2">No Asset Data Found</h4>
+              <h4 className="text-lg font-semibold text-white mb-2">No Token Data Found</h4>
               <p className="text-gray-400 mb-6 max-w-md mx-auto">
                 Your portfolio appears to be empty. Click the "Update Database" button to fetch the latest wallet balances and asset data from your configured wallets.
               </p>
@@ -1560,16 +1676,18 @@ const App = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {visibleAssets.map((asset) => (
-                <AssetCard
-                  key={asset.id}
-                  asset={asset}
-                  onClick={() => setSelectedAsset(asset)}
-                  onHide={() => toggleHiddenAsset(asset)}
-                  isEditor={isEditor}
-                  totalValue={totalValue}
-                />
-              ))}
+              {visibleAssets
+                .filter(asset => !asset.isNFT)
+                .map((asset) => (
+                  <AssetCard
+                    key={asset.id}
+                    asset={asset}
+                    onClick={() => setSelectedAsset(asset)}
+                    onHide={() => toggleHiddenAsset(asset)}
+                    isEditor={isEditor}
+                    totalValue={totalValue}
+                  />
+                ))}
             </div>
           )}
         </div>

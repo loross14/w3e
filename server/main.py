@@ -222,7 +222,7 @@ class EthereumAssetFetcher(AssetFetcher):
                         contract_info = nft.get("contract", {})
                         collection_name = contract_info.get("name", "Unknown NFT Collection")
                         collection_symbol = contract_info.get("symbol", "NFT")
-                        
+
                         # Extract image from metadata
                         metadata = nft.get("metadata", {})
                         image_url = None
@@ -254,7 +254,7 @@ class EthereumAssetFetcher(AssetFetcher):
                     for contract_address, collection_data in nft_collections.items():
                         # Try to get floor price from OpenSea
                         floor_price = await self._get_nft_floor_price(client, contract_address, collection_data.get("opensea_slug"))
-                        
+
                         assets.append(AssetData(
                             token_address=contract_address,
                             symbol=f"{collection_data['symbol']} NFT",
@@ -286,7 +286,7 @@ class EthereumAssetFetcher(AssetFetcher):
                     },
                     timeout=10.0
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     stats = data.get("stats", {})
@@ -295,7 +295,7 @@ class EthereumAssetFetcher(AssetFetcher):
                         # Convert ETH to USD (approximate)
                         eth_price = 3800  # Could fetch real ETH price here
                         return floor_price * eth_price
-            
+
             # Fallback: try contract address
             response = await client.get(
                 f"https://api.opensea.io/api/v1/asset_contract/{contract_address}",
@@ -304,14 +304,14 @@ class EthereumAssetFetcher(AssetFetcher):
                 },
                 timeout=10.0
             )
-            
+
             if response.status_code == 200:
                 # This is a basic fallback - real implementation would need more complex floor price logic
                 return 0.1  # Placeholder floor price
-                
+
         except Exception as e:
             print(f"⚠️ Could not fetch floor price for {contract_address}: {e}")
-            
+
         return 0
 
 class EthereumPriceFetcher(PriceFetcher):
@@ -408,6 +408,7 @@ class SolanaAssetFetcher(AssetFetcher):
         }
         self.spl_token_program = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         self.spl_token_2022_program = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        self.solana_rpc_url = self.solana_url  # Use Alchemy as RPC URL
 
     async def fetch_assets(self, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
         assets = []
@@ -723,114 +724,106 @@ class SolanaAssetFetcher(AssetFetcher):
 
     async def _fetch_token_metadata(self, client: httpx.AsyncClient, mint_address: str) -> tuple[str, str]:
         """
-        Fetches token metadata using DexScreener API for better accuracy.
-        Returns a tuple of (symbol, name). Falls back to RPC if DexScreener fails.
+        Fetches token metadata using multiple sources for better accuracy.
+        Returns (symbol, name) tuple.
         """
         try:
-            print(f"🌐 [TOKEN METADATA] Fetching metadata for mint: {mint_address}")
+            # Try DexScreener API first
+            print(f"🔍 [TOKEN METADATA] Fetching metadata for {mint_address} from DexScreener...")
+            dex_url = f"https://api.dexscreener.com/latest/dex/tokens/{mint_address}"
 
-            # Method 1: Try DexScreener API for accurate token info
-            try:
-                response = await client.get(
-                    f"https://api.dexscreener.com/latest/dex/tokens/{mint_address}",
-                    timeout=10.0,
-                    headers={
-                        "User-Agent": "Mozilla/5.0 (compatible; CryptoFund/1.0)"
-                    }
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    pairs = data.get("pairs", [])
-                    
-                    if pairs:
-                        # Get the most liquid pair
-                        best_pair = max(pairs, key=lambda p: float(p.get("liquidity", {}).get("usd", 0)))
-                        base_token = best_pair.get("baseToken", {})
-                        
-                        symbol = base_token.get("symbol", "")
-                        name = base_token.get("name", "")
-                        
-                        if symbol and name and not symbol.startswith("SPL-"):
-                            print(f"✅ [TOKEN METADATA] DexScreener metadata: Symbol={symbol}, Name={name}")
-                            return symbol, name
-                            
-            except Exception as e:
-                print(f"⚠️ [TOKEN METADATA] DexScreener failed: {e}")
+            dex_response = await client.get(dex_url, timeout=15.0)
+            if dex_response.status_code == 200:
+                dex_data = dex_response.json()
+                print(f"🔍 [TOKEN METADATA] DexScreener response: {dex_data}")
 
-            # Method 2: Try Jupiter Token List API
-            try:
-                response = await client.get(
-                    f"https://token.jup.ag/strict",
-                    timeout=10.0
-                )
-                
-                if response.status_code == 200:
-                    tokens = response.json()
-                    for token in tokens:
-                        if token.get("address") == mint_address:
-                            symbol = token.get("symbol", "")
-                            name = token.get("name", "")
-                            if symbol and name:
-                                print(f"✅ [TOKEN METADATA] Jupiter metadata: Symbol={symbol}, Name={name}")
+                if 'pairs' in dex_data and len(dex_data['pairs']) > 0:
+                    for pair in dex_data['pairs']:
+                        base_token = pair.get('baseToken', {})
+                        quote_token = pair.get('quoteToken', {})
+
+                        # Check if base token matches our mint
+                        if base_token.get('address', '').lower() == mint_address.lower():
+                            symbol = base_token.get('symbol', '')
+                            name = base_token.get('name', '')
+
+                            if symbol and name and symbol != 'unknown':
+                                print(f"✅ [TOKEN METADATA] DexScreener base token: Symbol={symbol}, Name={name}")
                                 return symbol, name
-                                
-            except Exception as e:
-                print(f"⚠️ [TOKEN METADATA] Jupiter API failed: {e}")
 
-            # Method 3: Fallback to original RPC method
-            rpc_payload = {
+                        # Check if quote token matches our mint
+                        if quote_token.get('address', '').lower() == mint_address.lower():
+                            symbol = quote_token.get('symbol', '')
+                            name = quote_token.get('name', '')
+
+                            if symbol and name and symbol != 'unknown':
+                                print(f"✅ [TOKEN METADATA] DexScreener quote token: Symbol={symbol}, Name={name}")
+                                return symbol, name
+
+        except Exception as e:
+            print(f"❌ [TOKEN METADATA] DexScreener error: {e}")
+
+        # Try Jupiter API as second option
+        try:
+            print(f"🔄 [TOKEN METADATA] Trying Jupiter API for {mint_address}...")
+            jupiter_url = f"https://token.jup.ag/strict"
+
+            jupiter_response = await client.get(jupiter_url, timeout=10.0)
+            if jupiter_response.status_code == 200:
+                jupiter_tokens = jupiter_response.json()
+
+                for token in jupiter_tokens:
+                    if token.get('address', '').lower() == mint_address.lower():
+                        symbol = token.get('symbol', '')
+                        name = token.get('name', '')
+
+                        if symbol and name:
+                            print(f"✅ [TOKEN METADATA] Jupiter metadata: Symbol={symbol}, Name={name}")
+                            return symbol, name
+
+        except Exception as e:
+            print(f"❌ [TOKEN METADATA] Jupiter error: {e}")
+
+        # Fallback to Solana RPC metadata
+        try:
+            print(f"🔄 [TOKEN METADATA] Trying Solana RPC metadata for {mint_address}...")
+            metadata_url = f"{self.solana_rpc_url}"
+            metadata_payload = {
                 "jsonrpc": "2.0",
                 "id": 1,
-                "method": "getTokenAccountsByOwner",
+                "method": "getAccountInfo",
                 "params": [
                     mint_address,
-                    {
-                        "programId": "spl-token"
-                    },
-                    {
-                        "encoding": "jsonParsed",
-                        "commitment": "confirmed"
-                    }
+                    {"encoding": "jsonParsed"}
                 ]
             }
-            response = await client.post(
-                self.solana_url,
-                json=rpc_payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "accept": "application/json"
-                },
-                timeout=30.0
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if "result" in data and "value" in data["result"]:
-                    token_accounts = data["result"]["value"]
-                    if token_accounts:
-                        account_info = token_accounts[0].get("account", {})
-                        if account_info:
-                            account_data = account_info.get("data", {})
-                            if account_data and isinstance(account_data, dict):
-                                parsed_data = account_data.get("parsed", {})
-                                if parsed_data:
-                                    info = parsed_data.get("info", {})
-                                    if info:
-                                        symbol = info.get("symbol", "")
-                                        name = info.get("name", "")
-                                        if symbol and name:
-                                            print(f"✅ [TOKEN METADATA] RPC metadata: Symbol={symbol}, Name={name}")
-                                            return symbol, name
+
+            metadata_response = await client.post(metadata_url, json=metadata_payload, timeout=10.0)
+            if metadata_response.status_code == 200:
+                metadata_data = metadata_response.json()
+                result = metadata_data.get('result', {})
+
+                if result and result.get('value'):
+                    account_data = result['value'].get('data', {})
+                    if account_data.get('program') == 'spl-token':
+                        parsed = account_data.get('parsed', {})
+                        info = parsed.get('info', {})
+
+                        # Try to get token name from mint info
+                        if 'name' in info:
+                            name = info['name']
+                            symbol = info.get('symbol', name[:8])
+                            print(f"✅ [TOKEN METADATA] RPC metadata: Symbol={symbol}, Name={name}")
+                            return symbol, name
 
         except Exception as e:
             print(f"❌ [TOKEN METADATA] Error fetching metadata: {e}")
-            
+
         # Final fallback values
-        symbol = f"SPL-{mint_address[:6]}"
-        name = f"SPL Token ({mint_address[:8]}...)"
-        print(f"⚠️ [TOKEN METADATA] Using fallback: Symbol={symbol}, Name={name}")
-        return symbol, name
+        fallback_symbol = f"SPL-{mint_address[:6]}"
+        fallback_name = f"SPL Token ({mint_address[:8]}...)"
+        print(f"⚠️ [TOKEN METADATA] Using fallback: Symbol={fallback_symbol}, Name={fallback_name}")
+        return fallback_symbol, fallback_name
 
 class SolanaPriceFetcher(PriceFetcher):
     def __init__(self):
