@@ -1733,7 +1733,7 @@ const App = () => {
         )}
 
         {/* Top Performing Assets Card */}
-        <div className="mb-6 sm:mb-8">
+        <div className="mb-6 sm:mb-8 hidden sm:block">
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
             <h3 className="text-base sm:text-lg font-semibold text-white mb-4">🚀 Top 3 Performing Assets (24h)</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
