@@ -216,19 +216,32 @@ const WalletCard = ({ wallet, onClick, walletData }) => {
   const totalValue = walletData?.assets?.reduce((sum, asset) => sum + asset.valueUSD, 0) || 0;
   const assetCount = walletData?.assets?.length || 0;
   const performance = walletData?.performance || 0;
+  
+  // Check if this is the Solana wallet and show error state
+  const isSolanaWallet = wallet.network === 'SOL';
+  const hasError = isSolanaWallet; // For now, show error for all Solana wallets
 
   return (
     <div 
-      className="bg-gray-900 border border-gray-700 rounded-xl p-4 hover:border-gray-600 cursor-pointer transition-all duration-200"
+      className={`bg-gray-900 border rounded-xl p-4 hover:border-gray-600 cursor-pointer transition-all duration-200 ${
+        hasError ? 'border-red-700' : 'border-gray-700'
+      }`}
       onClick={onClick}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center space-x-3 min-w-0 flex-1">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+            hasError 
+              ? 'bg-gradient-to-r from-red-500 to-red-600' 
+              : 'bg-gradient-to-r from-green-500 to-emerald-500'
+          }`}>
             <span className="text-white font-bold text-sm">{wallet.network}</span>
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="font-medium text-white text-sm sm:text-base truncate">{wallet.label}</h3>
+            <div className="flex items-center space-x-2">
+              <h3 className="font-medium text-white text-sm sm:text-base truncate">{wallet.label}</h3>
+              {hasError && <span className="text-red-400 text-xs">❌</span>}
+            </div>
             <p className="text-xs sm:text-sm text-gray-400 font-mono truncate">{wallet.address}</p>
           </div>
         </div>
@@ -238,22 +251,31 @@ const WalletCard = ({ wallet, onClick, walletData }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm">
-        <div>
-          <span className="text-gray-400 block">Total Value</span>
-          <span className="text-white font-mono">${totalValue.toLocaleString()}</span>
+      {hasError ? (
+        <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
+          <div className="text-red-400 text-xs font-medium mb-1">⚠️ Data Fetch Error</div>
+          <div className="text-red-300 text-xs">
+            Unable to fetch Solana wallet data. Solana integration is currently experiencing issues.
+          </div>
         </div>
-        <div>
-          <span className="text-gray-400 block">Assets</span>
-          <span className="text-white font-mono">{assetCount}</span>
+      ) : (
+        <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm">
+          <div>
+            <span className="text-gray-400 block">Total Value</span>
+            <span className="text-white font-mono">${totalValue.toLocaleString()}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block">Assets</span>
+            <span className="text-white font-mono">{assetCount}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block">24h Change</span>
+            <span className={`font-mono ${performance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {performance >= 0 ? '+' : ''}{performance.toFixed(2)}%
+            </span>
+          </div>
         </div>
-        <div>
-          <span className="text-gray-400 block">24h Change</span>
-          <span className={`font-mono ${performance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {performance >= 0 ? '+' : ''}{performance.toFixed(2)}%
-          </span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -1275,65 +1297,7 @@ const App = () => {
               </div>
             )}
 
-            {/* Debug Information */}
-            {debugInfo.length > 0 && (
-              <div className="mt-3 p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg">
-                <details className="cursor-pointer">
-                  <summary className="text-sm text-gray-300 font-medium mb-2">
-                    🐛 Debug Log ({debugInfo.length} entries)
-                  </summary>
-                  <div className="max-h-48 overflow-y-auto space-y-1 text-xs">
-                    {debugInfo.map((entry, index) => (
-                      <div key={index} className="flex flex-col space-y-1">
-                        <div className="text-gray-400">
-                          [{entry.timestamp}] {entry.message}
-                        </div>
-                        {entry.data && (
-                          <pre className="text-green-400 ml-4 text-xs bg-gray-900/50 p-1 rounded">
-                            {typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data, null, 2)}
-                          </pre>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              </div>
-            )}
-
-            {/* Portfolio State Debug */}
-            <div className="mt-3 p-3 bg-purple-900/20 border border-purple-700/50 rounded-lg">
-              <details className="cursor-pointer">
-                <summary className="text-sm text-purple-300 font-medium mb-2">
-                  📊 Current Portfolio State
-                </summary>
-                <div className="text-xs space-y-2">
-                  <div>
-                    <span className="text-gray-400">Total Value:</span>
-                    <span className="text-white ml-2">${totalValue.toLocaleString()}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Assets Count:</span>
-                    <span className="text-white ml-2">{visibleAssets.length} visible / {portfolioData.assets?.length || 0} total</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Hidden Assets:</span>
-                    <span className="text-white ml-2">{hiddenAssets.length}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Wallets:</span>
-                    <span className="text-white ml-2">{walletAddresses.length}</span>
-                  </div>
-                  {portfolioData.assets && portfolioData.assets.length > 0 && (
-                    <div>
-                      <span className="text-gray-400">Sample Asset:</span>
-                      <pre className="text-green-400 mt-1 text-xs bg-gray-900/50 p-1 rounded">
-                        {JSON.stringify(portfolioData.assets[0], null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              </details>
-            </div>
+            
           </ActionCard>
         </div>
 
