@@ -641,10 +641,24 @@ const App = () => {
   const [updateStatus, setUpdateStatus] = useState('');
   const [updateError, setUpdateError] = useState('');
 
-  // Sync wallets with backend on app load
+  // Sync wallets with backend on app load - with retry logic
   useEffect(() => {
-    const syncWalletsWithBackend = async () => {
+    const syncWalletsWithBackend = async (retryCount = 0) => {
+      const maxRetries = 3;
+      
       try {
+        // Test backend connection first
+        const healthResponse = await fetch(`${API_BASE_URL}/`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!healthResponse.ok) {
+          throw new Error('Backend not ready');
+        }
+        
         // Get current wallets from backend
         const response = await fetch(`${API_BASE_URL}/wallets`);
         if (response.ok) {
@@ -655,7 +669,7 @@ const App = () => {
             console.log('Syncing local wallets to backend...');
             for (const wallet of walletAddresses) {
               try {
-                await fetch(`${API_BASE_URL}/wallets`, {
+                const syncResponse = await fetch(`${API_BASE_URL}/wallets`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -666,18 +680,35 @@ const App = () => {
                     network: wallet.network
                   }),
                 });
+                
+                if (syncResponse.ok) {
+                  console.log(`✅ Synced wallet: ${wallet.label}`);
+                } else {
+                  console.log(`⚠️ Wallet ${wallet.label} may already exist in backend`);
+                }
               } catch (error) {
-                console.error(`Failed to sync wallet ${wallet.label}:`, error);
+                console.error(`❌ Failed to sync wallet ${wallet.label}:`, error.message);
               }
             }
+          } else {
+            console.log(`✅ Backend already has ${backendWallets.length} wallets configured`);
           }
         }
       } catch (error) {
-        console.error('Error syncing wallets:', error);
+        console.error(`❌ Error syncing wallets (attempt ${retryCount + 1}/${maxRetries + 1}):`, error.message);
+        
+        // Retry with exponential backoff if backend isn't ready yet
+        if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('Backend not ready'))) {
+          const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s delays
+          console.log(`🔄 Retrying wallet sync in ${delay / 1000}s...`);
+          setTimeout(() => syncWalletsWithBackend(retryCount + 1), delay);
+        }
       }
     };
 
-    syncWalletsWithBackend();
+    // Delay initial sync to let backend start up
+    const timer = setTimeout(() => syncWalletsWithBackend(), 2000);
+    return () => clearTimeout(timer);
   }, []);
 
   const updatePortfolio = async () => {
