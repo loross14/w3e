@@ -26,7 +26,7 @@ const MetricCard = ({ title, value, change, changeType = "positive", icon, child
   </div>
 );
 
-const ActionCard = ({ title, description, buttonText, onAction, variant = "primary", disabled = false }) => (
+const ActionCard = ({ title, description, buttonText, onAction, variant = "primary", disabled = false, children }) => (
   <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
     <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">{title}</h3>
     {description && <p className="text-sm text-gray-400 mb-4">{description}</p>}
@@ -43,6 +43,7 @@ const ActionCard = ({ title, description, buttonText, onAction, variant = "prima
     >
       {buttonText}
     </button>
+    {children}
   </div>
 );
 
@@ -470,11 +471,11 @@ const ReportGenerator = ({ portfolioData }) => {
   );
 };
 
-// Loading Component
-const LoadingSpinner = () => (
+// Loading Component with status
+const LoadingSpinner = ({ status }) => (
   <div className="flex items-center justify-center space-x-2 text-purple-400">
     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
-    <span className="text-sm">Updating...</span>
+    <span className="text-sm">{status || 'Loading...'}</span>
   </div>
 );
 
@@ -631,16 +632,36 @@ const App = () => {
     }
   };
 
+  // API Configuration for Replit environment
   const API_BASE_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:8000' 
-    : window.location.origin.replace(/:\d+$/, '') + ':8000';
+    : `https://${window.location.hostname.split('-').slice(0, -1).join('-')}-8000.${window.location.hostname.split('.').slice(1).join('.')}`;
+
+  // Status tracking state
+  const [updateStatus, setUpdateStatus] = useState('');
+  const [updateError, setUpdateError] = useState('');
 
   const updatePortfolio = async () => {
     setIsLoading(true);
+    setUpdateError('');
+    setUpdateStatus('🔗 Connecting to backend...');
+    
     try {
-      console.log('Updating portfolio with real blockchain data...');
+      // Step 1: Test backend connection
+      setUpdateStatus('🔗 Testing backend connection...');
+      const healthResponse = await fetch(`${API_BASE_URL}/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       
-      // Trigger backend portfolio update
+      if (!healthResponse.ok) {
+        throw new Error(`Backend not responding (${healthResponse.status})`);
+      }
+      
+      // Step 2: Trigger portfolio update
+      setUpdateStatus('🚀 Starting portfolio update...');
       const updateResponse = await fetch(`${API_BASE_URL}/portfolio/update`, {
         method: 'POST',
         headers: {
@@ -649,21 +670,26 @@ const App = () => {
       });
       
       if (!updateResponse.ok) {
-        throw new Error(`Update failed: ${updateResponse.status}`);
+        const errorText = await updateResponse.text();
+        throw new Error(`Update failed (${updateResponse.status}): ${errorText}`);
       }
       
-      // Wait a moment for the update to process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Step 3: Wait for processing
+      setUpdateStatus('⏳ Processing wallet data...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
-      // Fetch updated portfolio data
+      // Step 4: Fetch updated portfolio data
+      setUpdateStatus('📊 Fetching portfolio data...');
       const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
       if (!portfolioResponse.ok) {
-        throw new Error(`Failed to fetch portfolio: ${portfolioResponse.status}`);
+        const errorText = await portfolioResponse.text();
+        throw new Error(`Failed to fetch portfolio (${portfolioResponse.status}): ${errorText}`);
       }
       
       const portfolioData = await portfolioResponse.json();
       
-      // Transform API data to frontend format
+      // Step 5: Transform data
+      setUpdateStatus('🔄 Processing asset data...');
       const updatedAssets = portfolioData.assets.map(asset => ({
         id: asset.id,
         name: asset.name,
@@ -685,10 +711,14 @@ const App = () => {
         { value: newTotalValue }
       ];
       
-      // Fetch individual wallet data
+      // Step 6: Fetch individual wallet data
+      setUpdateStatus('💼 Updating wallet details...');
       const newWalletData = {};
+      let walletCount = 0;
+      
       for (const wallet of walletAddresses) {
         try {
+          setUpdateStatus(`💼 Processing ${wallet.label} (${++walletCount}/${walletAddresses.length})...`);
           const walletResponse = await fetch(`${API_BASE_URL}/wallets/${wallet.id}/details`);
           if (walletResponse.ok) {
             const walletDetails = await walletResponse.json();
@@ -718,9 +748,13 @@ const App = () => {
           }
         } catch (error) {
           console.error(`Error fetching wallet ${wallet.id} details:`, error);
+          setUpdateStatus(`⚠️ Warning: Could not fetch ${wallet.label} details`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
       
+      // Step 7: Save data
+      setUpdateStatus('💾 Saving data...');
       setWalletData(newWalletData);
       localStorage.setItem("walletData", JSON.stringify(newWalletData));
       
@@ -731,10 +765,27 @@ const App = () => {
         totalValue: newTotalValue
       }));
       
+      // Step 8: Complete
+      setUpdateStatus('✅ Portfolio updated successfully!');
+      setTimeout(() => setUpdateStatus(''), 3000);
+      
       console.log('Portfolio updated successfully with real data');
     } catch (error) {
       console.error('Error updating portfolio:', error);
-      alert(`Failed to update portfolio: ${error.message}`);
+      let errorMessage = 'Unknown error occurred';
+      
+      if (error.message.includes('Failed to fetch')) {
+        errorMessage = '🔌 Cannot connect to backend server. Make sure the backend is running on port 8000.';
+      } else if (error.message.includes('CORS')) {
+        errorMessage = '🚫 CORS error - backend not configured for frontend domain.';
+      } else if (error.message.includes('Network')) {
+        errorMessage = '🌐 Network error - check your internet connection.';
+      } else {
+        errorMessage = `❌ ${error.message}`;
+      }
+      
+      setUpdateError(errorMessage);
+      setUpdateStatus('');
     } finally {
       setIsLoading(false);
     }
@@ -786,11 +837,33 @@ const App = () => {
           <ActionCard
             title="🔄 Update Portfolio Database"
             description="Query all wallets and fetch current balances & history"
-            buttonText={isLoading ? <LoadingSpinner /> : "Update Database"}
+            buttonText={isLoading ? <LoadingSpinner status={updateStatus} /> : "Update Database"}
             onAction={updatePortfolio}
             variant="primary"
             disabled={isLoading}
-          />
+          >
+            {/* Status Display */}
+            {updateStatus && (
+              <div className="mt-3 p-3 bg-blue-900/30 border border-blue-700/50 rounded-lg">
+                <p className="text-sm text-blue-300">{updateStatus}</p>
+              </div>
+            )}
+            
+            {/* Error Display */}
+            {updateError && (
+              <div className="mt-3 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
+                <p className="text-sm text-red-300">{updateError}</p>
+                <div className="mt-2 text-xs text-red-400">
+                  <p>💡 Troubleshooting:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    <li>Make sure the backend is running (check "Full Stack" workflow)</li>
+                    <li>Check if your ALCHEMY_API_KEY secret is set</li>
+                    <li>Backend should be accessible at: {API_BASE_URL}</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </ActionCard>
         </div>
 
         {/* Key Metrics - Mobile responsive grid */}
@@ -850,7 +923,7 @@ const App = () => {
             <ActionCard
               title="Update Portfolio"
               description="Refresh asset prices and balances"
-              buttonText={isLoading ? <LoadingSpinner /> : "Update Portfolio"}
+              buttonText={isLoading ? <LoadingSpinner status={updateStatus} /> : "Update Portfolio"}
               onAction={updatePortfolio}
               variant="secondary"
               disabled={isLoading}
@@ -960,7 +1033,7 @@ const App = () => {
                 disabled={isLoading}
                 className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:bg-purple-800 disabled:cursor-not-allowed"
               >
-                {isLoading ? <LoadingSpinner /> : "🔄 Update Database"}
+                {isLoading ? <LoadingSpinner status={updateStatus} /> : "🔄 Update Database"}
               </button>
             </div>
           ) : (
