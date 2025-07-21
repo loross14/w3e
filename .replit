@@ -24,7 +24,7 @@ localPort = 8000
 externalPort = 8000
 
 [workflows]
-runButton = "Start Frontend"
+runButton = "Full Stack (Both Services)"
 
 [[workflows.workflow]]
 name = "Run"
