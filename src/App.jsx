@@ -3,7 +3,103 @@ import React, { useEffect, useState, useRef } from "react";
 import Chart from "chart.js/auto";
 import { jsPDF } from "jspdf";
 
-// Portfolio Chart Component with Dune-style styling
+// Modular Card Components
+const MetricCard = ({ title, value, change, changeType = "positive", icon, children }) => (
+  <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 hover:border-gray-600 transition-colors">
+    <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center space-x-2">
+        <h3 className="text-xs sm:text-sm font-medium text-gray-400 uppercase tracking-wide">{title}</h3>
+        {icon && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: icon }}></div>}
+      </div>
+    </div>
+    <div className="space-y-1">
+      <p className="text-xl sm:text-2xl font-bold text-white font-mono break-all">
+        {value}
+      </p>
+      {change && (
+        <p className={`text-xs sm:text-sm ${changeType === "positive" ? "text-green-400" : "text-red-400"} mt-1`}>
+          {change}
+        </p>
+      )}
+      {children}
+    </div>
+  </div>
+);
+
+const ActionCard = ({ title, description, buttonText, onAction, variant = "primary", disabled = false }) => (
+  <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
+    <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">{title}</h3>
+    {description && <p className="text-sm text-gray-400 mb-4">{description}</p>}
+    <button
+      onClick={onAction}
+      disabled={disabled}
+      className={`w-full px-4 py-2 sm:py-3 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+        variant === "primary"
+          ? "bg-purple-600 text-white hover:bg-purple-700 disabled:bg-purple-800"
+          : variant === "secondary"
+          ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-800"
+          : "bg-gray-700 text-white hover:bg-gray-600 disabled:bg-gray-800"
+      } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+    >
+      {buttonText}
+    </button>
+  </div>
+);
+
+const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
+  const weight = ((asset.valueUSD / totalValue) * 100).toFixed(1);
+  
+  return (
+    <div 
+      className="bg-gray-900 border border-gray-700 rounded-xl p-4 hover:border-gray-600 cursor-pointer transition-all duration-200"
+      onClick={onClick}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center space-x-3 min-w-0 flex-1">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-bold text-sm">{asset.symbol.slice(0, 2)}</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-medium text-white text-sm sm:text-base truncate">{asset.name}</h3>
+            <p className="text-xs sm:text-sm text-gray-400 truncate">{asset.symbol}</p>
+          </div>
+        </div>
+        {isEditor && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onHide();
+            }}
+            className="text-xs bg-red-600/20 text-red-400 px-2 py-1 rounded-md hover:bg-red-600/30 transition-colors border border-red-600/30 ml-2 flex-shrink-0"
+          >
+            Hide
+          </button>
+        )}
+      </div>
+      
+      <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
+        <div>
+          <span className="text-gray-400 block">Balance</span>
+          <span className="text-white font-mono">{asset.balance}</span>
+        </div>
+        <div>
+          <span className="text-gray-400 block">Price</span>
+          <span className="text-white font-mono">${asset.priceUSD.toLocaleString()}</span>
+        </div>
+        <div>
+          <span className="text-gray-400 block">Value</span>
+          <span className="text-white font-mono">${asset.valueUSD.toLocaleString()}</span>
+        </div>
+        <div>
+          <span className="text-gray-400 block">Weight</span>
+          <span className="text-gray-300 font-mono">{weight}%</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Portfolio Chart Component with mobile optimization
 const PortfolioChart = ({ data }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
@@ -26,11 +122,11 @@ const PortfolioChart = ({ data }) => {
             backgroundColor: "rgba(139, 92, 246, 0.1)",
             fill: true,
             tension: 0.4,
-            borderWidth: 3,
+            borderWidth: 2,
             pointBackgroundColor: "#8B5CF6",
             pointBorderColor: "#ffffff",
             pointBorderWidth: 2,
-            pointRadius: 6,
+            pointRadius: 4,
           },
         ],
       },
@@ -50,6 +146,10 @@ const PortfolioChart = ({ data }) => {
             },
             ticks: {
               color: "#9CA3AF",
+              maxTicksLimit: 6,
+              font: {
+                size: 10,
+              },
             },
           },
           y: {
@@ -60,7 +160,10 @@ const PortfolioChart = ({ data }) => {
             },
             ticks: {
               color: "#9CA3AF",
-              callback: (value) => `$${value.toLocaleString()}`,
+              callback: (value) => `$${(value / 1000).toFixed(0)}K`,
+              font: {
+                size: 10,
+              },
             },
           },
         },
@@ -74,10 +177,10 @@ const PortfolioChart = ({ data }) => {
     };
   }, [data]);
 
-  return <canvas ref={chartRef} />;
+  return <canvas ref={chartRef} className="w-full h-full" />;
 };
 
-// Asset Details Modal with Dune styling
+// Asset Details Modal
 const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
   const [notes, setNotes] = useState(asset?.notes || "");
 
@@ -89,79 +192,94 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl max-w-md w-full m-4">
-        <h2 className="text-xl font-bold mb-4 text-white">{asset.name}</h2>
-        <div className="space-y-3 mb-4">
-          <div className="flex justify-between">
-            <span className="text-gray-400">Balance:</span>
-            <span className="text-white font-mono">{asset.balance} {asset.symbol}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Value:</span>
-            <span className="text-green-400 font-mono">${asset.valueUSD.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Price:</span>
-            <span className="text-white font-mono">${asset.priceUSD.toFixed(4)}</span>
-          </div>
-        </div>
-        {isEditor && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2 text-gray-300">Notes:</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
-              rows="3"
-              placeholder="Add your notes here..."
-            />
-          </div>
-        )}
-        <div className="flex space-x-3">
-          {isEditor && (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg sm:text-xl font-bold text-white">{asset.name}</h2>
             <button
-              onClick={handleSave}
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+              onClick={onClose}
+              className="text-gray-400 hover:text-white p-1"
             >
-              Save
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
+          </div>
+          
+          <div className="space-y-3 mb-4 text-sm sm:text-base">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Balance:</span>
+              <span className="text-white font-mono">{asset.balance} {asset.symbol}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Value:</span>
+              <span className="text-green-400 font-mono">${asset.valueUSD.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Price:</span>
+              <span className="text-white font-mono">${asset.priceUSD.toFixed(4)}</span>
+            </div>
+          </div>
+          
+          {isEditor && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-gray-300">Notes:</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-sm"
+                rows="3"
+                placeholder="Add your notes here..."
+              />
+            </div>
           )}
-          <button
-            onClick={onClose}
-            className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium"
-          >
-            Close
-          </button>
+          
+          <div className="flex space-x-3">
+            {isEditor && (
+              <button
+                onClick={handleSave}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm flex-1"
+              >
+                Save
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium text-sm flex-1"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// Report Generator Component with Dune styling
+// Report Generator Component
 const ReportGenerator = ({ portfolioData }) => {
-  const periods = ["1 Week", "1 Month", "1 Quarter", "1 Year"];
+  const periods = ["1W", "1M", "1Q", "1Y"];
 
   const generateReport = (period) => {
     const doc = new jsPDF();
     doc.setFontSize(20);
-    doc.text(`Crypto Fund Performance Report - ${period}`, 20, 20);
+    doc.text(`Crypto Fund Report - ${period}`, 20, 20);
     doc.setFontSize(12);
     doc.text(
-      `Total Balance: $${portfolioData.balanceHistory[0]?.value.toLocaleString() || "0"}`,
+      `Total Balance: $${portfolioData.totalValue?.toLocaleString() || "0"}`,
       20,
       40,
     );
     doc.text("Assets:", 20, 50);
-    portfolioData.assets.forEach((asset, i) => {
+    portfolioData.assets?.forEach((asset, i) => {
       doc.text(
         `${asset.name}: $${asset.valueUSD.toLocaleString()}`,
         30,
         60 + i * 10,
       );
     });
-    doc.save(`CryptoFund_Report_${period.replace(" ", "_")}.pdf`);
+    doc.save(`CryptoFund_Report_${period}.pdf`);
   };
 
   return (
@@ -170,16 +288,24 @@ const ReportGenerator = ({ portfolioData }) => {
         <button
           key={period}
           onClick={() => generateReport(period)}
-          className="bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+          className="bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition-colors text-xs sm:text-sm font-medium"
         >
-          Export {period}
+          {period}
         </button>
       ))}
     </div>
   );
 };
 
-// Main App Component with Dune.com styling
+// Loading Component
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center space-x-2 text-purple-400">
+    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
+    <span className="text-sm">Updating...</span>
+  </div>
+);
+
+// Main App Component
 const App = () => {
   const [isEditor, setIsEditor] = useState(false);
   const [password, setPassword] = useState("");
@@ -187,6 +313,7 @@ const App = () => {
     () => JSON.parse(localStorage.getItem("hiddenAssets")) || [],
   );
   const [selectedAsset, setSelectedAsset] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [portfolioData, setPortfolioData] = useState({
     balanceHistory: [
       { value: 1250000 },
@@ -260,37 +387,66 @@ const App = () => {
     }));
   };
 
+  const updatePortfolio = async () => {
+    setIsLoading(true);
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Simulate real-time price updates
+      setPortfolioData(prev => ({
+        ...prev,
+        assets: prev.assets.map(asset => ({
+          ...asset,
+          priceUSD: asset.priceUSD * (0.95 + Math.random() * 0.1), // ±5% price change
+          valueUSD: asset.balance * (asset.priceUSD * (0.95 + Math.random() * 0.1))
+        })),
+        balanceHistory: [
+          ...prev.balanceHistory.slice(1),
+          { value: prev.balanceHistory[prev.balanceHistory.length - 1].value * (0.98 + Math.random() * 0.04) }
+        ]
+      }));
+    } catch (error) {
+      console.error('Error updating portfolio:', error);
+      alert('Failed to update portfolio. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Calculate metrics
   const visibleAssets = portfolioData.assets.filter(
     (asset) => !hiddenAssets.includes(asset.id),
   );
-
+  
   const totalValue = visibleAssets.reduce(
     (sum, asset) => sum + asset.valueUSD,
     0,
   );
 
+  const topAsset = visibleAssets.length > 0 ? visibleAssets.reduce((prev, current) => 
+    prev.valueUSD > current.valueUSD ? prev : current
+  ) : null;
+
+  const topAssetWeight = topAsset ? ((topAsset.valueUSD / totalValue) * 100).toFixed(1) : 0;
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Header */}
-      <div className="border-b border-gray-800 bg-gray-900/50">
-        <div className="container mx-auto px-6 py-4">
+      {/* Mobile-optimized Header */}
+      <div className="border-b border-gray-800 bg-gray-900/50 sticky top-0 z-40">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">D</span>
+            <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-xs sm:text-sm">D</span>
               </div>
-              <h1 className="text-2xl font-bold">Crypto Fund Analytics</h1>
+              <h1 className="text-lg sm:text-2xl font-bold truncate">Crypto Fund Analytics</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <button className="text-gray-400 hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+              <button className="text-gray-400 hover:text-white transition-colors p-1">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7H4l5-5v5z" />
-                </svg>
-              </button>
-              <button className="text-gray-400 hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
                 </svg>
               </button>
             </div>
@@ -298,199 +454,128 @@ const App = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-6">
+      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {/* Editor Access */}
         {!isEditor && (
-          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl mb-6 max-w-md">
-            <h2 className="text-lg font-semibold mb-4 text-purple-400">🔐 Editor Access</h2>
-            <div className="space-y-4">
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter access key"
-                className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
-                onKeyPress={(e) => e.key === "Enter" && checkPassword()}
-              />
-              <button
-                onClick={checkPassword}
-                className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
-              >
-                Unlock Dashboard
-              </button>
-            </div>
+          <div className="mb-6">
+            <ActionCard
+              title="🔐 Editor Access"
+              description="Enter access key to unlock dashboard editing features"
+              buttonText="Unlock Dashboard"
+              onAction={checkPassword}
+            >
+              <div className="mb-4">
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter access key"
+                  className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-sm"
+                  onKeyPress={(e) => e.key === "Enter" && checkPassword()}
+                />
+              </div>
+            </ActionCard>
           </div>
         )}
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide">Total Value</h3>
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-            </div>
-            <p className="text-2xl font-bold text-white font-mono">
-              ${totalValue.toLocaleString()}
-            </p>
-            <p className="text-sm text-green-400 mt-1">+2.4% (24h)</p>
-          </div>
+        {/* Key Metrics - Mobile responsive grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
+          <MetricCard
+            title="Total Value"
+            value={`$${totalValue.toLocaleString()}`}
+            change="+2.4% (24h)"
+            changeType="positive"
+            icon="#10B981"
+          />
           
-          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide">Assets</h3>
-              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-            </div>
-            <p className="text-2xl font-bold text-white font-mono">
-              {visibleAssets.length}
-            </p>
-            <p className="text-sm text-gray-400 mt-1">Active positions</p>
-          </div>
+          <MetricCard
+            title="Assets"
+            value={visibleAssets.length}
+            change="Active positions"
+            changeType="neutral"
+            icon="#3B82F6"
+          />
 
-          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide">Top Asset</h3>
-              <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-            </div>
-            <p className="text-2xl font-bold text-white">
-              ETH
-            </p>
-            <p className="text-sm text-gray-400 mt-1">83.6% of portfolio</p>
-          </div>
+          <MetricCard
+            title="Top Asset"
+            value={topAsset?.symbol || "N/A"}
+            change={`${topAssetWeight}% of portfolio`}
+            changeType="neutral"
+            icon="#8B5CF6"
+          />
 
-          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide">Performance</h3>
-              <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-            </div>
-            <p className="text-2xl font-bold text-green-400 font-mono">
-              +5.6%
-            </p>
-            <p className="text-sm text-gray-400 mt-1">Since inception</p>
-          </div>
+          <MetricCard
+            title="Performance"
+            value="+5.6%"
+            change="Since inception"
+            changeType="positive"
+            icon="#F59E0B"
+          />
         </div>
 
-        {/* Chart Section */}
-        <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-white">Portfolio Performance</h3>
-            <div className="flex space-x-2">
-              <button className="px-3 py-1 text-xs bg-purple-600 text-white rounded-md">7D</button>
-              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600">30D</button>
-              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600">90D</button>
-              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600">1Y</button>
+        {/* Chart Section - Mobile optimized */}
+        <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-3 sm:space-y-0">
+            <h3 className="text-base sm:text-lg font-semibold text-white">Portfolio Performance</h3>
+            <div className="flex space-x-2 overflow-x-auto">
+              <button className="px-3 py-1 text-xs bg-purple-600 text-white rounded-md whitespace-nowrap">7D</button>
+              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">30D</button>
+              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">90D</button>
+              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">1Y</button>
             </div>
           </div>
-          <div className="chart-container">
+          <div className="h-48 sm:h-64 lg:h-80">
             <PortfolioChart data={portfolioData.balanceHistory} />
           </div>
         </div>
 
-        {/* Assets Table */}
-        <div className="bg-gray-900 border border-gray-700 rounded-xl overflow-hidden mb-8">
-          <div className="flex justify-between items-center p-6 border-b border-gray-700">
-            <h3 className="text-lg font-semibold text-white">Asset Holdings</h3>
-            <div className="flex items-center space-x-4">
-              {isEditor && (
-                <>
-                  <button
-                    onClick={() => {
-                      // Simulate portfolio update with random price changes
-                      setPortfolioData(prev => ({
-                        ...prev,
-                        assets: prev.assets.map(asset => ({
-                          ...asset,
-                          priceUSD: asset.priceUSD * (0.95 + Math.random() * 0.1), // ±5% price change
-                          valueUSD: asset.balance * (asset.priceUSD * (0.95 + Math.random() * 0.1))
-                        })),
-                        balanceHistory: [
-                          ...prev.balanceHistory.slice(1),
-                          { value: prev.balanceHistory[prev.balanceHistory.length - 1].value * (0.98 + Math.random() * 0.04) }
-                        ]
-                      }));
-                    }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span>Update Portfolio</span>
-                  </button>
-                  <ReportGenerator portfolioData={portfolioData} />
-                </>
-              )}
+        {/* Action Cards for Editor */}
+        {isEditor && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 sm:mb-8">
+            <ActionCard
+              title="Update Portfolio"
+              description="Refresh asset prices and balances"
+              buttonText={isLoading ? <LoadingSpinner /> : "Update Portfolio"}
+              onAction={updatePortfolio}
+              variant="secondary"
+              disabled={isLoading}
+            />
+            
+            <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">Generate Reports</h3>
+              <p className="text-sm text-gray-400 mb-4">Export performance reports</p>
+              <ReportGenerator portfolioData={{ ...portfolioData, totalValue }} />
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-800">
-                <tr>
-                  <th className="text-left p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Asset</th>
-                  <th className="text-right p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Balance</th>
-                  <th className="text-right p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Price</th>
-                  <th className="text-right p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Value</th>
-                  <th className="text-right p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Weight</th>
-                  {isEditor && <th className="text-right p-4 text-xs font-medium text-gray-400 uppercase tracking-wide">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {visibleAssets.map((asset, index) => (
-                  <tr
-                    key={asset.id}
-                    className={`border-b border-gray-800 hover:bg-gray-800/50 cursor-pointer transition-colors ${
-                      index % 2 === 0 ? 'bg-gray-900/50' : ''
-                    }`}
-                    onClick={() => setSelectedAsset(asset)}
-                  >
-                    <td className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                          <span className="text-white font-bold text-xs">{asset.symbol.slice(0, 2)}</span>
-                        </div>
-                        <div>
-                          <div className="font-medium text-white">{asset.name}</div>
-                          <div className="text-sm text-gray-400">{asset.symbol}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="text-right p-4">
-                      <div className="font-mono text-white">{asset.balance}</div>
-                      <div className="text-sm text-gray-400">{asset.symbol}</div>
-                    </td>
-                    <td className="text-right p-4">
-                      <div className="font-mono text-white">${asset.priceUSD.toLocaleString()}</div>
-                    </td>
-                    <td className="text-right p-4">
-                      <div className="font-mono text-white">${asset.valueUSD.toLocaleString()}</div>
-                    </td>
-                    <td className="text-right p-4">
-                      <div className="font-mono text-gray-300">
-                        {((asset.valueUSD / totalValue) * 100).toFixed(1)}%
-                      </div>
-                    </td>
-                    {isEditor && (
-                      <td className="text-right p-4">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleHiddenAsset(asset.id);
-                          }}
-                          className="text-sm bg-red-600/20 text-red-400 px-3 py-1 rounded-md hover:bg-red-600/30 transition-colors border border-red-600/30"
-                        >
-                          Hide
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        )}
+
+        {/* Assets Grid - Mobile responsive */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex justify-between items-center mb-4 sm:mb-6">
+            <h3 className="text-base sm:text-lg font-semibold text-white">Asset Holdings</h3>
+            <span className="text-xs sm:text-sm text-gray-400">
+              {visibleAssets.length} assets • ${totalValue.toLocaleString()}
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {visibleAssets.map((asset) => (
+              <AssetCard
+                key={asset.id}
+                asset={asset}
+                onClick={() => setSelectedAsset(asset)}
+                onHide={() => toggleHiddenAsset(asset.id)}
+                isEditor={isEditor}
+                totalValue={totalValue}
+              />
+            ))}
           </div>
         </div>
 
         {/* Hidden Assets */}
         {hiddenAssets.length > 0 && isEditor && (
-          <div className="bg-gray-900 border border-gray-700 p-6 rounded-xl">
-            <h3 className="text-lg font-semibold mb-4 text-white">Hidden Assets</h3>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">Hidden Assets</h3>
             <div className="space-y-3">
               {portfolioData.assets
                 .filter((asset) => hiddenAssets.includes(asset.id))
@@ -499,15 +584,15 @@ const App = () => {
                     key={asset.id}
                     className="flex justify-between items-center p-3 bg-gray-800 rounded-lg border border-gray-700"
                   >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
                         <span className="text-white font-bold text-xs">{asset.symbol.slice(0, 2)}</span>
                       </div>
-                      <span className="text-white font-medium">{asset.name}</span>
+                      <span className="text-white font-medium truncate">{asset.name}</span>
                     </div>
                     <button
                       onClick={() => toggleHiddenAsset(asset.id)}
-                      className="text-sm bg-green-600/20 text-green-400 px-3 py-1 rounded-md hover:bg-green-600/30 transition-colors border border-green-600/30"
+                      className="text-xs bg-green-600/20 text-green-400 px-3 py-1 rounded-md hover:bg-green-600/30 transition-colors border border-green-600/30 whitespace-nowrap"
                     >
                       Show
                     </button>
