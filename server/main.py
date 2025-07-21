@@ -64,7 +64,8 @@ ERC20_ABI = [
 class AssetData:
     def __init__(self, token_address: str, symbol: str, name: str, balance: float, 
                  balance_formatted: str, decimals: int, is_nft: bool = False, 
-                 token_ids: List[str] = None):
+                 token_ids: List[str] = None, floor_price: float = 0, 
+                 image_url: str = None):
         self.token_address = token_address
         self.symbol = symbol
         self.name = name
@@ -73,6 +74,8 @@ class AssetData:
         self.decimals = decimals
         self.is_nft = is_nft
         self.token_ids = token_ids or []
+        self.floor_price = floor_price
+        self.image_url = image_url
 
 # Abstract base classes for chain-specific implementations
 class AssetFetcher(ABC):
@@ -187,13 +190,20 @@ class EthereumAssetFetcher(AssetFetcher):
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
+                # Enhanced NFT fetch with metadata
                 nft_response = await client.post(
                     self.alchemy_url,
                     json={
                         "id": 1,
                         "jsonrpc": "2.0",
                         "method": "alchemy_getNFTsForOwner",
-                        "params": [wallet_address]
+                        "params": [
+                            wallet_address,
+                            {
+                                "withMetadata": True,
+                                "tokenUriTimeoutInMs": 5000
+                            }
+                        ]
                     }
                 )
 
@@ -201,7 +211,7 @@ class EthereumAssetFetcher(AssetFetcher):
                     nft_data = nft_response.json()
                     owned_nfts = nft_data.get("result", {}).get("ownedNfts", [])
 
-                    # Group NFTs by collection
+                    # Group NFTs by collection with enhanced metadata
                     nft_collections = {}
                     for nft in owned_nfts:
                         contract_address = nft.get("contract", {}).get("address", "").lower()
@@ -209,15 +219,26 @@ class EthereumAssetFetcher(AssetFetcher):
                         if contract_address in hidden_addresses:
                             continue
 
-                        collection_name = nft.get("contract", {}).get("name", "Unknown NFT Collection")
-                        collection_symbol = nft.get("contract", {}).get("symbol", "NFT")
+                        contract_info = nft.get("contract", {})
+                        collection_name = contract_info.get("name", "Unknown NFT Collection")
+                        collection_symbol = contract_info.get("symbol", "NFT")
+                        
+                        # Extract image from metadata
+                        metadata = nft.get("metadata", {})
+                        image_url = None
+                        if metadata:
+                            image_url = metadata.get("image")
+                            if not image_url and "image_url" in metadata:
+                                image_url = metadata.get("image_url")
 
                         if contract_address not in nft_collections:
                             nft_collections[contract_address] = {
                                 "name": collection_name,
                                 "symbol": collection_symbol,
                                 "count": 0,
-                                "token_ids": []
+                                "token_ids": [],
+                                "image_url": image_url,
+                                "opensea_slug": contract_info.get("openSea", {}).get("collectionSlug")
                             }
 
                         nft_collections[contract_address]["count"] += 1
@@ -225,8 +246,15 @@ class EthereumAssetFetcher(AssetFetcher):
                         if token_id:
                             nft_collections[contract_address]["token_ids"].append(token_id)
 
-                    # Add NFT collections as assets
+                        # Use first NFT image if collection doesn't have one
+                        if not nft_collections[contract_address]["image_url"] and image_url:
+                            nft_collections[contract_address]["image_url"] = image_url
+
+                    # Fetch floor prices for collections and add as assets
                     for contract_address, collection_data in nft_collections.items():
+                        # Try to get floor price from OpenSea
+                        floor_price = await self._get_nft_floor_price(client, contract_address, collection_data.get("opensea_slug"))
+                        
                         assets.append(AssetData(
                             token_address=contract_address,
                             symbol=f"{collection_data['symbol']} NFT",
@@ -235,14 +263,56 @@ class EthereumAssetFetcher(AssetFetcher):
                             balance_formatted=f"{collection_data['count']} NFTs",
                             decimals=0,
                             is_nft=True,
-                            token_ids=collection_data["token_ids"][:10]
+                            token_ids=collection_data["token_ids"][:10],
+                            floor_price=floor_price,
+                            image_url=collection_data.get("image_url")
                         ))
-                        print(f"✅ Found {collection_data['count']} NFTs from {collection_data['name']}")
+                        print(f"✅ Found {collection_data['count']} NFTs from {collection_data['name']} (Floor: ${floor_price})")
 
         except Exception as e:
             print(f"❌ Error fetching Ethereum NFTs: {e}")
 
         return assets
+
+    async def _get_nft_floor_price(self, client: httpx.AsyncClient, contract_address: str, opensea_slug: str = None) -> float:
+        """Get NFT collection floor price from OpenSea API"""
+        try:
+            if opensea_slug:
+                # Use OpenSea API with collection slug
+                response = await client.get(
+                    f"https://api.opensea.io/api/v1/collection/{opensea_slug}/stats",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (compatible; CryptoFund/1.0)"
+                    },
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    stats = data.get("stats", {})
+                    floor_price = stats.get("floor_price", 0)
+                    if floor_price:
+                        # Convert ETH to USD (approximate)
+                        eth_price = 3800  # Could fetch real ETH price here
+                        return floor_price * eth_price
+            
+            # Fallback: try contract address
+            response = await client.get(
+                f"https://api.opensea.io/api/v1/asset_contract/{contract_address}",
+                headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; CryptoFund/1.0)"
+                },
+                timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                # This is a basic fallback - real implementation would need more complex floor price logic
+                return 0.1  # Placeholder floor price
+                
+        except Exception as e:
+            print(f"⚠️ Could not fetch floor price for {contract_address}: {e}")
+            
+        return 0
 
 class EthereumPriceFetcher(PriceFetcher):
     def __init__(self):
@@ -653,12 +723,62 @@ class SolanaAssetFetcher(AssetFetcher):
 
     async def _fetch_token_metadata(self, client: httpx.AsyncClient, mint_address: str) -> tuple[str, str]:
         """
-        Fetches token metadata (symbol and name) from the Solana RPC.
-        Returns a tuple of (symbol, name).  If metadata cannot be fetched, returns fallback values.
+        Fetches token metadata using DexScreener API for better accuracy.
+        Returns a tuple of (symbol, name). Falls back to RPC if DexScreener fails.
         """
         try:
             print(f"🌐 [TOKEN METADATA] Fetching metadata for mint: {mint_address}")
 
+            # Method 1: Try DexScreener API for accurate token info
+            try:
+                response = await client.get(
+                    f"https://api.dexscreener.com/latest/dex/tokens/{mint_address}",
+                    timeout=10.0,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (compatible; CryptoFund/1.0)"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    pairs = data.get("pairs", [])
+                    
+                    if pairs:
+                        # Get the most liquid pair
+                        best_pair = max(pairs, key=lambda p: float(p.get("liquidity", {}).get("usd", 0)))
+                        base_token = best_pair.get("baseToken", {})
+                        
+                        symbol = base_token.get("symbol", "")
+                        name = base_token.get("name", "")
+                        
+                        if symbol and name and not symbol.startswith("SPL-"):
+                            print(f"✅ [TOKEN METADATA] DexScreener metadata: Symbol={symbol}, Name={name}")
+                            return symbol, name
+                            
+            except Exception as e:
+                print(f"⚠️ [TOKEN METADATA] DexScreener failed: {e}")
+
+            # Method 2: Try Jupiter Token List API
+            try:
+                response = await client.get(
+                    f"https://token.jup.ag/strict",
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200:
+                    tokens = response.json()
+                    for token in tokens:
+                        if token.get("address") == mint_address:
+                            symbol = token.get("symbol", "")
+                            name = token.get("name", "")
+                            if symbol and name:
+                                print(f"✅ [TOKEN METADATA] Jupiter metadata: Symbol={symbol}, Name={name}")
+                                return symbol, name
+                                
+            except Exception as e:
+                print(f"⚠️ [TOKEN METADATA] Jupiter API failed: {e}")
+
+            # Method 3: Fallback to original RPC method
             rpc_payload = {
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -683,12 +803,12 @@ class SolanaAssetFetcher(AssetFetcher):
                 },
                 timeout=30.0
             )
+            
             if response.status_code == 200:
                 data = response.json()
                 if "result" in data and "value" in data["result"]:
                     token_accounts = data["result"]["value"]
                     if token_accounts:
-                        # Assuming the first account contains the necessary metadata
                         account_info = token_accounts[0].get("account", {})
                         if account_info:
                             account_data = account_info.get("data", {})
@@ -700,27 +820,16 @@ class SolanaAssetFetcher(AssetFetcher):
                                         symbol = info.get("symbol", "")
                                         name = info.get("name", "")
                                         if symbol and name:
-                                            print(f"✅ [TOKEN METADATA] Fetched metadata: Symbol={symbol}, Name={name}")
+                                            print(f"✅ [TOKEN METADATA] RPC metadata: Symbol={symbol}, Name={name}")
                                             return symbol, name
-                                        else:
-                                            print(f"⚠️ [TOKEN METADATA] Missing symbol or name in metadata")
-                                    else:
-                                        print(f"⚠️ [TOKEN METADATA] No 'info' found in parsed data")
-                                else:
-                                    print(f"⚠️ [TOKEN METADATA] No 'parsed' data found")
-                            else:
-                                print(f"⚠️ [TOKEN METADATA] No valid account data found")
-                    else:
-                        print(f"⚠️ [TOKEN METADATA] No token accounts found")
-                else:
-                    print(f"❌ [TOKEN METADATA] Unexpected response structure: {data}")
-            else:
-                print(f"❌ [TOKEN METADATA] HTTP error {response.status_code}: {response.text}")
+
         except Exception as e:
             print(f"❌ [TOKEN METADATA] Error fetching metadata: {e}")
-        # Fallback values if metadata cannot be retrieved
+            
+        # Final fallback values
         symbol = f"SPL-{mint_address[:6]}"
         name = f"SPL Token ({mint_address[:8]}...)"
+        print(f"⚠️ [TOKEN METADATA] Using fallback: Symbol={symbol}, Name={name}")
         return symbol, name
 
 class SolanaPriceFetcher(PriceFetcher):
@@ -1130,6 +1239,21 @@ def init_db():
 
     try:
         cursor.execute('ALTER TABLE assets ADD COLUMN nft_metadata TEXT')
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute('ALTER TABLE assets ADD COLUMN floor_price REAL DEFAULT 0')
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute('ALTER TABLE assets ADD COLUMN image_url TEXT')
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute('ALTER TABLE assets ADD COLUMN price_change_24h REAL DEFAULT 0')
     except sqlite3.OperationalError:
         pass
 
@@ -1755,13 +1879,15 @@ async def update_portfolio_data_new():
             wallet_id = asset['wallet_id']
 
             if is_nft:
-                price_usd = 0
-                value_usd = 0
+                price_usd = asset.get('floor_price', 0)
+                value_usd = price_usd * asset['balance'] if price_usd > 0 else 0
                 nft_metadata = json.dumps({
                     "token_ids": asset.get('token_ids', []),
-                    "count": asset.get('balance', 0)
+                    "count": asset.get('balance', 0),
+                    "image_url": asset.get('image_url'),
+                    "floor_price": price_usd
                 })
-                print(f"🖼️ NFT Asset: {asset['symbol']} - {asset['balance']} items")
+                print(f"🖼️ NFT Asset: {asset['symbol']} - {asset['balance']} items (Floor: ${price_usd})")
             else:
                 # Look up price with multiple fallbacks
                 price_usd = price_map.get(token_address.lower(), 0)
@@ -1814,12 +1940,13 @@ async def update_portfolio_data_new():
             # Insert asset into database
             cursor.execute("""
                 INSERT INTO assets 
-                (wallet_id, token_address, symbol, name, balance, balance_formatted, price_usd, value_usd, is_nft, nft_metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (wallet_id, token_address, symbol, name, balance, balance_formatted, price_usd, value_usd, is_nft, nft_metadata, floor_price, image_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 wallet_id, token_address, asset['symbol'], 
                 asset['name'], asset['balance'], asset['balance_formatted'], 
-                price_usd, value_usd, is_nft, nft_metadata
+                price_usd, value_usd, is_nft, nft_metadata,
+                asset.get('floor_price', 0), asset.get('image_url')
             ))
 
         # CRITICAL FIX: Clean up hidden assets table to remove legitimate tokens

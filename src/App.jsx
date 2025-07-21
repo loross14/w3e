@@ -738,7 +738,8 @@ const App = () => {
   // Wallet addresses for the fund - stored in state for dynamic management
   const [walletAddresses, setWalletAddresses] = useState(() => {
     const saved = localStorage.getItem("fundWallets");
-    return saved ? JSON.parse(saved) : [
+    return saved```text
+ ? JSON.parse(saved) : [
       { id: 1, address: "0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98", label: "Ethereum Safe Multisig", network: "ETH" },
       { id: 2, address: "4ZE7D7ecU7tSvA5iJVCVp6MprguDqy7tvXguE64T9Twb", label: "Solana EOA", network: "SOL" }
     ];
@@ -890,19 +891,34 @@ const App = () => {
         if (savedData.assets && savedData.assets.length > 0) {
           console.log("🔄 [FRONTEND DEBUG] Starting asset transformation...");
           const transformedAssets = savedData.assets.map((asset, index) => {
-            console.log(`🔄 [FRONTEND DEBUG] Transforming asset ${index + 1}:`, asset);
-            const transformed = {
-              id: asset.id,
-              name: asset.name,
-              symbol: asset.symbol,
-              balance: asset.balance_formatted || asset.balance,
-              priceUSD: asset.price_usd || 0,
-              valueUSD: asset.value_usd || 0,
-              notes: asset.notes || "",
-            };
-            console.log(`✅ [FRONTEND DEBUG] Transformed to:`, transformed);
-            return transformed;
-          });
+        console.log(`🔄 [FRONTEND DEBUG] Transforming asset ${index + 1}:`, asset);
+
+        // Parse NFT metadata if present
+        let nftMetadata = null;
+        if (asset.nft_metadata) {
+          try {
+            nftMetadata = JSON.parse(asset.nft_metadata);
+          } catch (e) {
+            console.warn("Failed to parse NFT metadata:", e);
+          }
+        }
+
+        const transformed = {
+          id: asset.id,
+          name: asset.name,
+          symbol: asset.symbol,
+          balance: asset.balance_formatted || asset.balance,
+          priceUSD: asset.price_usd || 0,
+          valueUSD: asset.value_usd || 0,
+          notes: asset.notes || "",
+          isNFT: asset.is_nft || false,
+          floorPrice: asset.floor_price || (nftMetadata?.floor_price) || 0,
+          imageUrl: asset.image_url || (nftMetadata?.image_url) || null,
+          performance24h: asset.price_change_24h || 0
+        };
+        console.log(`✅ [FRONTEND DEBUG] Transformed to:`, transformed);
+        return transformed;
+      });
           console.log("🎯 [FRONTEND DEBUG] Final transformed assets:", transformedAssets);
 
           const savedTotalValue = savedData.total_value || 0;
