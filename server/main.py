@@ -695,7 +695,8 @@ class SolanaAssetFetcher(AssetFetcher):
                                 # Parse the token account structure
                                 account_info = token_account.get("account", {})
                                 if not account_info:
-                                    print(f"⚠️ [SPL TOKENS] No account info in token_account")                                    continue
+                                    print(f"⚠️ [SPL TOKENS] No account info in token_account")
+                                    continue
 
                                 account_data = account_info.get("data", {})
                                 if not isinstance(account_data, dict):
