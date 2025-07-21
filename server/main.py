@@ -383,10 +383,10 @@ class SolanaAssetFetcher(AssetFetcher):
         """Proper Solana address validation using base58 decoding"""
         try:
             import base58
-            
+
             if not address or len(address) < 32 or len(address) > 44:
                 return False
-            
+
             # Decode base58 and check if it's 32 bytes (standard Solana pubkey length)
             decoded = base58.b58decode(address)
             return len(decoded) == 32
@@ -426,7 +426,7 @@ class SolanaAssetFetcher(AssetFetcher):
             )
 
             print(f"🌐 [SOL BALANCE] Response status: {response.status_code}")
-            
+
             if response.status_code == 200:
                 data = response.json()
                 print(f"📈 [SOL BALANCE] Response data: {data}")
@@ -449,7 +449,7 @@ class SolanaAssetFetcher(AssetFetcher):
                     else:
                         print(f"❌ [SOL BALANCE] Unexpected result format: {result}")
                         return None
-                    
+
                     sol_balance = sol_balance_lamports / 1_000_000_000  # Convert lamports to SOL
                     print(f"💰 [SOL BALANCE] Success! {sol_balance} SOL ({sol_balance_lamports} lamports)")
 
@@ -604,10 +604,10 @@ class SolanaAssetFetcher(AssetFetcher):
                                         name = self.known_tokens[mint_address]["name"]
                                         print(f"✅ [SPL TOKENS] Found known token: {symbol}")
                                     else:
-                                        # Create fallback names for unknown tokens
-                                        symbol = f"SPL-{mint_address[:6]}"
-                                        name = f"SPL Token ({mint_address[:8]}...)"
-                                        print(f"⚠️ [SPL TOKENS] Unknown token, using fallback: {symbol}")
+                                        # Try to fetch metadata from Solana RPC
+                                        symbol, name = await self._fetch_token_metadata(client, mint_address)
+                                        if not symbol or symbol.startswith("SPL-"):
+                                            print(f"⚠️ [SPL TOKENS] Using fallback for unknown token: {mint_address[:12]}...")
 
                                     asset = AssetData(
                                         token_address=mint_address,
@@ -651,6 +651,78 @@ class SolanaAssetFetcher(AssetFetcher):
         print(f"🎯 [SPL TOKENS] Final result: {len(assets)} SPL tokens found")
         return assets
 
+    async def _fetch_token_metadata(self, client: httpx.AsyncClient, mint_address: str) -> tuple[str, str]:
+        """
+        Fetches token metadata (symbol and name) from the Solana RPC.
+        Returns a tuple of (symbol, name).  If metadata cannot be fetched, returns fallback values.
+        """
+        try:
+            print(f"🌐 [TOKEN METADATA] Fetching metadata for mint: {mint_address}")
+
+            rpc_payload = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "getTokenAccountsByOwner",
+                "params": [
+                    mint_address,
+                    {
+                        "programId": "spl-token"
+                    },
+                    {
+                        "encoding": "jsonParsed",
+                        "commitment": "confirmed"
+                    }
+                ]
+            }
+            response = await client.post(
+                self.solana_url,
+                json=rpc_payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "accept": "application/json"
+                },
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if "result" in data and "value" in data["result"]:
+                    token_accounts = data["result"]["value"]
+                    if token_accounts:
+                        # Assuming the first account contains the necessary metadata
+                        account_info = token_accounts[0].get("account", {})
+                        if account_info:
+                            account_data = account_info.get("data", {})
+                            if account_data and isinstance(account_data, dict):
+                                parsed_data = account_data.get("parsed", {})
+                                if parsed_data:
+                                    info = parsed_data.get("info", {})
+                                    if info:
+                                        symbol = info.get("symbol", "")
+                                        name = info.get("name", "")
+                                        if symbol and name:
+                                            print(f"✅ [TOKEN METADATA] Fetched metadata: Symbol={symbol}, Name={name}")
+                                            return symbol, name
+                                        else:
+                                            print(f"⚠️ [TOKEN METADATA] Missing symbol or name in metadata")
+                                    else:
+                                        print(f"⚠️ [TOKEN METADATA] No 'info' found in parsed data")
+                                else:
+                                    print(f"⚠️ [TOKEN METADATA] No 'parsed' data found")
+                            else:
+                                print(f"⚠️ [TOKEN METADATA] No valid account data found")
+                    else:
+                        print(f"⚠️ [TOKEN METADATA] No token accounts found")
+                else:
+                    print(f"❌ [TOKEN METADATA] Unexpected response structure: {data}")
+            else:
+                print(f"❌ [TOKEN METADATA] HTTP error {response.status_code}: {response.text}")
+        except Exception as e:
+            print(f"❌ [TOKEN METADATA] Error fetching metadata: {e}")
+        # Fallback values if metadata cannot be retrieved
+        symbol = f"SPL-{mint_address[:6]}"
+        name = f"SPL Token ({mint_address[:8]}...)"
+        return symbol, name
+
 class SolanaPriceFetcher(PriceFetcher):
     def __init__(self):
         self.known_tokens = {
@@ -667,7 +739,7 @@ class SolanaPriceFetcher(PriceFetcher):
 
     async def fetch_prices(self, token_addresses: List[str]) -> Dict[str, float]:
         price_map = {}
-        
+
         print(f"💵 [SOLANA PRICES] Starting price fetch for {len(token_addresses)} tokens...")
         print(f"🔍 [SOLANA PRICES] Token addresses: {token_addresses}")
 
@@ -693,19 +765,19 @@ class SolanaPriceFetcher(PriceFetcher):
                 # Process mint addresses
                 mint_addresses = [addr for addr in token_addresses if addr != "solana"]
                 print(f"🪙 [SOLANA PRICES] Processing {len(mint_addresses)} mint addresses...")
-                
+
                 # Method 1: Try known tokens first
                 print(f"1️⃣ [SOLANA PRICES] Trying known tokens...")
                 await self._fetch_known_token_prices(client, mint_addresses, price_map)
-                
+
                 # Method 2: Try Jupiter API for SPL token prices
                 print(f"2️⃣ [SOLANA PRICES] Trying Jupiter API...")
                 await self._fetch_jupiter_prices(client, mint_addresses, price_map)
-                
+
                 # Method 3: Try DexScreener API for pump.fun and other tokens
                 print(f"3️⃣ [SOLANA PRICES] Trying DexScreener API...")
                 await self._fetch_dexscreener_prices(client, mint_addresses, price_map)
-                
+
                 # Method 4: Try Birdeye API as fallback
                 print(f"4️⃣ [SOLANA PRICES] Trying Birdeye API...")
                 await self._fetch_birdeye_prices(client, mint_addresses, price_map)
@@ -716,7 +788,7 @@ class SolanaPriceFetcher(PriceFetcher):
 
                 # Final logging and fallback
                 print(f"📊 [SOLANA PRICES] Price fetch complete. Found prices for {len([k for k in price_map.keys() if k != 'solana'])} SPL tokens")
-                
+
                 for addr in mint_addresses:
                     if addr.lower() not in price_map and addr not in price_map:
                         price_map[addr.lower()] = 0
@@ -777,15 +849,15 @@ class SolanaPriceFetcher(PriceFetcher):
                 return
 
             print(f"🪙 [JUPITER] Processing {len(remaining_mints)} mints...")
-            
+
             # Process in batches to avoid URL length limits
             for i in range(0, len(remaining_mints), 30):
                 batch_mints = remaining_mints[i:i+30]
                 mints_param = ",".join(batch_mints)
-                
+
                 print(f"📡 [JUPITER] Batch {i//30 + 1}: {len(batch_mints)} mints")
                 print(f"🔍 [JUPITER] Request URL: https://price.jup.ag/v4/price?ids={mints_param[:100]}...")
-                
+
                 try:
                     response = await client.get(
                         f"https://price.jup.ag/v4/price?ids={mints_param}",
@@ -795,14 +867,14 @@ class SolanaPriceFetcher(PriceFetcher):
                             "Accept": "application/json"
                         }
                     )
-                    
+
                     print(f"📊 [JUPITER] Response status: {response.status_code}")
-                    
+
                     if response.status_code == 200:
                         try:
                             data = response.json()
                             print(f"📈 [JUPITER] Response structure: {list(data.keys()) if isinstance(data, dict) else type(data)}")
-                            
+
                             if "data" in data and isinstance(data["data"], dict):
                                 found_prices = 0
                                 for mint, price_info in data["data"].items():
@@ -820,7 +892,7 @@ class SolanaPriceFetcher(PriceFetcher):
                                             print(f"❌ [JUPITER] Invalid price format for {mint[:12]}...: {price_info}")
                                     else:
                                         print(f"⚠️ [JUPITER] Invalid price data for {mint[:12]}...: {price_info}")
-                                
+
                                 print(f"📊 [JUPITER] Batch result: {found_prices}/{len(batch_mints)} prices found")
                             else:
                                 print(f"❌ [JUPITER] Unexpected response format: {data}")
@@ -835,16 +907,16 @@ class SolanaPriceFetcher(PriceFetcher):
                     else:
                         print(f"❌ [JUPITER] HTTP error {response.status_code}")
                         print(f"📋 [JUPITER] Error response: {response.text[:200]}...")
-                
+
                 except httpx.TimeoutException:
                     print(f"⏰ [JUPITER] Request timeout for batch {i//30 + 1}")
                 except Exception as batch_error:
                     print(f"❌ [JUPITER] Batch error: {batch_error}")
-                
+
                 # Rate limiting between batches
                 if i + 30 < len(remaining_mints):
                     await asyncio.sleep(0.5)
-                
+
         except Exception as e:
             print(f"❌ [JUPITER] Critical error: {e}")
             import traceback
@@ -859,14 +931,14 @@ class SolanaPriceFetcher(PriceFetcher):
                 return
 
             print(f"🪙 [COINGECKO SPL] Processing {len(remaining_mints)} mints...")
-            
+
             # Process in smaller batches for CoinGecko
             for i in range(0, len(remaining_mints), 20):
                 batch_mints = remaining_mints[i:i+20]
                 mints_param = ",".join(batch_mints)
-                
+
                 print(f"📡 [COINGECKO SPL] Batch {i//20 + 1}: {len(batch_mints)} mints")
-                
+
                 try:
                     response = await client.get(
                         "https://api.coingecko.com/api/v3/simple/token_price/solana",
@@ -880,14 +952,14 @@ class SolanaPriceFetcher(PriceFetcher):
                             "Accept": "application/json"
                         }
                     )
-                    
+
                     print(f"📊 [COINGECKO SPL] Response status: {response.status_code}")
-                    
+
                     if response.status_code == 200:
                         try:
                             data = response.json()
                             print(f"📈 [COINGECKO SPL] Found data for {len(data)} tokens")
-                            
+
                             found_prices = 0
                             for mint, price_data in data.items():
                                 if isinstance(price_data, dict) and "usd" in price_data:
@@ -900,9 +972,9 @@ class SolanaPriceFetcher(PriceFetcher):
                                             print(f"✅ [COINGECKO SPL] Found price: {mint[:12]}... = ${price}")
                                     except (ValueError, TypeError):
                                         print(f"❌ [COINGECKO SPL] Invalid price for {mint[:12]}...: {price_data}")
-                            
+
                             print(f"📊 [COINGECKO SPL] Batch result: {found_prices}/{len(batch_mints)} prices found")
-                            
+
                         except Exception as json_error:
                             print(f"❌ [COINGECKO SPL] JSON parsing error: {json_error}")
                     elif response.status_code == 429:
@@ -912,14 +984,14 @@ class SolanaPriceFetcher(PriceFetcher):
                         print(f"❌ [COINGECKO SPL] HTTP error {response.status_code}")
                         if response.status_code == 404:
                             print(f"❌ [COINGECKO SPL] Solana token endpoint not found")
-                
+
                 except Exception as batch_error:
                     print(f"❌ [COINGECKO SPL] Batch error: {batch_error}")
-                
+
                 # Rate limiting between batches
                 if i + 20 < len(remaining_mints):
                     await asyncio.sleep(1)
-                
+
         except Exception as e:
             print(f"❌ [COINGECKO SPL] Critical error: {e}")
 
@@ -934,12 +1006,12 @@ class SolanaPriceFetcher(PriceFetcher):
             for i in range(0, len(remaining_mints), 30):  # Process in batches of 30
                 batch_mints = remaining_mints[i:i+30]
                 mints_param = ",".join(batch_mints)
-                
+
                 response = await client.get(
                     f"https://api.dexscreener.com/latest/dex/tokens/{mints_param}",
                     timeout=15.0
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     if "pairs" in data and data["pairs"]:
@@ -955,10 +1027,10 @@ class SolanaPriceFetcher(PriceFetcher):
                         print(f"⚠️ DexScreener: No pairs found for batch {i//30 + 1}")
                 else:
                     print(f"⚠️ DexScreener API error: {response.status_code}")
-                
+
                 # Rate limiting
                 await asyncio.sleep(0.1)
-                
+
         except Exception as e:
             print(f"⚠️ Error fetching DexScreener prices: {e}")
 
@@ -977,7 +1049,7 @@ class SolanaPriceFetcher(PriceFetcher):
                         headers={"X-API-KEY": ""},  # Can work without API key for basic requests
                         timeout=10.0
                     )
-                    
+
                     if response.status_code == 200:
                         data = response.json()
                         if "data" in data and "value" in data["data"]:
@@ -986,14 +1058,14 @@ class SolanaPriceFetcher(PriceFetcher):
                                 price_map[mint.lower()] = price
                                 price_map[mint] = price
                                 print(f"✅ Birdeye price: {mint[:12]}... = ${price}")
-                    
+
                     # Rate limiting for free tier
                     await asyncio.sleep(0.2)
-                    
+
                 except Exception as mint_error:
                     print(f"⚠️ Birdeye error for {mint[:12]}...: {mint_error}")
                     continue
-                
+
         except Exception as e:
             print(f"⚠️ Error fetching Birdeye prices: {e}")
 
@@ -1203,18 +1275,18 @@ async def health_check():
     """Health check endpoint for debugging"""
     conn = sqlite3.connect('crypto_fund.db')
     cursor = conn.cursor()
-    
+
     try:
         # Test database connection
         cursor.execute("SELECT COUNT(*) FROM wallets")
         wallet_count = cursor.fetchone()[0]
-        
+
         cursor.execute("SELECT COUNT(*) FROM assets")
         asset_count = cursor.fetchone()[0]
-        
+
         cursor.execute("SELECT COUNT(*) FROM hidden_assets")
         hidden_count = cursor.fetchone()[0]
-        
+
         return {
             "status": "healthy",
             "database": "connected",
@@ -1328,7 +1400,7 @@ async def get_portfolio():
     """)
     assets_data = cursor.fetchall()
     print(f"🔍 [PORTFOLIO DEBUG] Assets after filtering: {len(assets_data)} assets")
-    
+
     if len(assets_data) > 0:
         print(f"🔍 [PORTFOLIO DEBUG] Sample asset: {assets_data[0]}")
     else:
@@ -1405,7 +1477,8 @@ async def get_wallet_details(wallet_id: int):
         conn.close()
         raise HTTPException(status_code=404, detail="Wallet not found")
 
-    wallet = WalletResponse(
+    wallet = Wallet<replit_final_file>
+Response(
         id=wallet_data[0], address=wallet_data[1], 
         label=wallet_data[2], network=wallet_data[3]
     )
@@ -1467,7 +1540,7 @@ async def get_wallet_status():
         LEFT JOIN wallet_status ws ON w.id = ws.wallet_id
         ORDER BY w.id
     """)
-    
+
     wallet_status_data = cursor.fetchall()
     conn.close()
 
@@ -1577,7 +1650,7 @@ async def update_portfolio_data_new():
         # Group wallets by network for optimized processing
         wallets_by_network = {}
         wallet_status = {}  # Track individual wallet success/failure
-        
+
         for wallet_id, address, network, label in wallets:
             if network not in wallets_by_network:
                 wallets_by_network[network] = []
@@ -1604,7 +1677,7 @@ async def update_portfolio_data_new():
             for wallet_id, address, label in network_wallets:
                 try:
                     print(f"📡 Fetching assets for {network} wallet: {label} ({address[:10]}...)")
-                    
+
                     # Use new chain-agnostic asset fetcher with timeout
                     assets = await asyncio.wait_for(
                         get_wallet_assets_new(address, network), 
@@ -1752,7 +1825,7 @@ async def update_portfolio_data_new():
 
         # CRITICAL FIX: Clean up hidden assets table to remove legitimate tokens
         print("🧹 Cleaning up hidden assets table...")
-        
+
         # Get current valuable assets (assets with significant value)
         cursor.execute("""
             SELECT DISTINCT token_address, symbol, name 
@@ -1797,7 +1870,7 @@ async def update_portfolio_data_new():
                 FOREIGN KEY (wallet_id) REFERENCES wallets (id)
             )
         """)
-        
+
         cursor.execute("DELETE FROM wallet_status")  # Clear old status
         for wallet_id, status_info in wallet_status.items():
             cursor.execute("""
@@ -1812,14 +1885,14 @@ async def update_portfolio_data_new():
             ))
 
         conn.commit()
-        
+
         # Final success summary
         successful_count = sum(1 for s in wallet_status.values() if s['status'] == 'success')
         total_count = len(wallet_status)
         print(f"✅ Portfolio updated successfully!")
         print(f"📈 {len(all_assets)} assets processed, ${total_portfolio_value:,.2f} total value")
         print(f"🏦 {successful_count}/{total_count} wallets processed successfully")
-        
+
         # Print any failed wallets
         failed_wallets = [(s['label'], s['error']) for s in wallet_status.values() if s['status'] in ['error', 'timeout']]
         if failed_wallets:
