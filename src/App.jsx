@@ -337,14 +337,18 @@ const WalletCard = ({ wallet, walletData, assets, totalValue, performance }) => 
       // Map assets to wallets based on token type
       if (wallet.network === 'SOL') {
         return asset.id === 'solana' || 
-               asset.id.length > 40 || // Solana addresses are longer
-               asset.symbol.startsWith('SPL-') ||
-               asset.symbol === 'PENGU' ||
+               asset.symbol === 'SOL' ||
                asset.symbol === 'Fartcoin ' ||
+               asset.id.includes('pump') ||
                asset.name?.includes('pump') ||
-               asset.id.includes('pump');
+               (asset.id.length > 40 && !asset.id.startsWith('0x')); // Solana addresses are longer and don't start with 0x
       } else if (wallet.network === 'ETH') {
-        return asset.id.startsWith('0x') || asset.id === '0x0000000000000000000000000000000000000000';
+        return asset.id.startsWith('0x') || 
+               asset.id === '0x0000000000000000000000000000000000000000' ||
+               asset.symbol === 'ETH' ||
+               asset.symbol === 'WBTC' ||
+               asset.symbol === 'PENDLE' ||
+               (asset.symbol === 'PENGU' && asset.id.startsWith('0x')); // Only ETH-based PENGU
       }
       return false;
     }) : [];
