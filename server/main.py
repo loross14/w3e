@@ -217,15 +217,20 @@ class EthereumAssetFetcher(AssetFetcher):
 
                     # Group NFTs by collection with enhanced metadata
                     nft_collections = {}
+                    print(f"🖼️ [ETH NFT] Processing {len(owned_nfts)} owned NFTs for wallet {wallet_address[:10]}...")
+                    
                     for nft in owned_nfts:
                         contract_address = nft.get("contract", {}).get("address", "").lower()
 
                         if contract_address in hidden_addresses:
+                            print(f"🙈 [ETH NFT] Skipping hidden NFT contract: {contract_address[:10]}...")
                             continue
 
                         contract_info = nft.get("contract", {})
                         collection_name = contract_info.get("name", "Unknown NFT Collection")
                         collection_symbol = contract_info.get("symbol", "NFT")
+                        
+                        print(f"🖼️ [ETH NFT] Found NFT: {collection_name} ({collection_symbol}) - Contract: {contract_address[:10]}...")
 
                         # Extract image from metadata
                         metadata = nft.get("metadata", {})
@@ -259,10 +264,10 @@ class EthereumAssetFetcher(AssetFetcher):
                         # Try to get floor price from OpenSea
                         floor_price = await self._get_nft_floor_price(client, contract_address, collection_data.get("opensea_slug"))
 
-                        assets.append(AssetData(
+                        nft_asset = AssetData(
                             token_address=contract_address,
-                            symbol=f"{collection_data['symbol']} NFT",
-                            name=f"{collection_data['name']} (Collection)",
+                            symbol=f"{collection_data['symbol']}",
+                            name=f"{collection_data['name']}",
                             balance=collection_data["count"],
                             balance_formatted=f"{collection_data['count']} NFTs",
                             decimals=0,
@@ -270,8 +275,13 @@ class EthereumAssetFetcher(AssetFetcher):
                             token_ids=collection_data["token_ids"][:10],
                             floor_price=floor_price,
                             image_url=collection_data.get("image_url")
-                        ))
-                        print(f"✅ Found {collection_data['count']} NFTs from {collection_data['name']} (Floor: ${floor_price})")
+                        )
+                        assets.append(nft_asset)
+                        print(f"✅ [ETH NFT] Added NFT collection: {collection_data['name']} - {collection_data['count']} items - Floor: ${floor_price}")
+                        print(f"🖼️ [ETH NFT] Contract: {contract_address}")
+                        print(f"🖼️ [ETH NFT] Symbol: {collection_data['symbol']}")
+                        print(f"🖼️ [ETH NFT] Image URL: {collection_data.get('image_url')}")
+                        print(f"🖼️ [ETH NFT] Token IDs: {collection_data['token_ids'][:3]}...")
 
         except Exception as e:
             print(f"❌ Error fetching Ethereum NFTs: {e}")
@@ -2330,6 +2340,12 @@ async def update_portfolio_data_new():
                 asset.get('floor_price', 0), asset.get('image_url'),
                 purchase_price, total_invested, realized_pnl, unrealized_pnl, total_return_pct
             ))
+            
+            # Debug NFT insertion
+            if is_nft:
+                print(f"🖼️ [DATABASE] Inserted NFT: {asset['symbol']} - {asset['name']} - Count: {asset['balance']} - Floor: ${asset.get('floor_price', 0)}")
+                print(f"🖼️ [DATABASE] NFT metadata: {nft_metadata}")
+                print(f"🖼️ [DATABASE] Image URL: {asset.get('image_url')}")
 
         # CRITICAL FIX: Clean up hidden assets table to remove legitimate tokens
         print("🧹 Cleaning up hidden assets table...")

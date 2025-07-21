@@ -65,10 +65,22 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
     unrealized_pnl: asset?.unrealized_pnl || 0,
     total_return_pct: asset?.total_return_pct || 0,
     notes: asset?.notes || '',
-    isNFT: asset?.isNFT === true || asset?.symbol?.includes('NFT') || asset?.name?.includes('Collection'),
+    isNFT: asset?.isNFT === true || asset?.symbol?.includes('NFT') || asset?.name?.includes('Collection') || (asset?.balance && typeof asset.balance === 'string' && asset.balance.includes('NFTs')),
     floorPrice: asset?.floorPrice || 0,
-    imageUrl: asset?.imageUrl || null
+    imageUrl: asset?.imageUrl || null,
+    tokenIds: asset?.tokenIds || []
   };
+
+  // Debug NFT detection
+  if (safeAsset.isNFT) {
+    console.log(`🖼️ [CARD DEBUG] Rendering NFT card: ${safeAsset.symbol} - ${safeAsset.name}`, {
+      isNFT: safeAsset.isNFT,
+      balance: safeAsset.balance,
+      floorPrice: safeAsset.floorPrice,
+      imageUrl: safeAsset.imageUrl,
+      valueUSD: safeAsset.valueUSD
+    });
+  }
 
   const safeTotalValue = totalValue || 1; // Avoid division by zero
   const weight = ((safeAsset.valueUSD / safeTotalValue) * 100).toFixed(1);
@@ -158,11 +170,17 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
           </div>
           <div>
             <span className={`block ${isNFTCollection ? 'text-purple-300' : 'text-gray-400'}`}>
-              {isNFTCollection ? 'Est. Value' : 'Current Value'}
+              {isNFTCollection ? 'Collection Value' : 'Current Value'}
             </span>
             <span className={`font-mono ${isNFTCollection ? 'text-purple-100' : 'text-white'}`}>
               {isNFTCollection 
-                ? (safeAsset.floorPrice > 0 ? `$${(safeAsset.floorPrice * safeAsset.balance * 185).toLocaleString()}` : 'TBD')
+                ? (safeAsset.valueUSD > 0 
+                    ? `$${safeAsset.valueUSD.toLocaleString()}` 
+                    : (safeAsset.floorPrice > 0 
+                        ? `$${(safeAsset.floorPrice * parseFloat(safeAsset.balance)).toLocaleString()}` 
+                        : 'Evaluating...'
+                      )
+                  )
                 : `$${safeAsset.valueUSD.toLocaleString()}`
               }
             </span>
@@ -1142,6 +1160,24 @@ const App = () => {
 
         if (savedData.assets && savedData.assets.length > 0) {
           console.log("🔄 [FRONTEND DEBUG] Starting asset transformation...");
+          console.log("🖼️ [NFT SEARCH] Looking for NFTs in backend data...");
+          
+          // First pass - identify NFTs
+          const nftsFound = savedData.assets.filter(asset => 
+            asset.is_nft === true || 
+            asset.is_nft === 1 ||
+            asset.symbol?.includes('NFT') || 
+            asset.name?.includes('Collection') ||
+            (asset.nft_metadata && asset.nft_metadata !== null)
+          );
+          
+          console.log(`🖼️ [NFT SEARCH] Found ${nftsFound.length} potential NFTs:`, nftsFound.map(nft => ({
+            symbol: nft.symbol,
+            name: nft.name,
+            is_nft: nft.is_nft,
+            has_metadata: !!nft.nft_metadata
+          })));
+          
           const transformedAssets = savedData.assets.map((asset, index) => {
         console.log(`🔄 [FRONTEND DEBUG] Transforming asset ${index + 1}:`, asset);
 
@@ -1150,9 +1186,22 @@ const App = () => {
         if (asset.nft_metadata) {
           try {
             nftMetadata = JSON.parse(asset.nft_metadata);
+            console.log(`🖼️ [NFT DEBUG] Parsed metadata for ${asset.symbol}:`, nftMetadata);
           } catch (e) {
             console.warn("Failed to parse NFT metadata:", e);
           }
+        }
+
+        // Enhanced NFT detection
+        const isNFT = asset.is_nft === true || 
+                     asset.is_nft === 1 || 
+                     asset.symbol?.includes('NFT') || 
+                     asset.name?.includes('Collection') ||
+                     (asset.balance_formatted && asset.balance_formatted.includes('NFTs')) ||
+                     (nftMetadata && nftMetadata.token_ids);
+
+        if (isNFT) {
+          console.log(`🖼️ [NFT DEBUG] Detected NFT: ${asset.symbol} - ${asset.name} - isNFT flag: ${asset.is_nft}`);
         }
 
         const transformed = {
@@ -1168,10 +1217,11 @@ const App = () => {
           unrealized_pnl: asset.unrealized_pnl || 0,
           total_return_pct: asset.total_return_pct || 0,
           notes: asset.notes || "",
-          isNFT: asset.is_nft === true || asset.symbol?.includes('NFT') || asset.name?.includes('Collection'),
+          isNFT: isNFT,
           floorPrice: asset.floor_price || (nftMetadata?.floor_price) || 0,
           imageUrl: asset.image_url || (nftMetadata?.image_url) || null,
-          performance24h: asset.price_change_24h || 0
+          performance24h: asset.price_change_24h || 0,
+          tokenIds: nftMetadata?.token_ids || []
         };
         console.log(`✅ [FRONTEND DEBUG] Transformed to:`, transformed);
         return transformed;
