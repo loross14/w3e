@@ -1256,7 +1256,9 @@ class ChainFactory:
 
 # Database initialization
 def init_db():
-    conn = sqlite3.connect('crypto_fund.db')
+    # Use absolute path to ensure database is created in a consistent location
+    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Wallets table
@@ -1523,7 +1525,8 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for debugging"""
-    conn = sqlite3.connect('crypto_fund.db')
+    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     try:
@@ -2211,7 +2214,8 @@ async def estimate_asset_purchase_price(symbol: str, name: str, current_price: f
 
 async def update_portfolio_data_new():
     """New background task using chain-agnostic fetchers with comprehensive error handling"""
-    conn = sqlite3.connect('crypto_fund.db')
+    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     try:
