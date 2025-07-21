@@ -337,7 +337,7 @@ class EthereumAssetFetcher(AssetFetcher):
                 else:
                     print(f"❌ [ETH NFT QUERY] HTTP Error {nft_response.status_code}")
                     print(f"❌ [ETH NFT QUERY] Response text: {nft_response.text}")
-                    
+
                     # If the NFT API fails, continue without NFTs rather than failing completely
                     if nft_response.status_code == 400:
                         print(f"⚠️ [ETH NFT QUERY] NFT API not supported, skipping NFT collection...")
@@ -352,7 +352,7 @@ class EthereumAssetFetcher(AssetFetcher):
         print(f"🖼️ [ETH NFT QUERY] Final result: {len(assets)} NFT collections found")
         return assets
 
-    async def _get_nft_floor_price(self, client: httpx.AsyncClient, contract_address: str, opensea_slug: str = None) -> float:
+    async def _get_nft_floor_price(self, self, client: httpx.AsyncClient, contract_address: str, opensea_slug: str = None) -> float:
         """Get NFT collection floor price from OpenSea API"""
         try:
             if opensea_slug:
@@ -695,8 +695,7 @@ class SolanaAssetFetcher(AssetFetcher):
                                 # Parse the token account structure
                                 account_info = token_account.get("account", {})
                                 if not account_info:
-                                    print(f"⚠️ [SPL TOKENS] No account info in token_account")
-                                    continue
+                                    print(f"⚠️ [SPL TOKENS] No account info in token_account")                                    continue
 
                                 account_data = account_info.get("data", {})
                                 if not isinstance(account_data, dict):
@@ -1538,7 +1537,7 @@ async def health_check():
         if 'conn' in locals():
             conn.close()
 
-@app.post("/wallets", response_model=WalletResponse)
+@app.post("/api/wallets", response_model=WalletResponse)
 async def create_wallet(wallet: WalletCreate):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1568,7 +1567,7 @@ async def create_wallet(wallet: WalletCreate):
         cursor.close()
         conn.close()
 
-@app.get("/wallets", response_model=List[WalletResponse])
+@app.get("/api/wallets", response_model=List[WalletResponse])
 async def get_wallets():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1748,7 +1747,7 @@ async def get_portfolio():
         performance_24h=performance_24h
     )
 
-@app.get("/wallets/{wallet_id}/details", response_model=WalletDetailsResponse)
+@app.get("/api/wallets/{wallet_id}/details", response_model=WalletDetailsResponse)
 async def get_wallet_details(wallet_id: int):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1805,7 +1804,7 @@ async def get_wallet_details(wallet_id: int):
         performance_24h=0.0
     )
 
-@app.get("/wallets/status")
+@app.get("/api/wallets/status")
 async def get_wallet_status():
     """Get status of all wallets including success/failure information"""
     conn = get_db_connection()
@@ -1841,7 +1840,7 @@ async def get_wallet_status():
         for w in wallet_status_data
     ]
 
-@app.put("/assets/{symbol}/notes")
+@app.put("/api/assets/{symbol}/notes")
 async def update_asset_notes(symbol: str, notes: str):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1858,7 +1857,7 @@ async def update_asset_notes(symbol: str, notes: str):
 
     return {"message": "Notes updated successfully"}
 
-@app.post("/assets/hide")
+@app.post("/api/assets/hide")
 async def hide_asset(token_address: str, symbol: str, name: str):
     """Hide an asset from portfolio calculations"""
     conn = get_db_connection()
@@ -1880,7 +1879,7 @@ async def hide_asset(token_address: str, symbol: str, name: str):
     finally:
         conn.close()
 
-@app.delete("/assets/hide/{token_address}")
+@app.delete("/api/assets/hide/{token_address}")
 async def unhide_asset(token_address: str):
     """Unhide an asset to include in portfolio calculations"""
     conn = get_db_connection()
@@ -1896,7 +1895,7 @@ async def unhide_asset(token_address: str):
     conn.close()
     return {"message": "Asset unhidden successfully"}
 
-@app.get("/assets/hidden")
+@app.get("/api/assets/hidden")
 async def get_hidden_assets():
     """Get list of hidden assets"""
     conn = get_db_connection()
@@ -1916,17 +1915,17 @@ async def get_hidden_assets():
         for h in hidden_assets
     ]
 
-@app.get("/debug/database")
+@app.get("/api/debug/database")
 async def debug_database():
     """Debug endpoint to test database connection and structure"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         # Test basic connection
         cursor.execute("SELECT 1 as test")
         test_result = cursor.fetchone()
-        
+
         # Check if tables exist
         cursor.execute("""
             SELECT table_name FROM information_schema.tables 
@@ -1934,7 +1933,7 @@ async def debug_database():
             ORDER BY table_name
         """)
         tables = [row['table_name'] for row in cursor.fetchall()]
-        
+
         # Get table counts
         table_counts = {}
         for table in tables:
@@ -1944,9 +1943,9 @@ async def debug_database():
                 table_counts[table] = result['count'] if result else 0
             except Exception as e:
                 table_counts[table] = f"Error: {str(e)}"
-        
+
         conn.close()
-        
+
         return {
             "status": "connected",
             "test_query": test_result['test'] if test_result else None,
@@ -1955,7 +1954,7 @@ async def debug_database():
             "database_url_set": bool(DATABASE_URL),
             "connection_type": "PostgreSQL with RealDictCursor"
         }
-        
+
     except Exception as e:
         return {
             "status": "error",
@@ -1963,7 +1962,7 @@ async def debug_database():
             "database_url_set": bool(DATABASE_URL)
         }
 
-@app.get("/debug/nfts/{wallet_address}")
+@app.get("/api/debug/nfts/{wallet_address}")
 async def debug_nft_query(wallet_address: str):
     """Debug endpoint to manually test NFT queries"""
     try:
@@ -1996,7 +1995,7 @@ async def debug_nft_query(wallet_address: str):
         print(f"❌ [DEBUG NFT] Error: {e}")
         return {"error": str(e)}
 
-@app.get("/portfolio/returns")
+@app.get("/api/portfolio/returns")
 async def get_portfolio_returns():
     """Get comprehensive portfolio returns analysis"""
     conn = get_db_connection()
@@ -2092,7 +2091,7 @@ async def get_portfolio_returns():
     finally:
         conn.close()
 
-@app.post("/assets/{symbol}/purchase")
+@app.post("/api/assets/{symbol}/purchase")
 async def add_purchase_record(symbol: str, quantity: float, price_per_token: float, notes: str = ""):
     """Add a purchase record for manual tracking"""
     conn = get_db_connection()

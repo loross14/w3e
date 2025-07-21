@@ -897,9 +897,16 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
 };
 
 // API Configuration for Replit environment
-  const API_BASE_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:8000' 
-    : `https://${window.location.hostname}/api`;
+const API_BASE_URL = (() => {
+  if (window.location.hostname === 'localhost') {
+    return 'http://localhost:8000';
+  }
+  // For Replit deployment, use the same domain but different port
+  if (window.location.hostname.includes('replit.app')) {
+    return window.location.origin.replace(':80', ':8000').replace('https://', 'https://').replace('w3eq', '8eeaaaf9-dc12-41b3-a73d-ea464694d9d2-00-13ahw0dwiiebv.kirk');
+  }
+  return `${window.location.origin}/api`;
+})();
 
 // Main App Component
 const App = () => {
