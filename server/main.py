@@ -742,9 +742,11 @@ async def hide_asset(token_address: str, symbol: str, name: str):
         """, (token_address.lower(), symbol, name))
         
         conn.commit()
+        print(f"✅ Hidden asset: {symbol} ({token_address})")
         return {"message": f"Asset {symbol} hidden successfully"}
     except sqlite3.Error as e:
         conn.rollback()
+        print(f"❌ Error hiding asset: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
     finally:
         conn.close()

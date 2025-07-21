@@ -555,19 +555,23 @@ const App = () => {
             localStorage.setItem("hiddenAssets", JSON.stringify(newHiddenAssets));
             return newHiddenAssets;
           });
+          console.log(`✅ Unhid asset: ${asset.symbol}`);
+        } else {
+          throw new Error(`Failed to unhide asset: ${response.status}`);
         }
       } else {
-        // Hide the asset
-        const response = await fetch(`${API_BASE_URL}/assets/hide`, {
+        // Hide the asset - send as query parameters instead of JSON body
+        const params = new URLSearchParams({
+          token_address: asset.id,
+          symbol: asset.symbol,
+          name: asset.name
+        });
+        
+        const response = await fetch(`${API_BASE_URL}/assets/hide?${params}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            token_address: asset.id,
-            symbol: asset.symbol,
-            name: asset.name
-          }),
         });
         
         if (response.ok) {
@@ -576,11 +580,15 @@ const App = () => {
             localStorage.setItem("hiddenAssets", JSON.stringify(newHiddenAssets));
             return newHiddenAssets;
           });
+          console.log(`✅ Hid asset: ${asset.symbol}`);
+        } else {
+          const errorText = await response.text();
+          throw new Error(`Failed to hide asset: ${response.status} - ${errorText}`);
         }
       }
     } catch (error) {
       console.error('Error toggling hidden asset:', error);
-      alert('Failed to update asset visibility');
+      alert(`Failed to update asset visibility: ${error.message}`);
     }
   };
 
@@ -722,6 +730,20 @@ const App = () => {
 
         if (!healthResponse.ok) {
           throw new Error('Backend not ready');
+        }
+
+        // Load hidden assets from backend
+        try {
+          const hiddenResponse = await fetch(`${API_BASE_URL}/assets/hidden`);
+          if (hiddenResponse.ok) {
+            const hiddenData = await hiddenResponse.json();
+            const hiddenIds = hiddenData.map(asset => asset.token_address);
+            setHiddenAssets(hiddenIds);
+            localStorage.setItem("hiddenAssets", JSON.stringify(hiddenIds));
+            console.log(`📋 Loaded ${hiddenIds.length} hidden assets`);
+          }
+        } catch (error) {
+          console.error('Error loading hidden assets:', error);
         }
 
         // Load saved portfolio data
