@@ -1256,7 +1256,8 @@ class ChainFactory:
 
 # Database initialization
 def init_db():
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = sqlite3.connect('crypto_fund.db', timeout=30.0)
+    conn.execute('PRAGMA journal_mode=WAL;')  # Better concurrency
     cursor = conn.cursor()
 
     # Wallets table
@@ -2211,7 +2212,8 @@ async def estimate_asset_purchase_price(symbol: str, name: str, current_price: f
 
 async def update_portfolio_data_new():
     """New background task using chain-agnostic fetchers with comprehensive error handling"""
-    conn = sqlite3.connect('crypto_fund.db')
+    conn = sqlite3.connect('crypto_fund.db', timeout=30.0)
+    conn.execute('PRAGMA journal_mode=WAL;')
     cursor = conn.cursor()
 
     try:

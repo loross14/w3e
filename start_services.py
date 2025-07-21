@@ -47,7 +47,7 @@ def serve_backend():
         
         # Set environment variables for production
         os.environ['NODE_ENV'] = 'production'
-        os.environ['PORT'] = '8000'
+        os.environ['PORT'] = os.getenv('PORT', '8000')
         
         # Change to server directory and start the FastAPI server
         os.chdir('server')
