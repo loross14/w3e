@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
@@ -30,58 +31,57 @@
   .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
+  
+  .gradient-border {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%);
+    border: 1px solid transparent;
+    border-radius: 12px;
+  }
 }
 
 @layer utilities {
-
-/* Custom scrollbar for tables */
-.overflow-x-auto::-webkit-scrollbar {
-  height: 6px;
-}
-
-.overflow-x-auto::-webkit-scrollbar-track {
-  background: #1f2937;
-  border-radius: 3px;
-}
-
-.overflow-x-auto::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 3px;
-}
-
-.overflow-x-auto::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
-}
-
-/* Gradient borders for cards */
-.gradient-border {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%);
-  border: 1px solid transparent;
-  border-radius: 12px;
-}
-
-/* Animation for loading states */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
+  /* Custom scrollbar for tables */
+  .overflow-x-auto::-webkit-scrollbar {
+    height: 6px;
   }
-  50% {
-    opacity: 0.5;
+
+  .overflow-x-auto::-webkit-scrollbar-track {
+    background: #1f2937;
+    border-radius: 3px;
   }
-}
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
+  .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 3px;
+  }
 
-/* Focus states */
-input:focus, textarea:focus, button:focus {
-  outline: 2px solid rgba(139, 92, 246, 0.5);
-  outline-offset: 2px;
-}
+  .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+  }
 
-/* Table hover effects */
-tbody tr:hover {
-  background-color: rgba(55, 65, 81, 0.3);
-  transition: background-color 0.2s ease;
+  /* Animation for loading states */
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Focus states */
+  input:focus, textarea:focus, button:focus {
+    outline: 2px solid rgba(139, 92, 246, 0.5);
+    outline-offset: 2px;
+  }
+
+  /* Table hover effects */
+  tbody tr:hover {
+    background-color: rgba(55, 65, 81, 0.3);
+    transition: background-color 0.2s ease;
+  }
 }
