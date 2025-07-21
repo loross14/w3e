@@ -14,7 +14,7 @@ def serve_frontend():
         # Change to the dist directory where Vite builds the frontend
         if os.path.exists('dist'):
             os.chdir('dist')
-            port = 80  # Use port 80 for deployment
+            port = int(os.environ.get('PORT', '80'))  # Use PORT environment variable or default to 80
             
             class Handler(SimpleHTTPRequestHandler):
                 def end_headers(self):
@@ -44,7 +44,7 @@ def serve_backend():
         
         # Install dependencies first
         try:
-            subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', 'server/requirements.txt'], 
+            subprocess.run([sys.executable, '-m', 'pip', 'install', '--break-system-packages', '-r', 'server/requirements.txt'], 
                          check=True, timeout=300)
         except subprocess.TimeoutExpired:
             print("⚠️ Pip install timeout - continuing with existing packages")
@@ -72,14 +72,11 @@ def main():
         print(f"❌ Frontend build failed: {e}")
         sys.exit(1)
     
-    # Start backend in a separate thread
+    # Start both servers concurrently
     backend_thread = threading.Thread(target=serve_backend, daemon=True)
     backend_thread.start()
     
-    # Give backend time to start
-    time.sleep(3)
-    
-    # Start frontend server (this will block)
+    # Start frontend server immediately (this will block)
     print("🎯 Starting frontend server...")
     serve_frontend()
 

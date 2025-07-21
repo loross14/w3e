@@ -15,7 +15,7 @@ build = ["sh", "-c", "npm run build"]
 run = ["sh", "-c", "python3 start_services.py"]
 
 [[ports]]
-localPort = 5173
+localPort = 80
 externalPort = 80
 exposeLocalhost = true
 
