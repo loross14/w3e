@@ -542,13 +542,13 @@ const App = () => {
   const toggleHiddenAsset = async (asset) => {
     try {
       const isCurrentlyHidden = hiddenAssets.includes(asset.id);
-      
+
       if (isCurrentlyHidden) {
         // Unhide the asset
         const response = await fetch(`${API_BASE_URL}/assets/hide/${asset.id}`, {
           method: 'DELETE',
         });
-        
+
         if (response.ok) {
           setHiddenAssets((prev) => {
             const newHiddenAssets = prev.filter((id) => id !== asset.id);
@@ -566,14 +566,14 @@ const App = () => {
           symbol: asset.symbol,
           name: asset.name
         });
-        
+
         const response = await fetch(`${API_BASE_URL}/assets/hide?${params}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
         });
-        
+
         if (response.ok) {
           setHiddenAssets((prev) => {
             const newHiddenAssets = [...prev, asset.id];
@@ -751,7 +751,7 @@ const App = () => {
         const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
         if (portfolioResponse.ok) {
           const savedData = await portfolioResponse.json();
-          
+
           if (savedData.assets && savedData.assets.length > 0) {
             const transformedAssets = savedData.assets.map(asset => ({
               id: asset.id,
@@ -764,7 +764,7 @@ const App = () => {
             }));
 
             const savedTotalValue = savedData.total_value || 0;
-            
+
             // Generate balance history based on saved data
             const balanceHistory = savedTotalValue > 0 ? [
               { value: savedTotalValue * 0.92 },
