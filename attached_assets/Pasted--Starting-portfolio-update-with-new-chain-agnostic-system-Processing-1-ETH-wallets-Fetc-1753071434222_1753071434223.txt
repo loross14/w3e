@@ -1,0 +1,77 @@
+🚀 Starting portfolio update with new chain-agnostic system...
+🔗 Processing 1 ETH wallets...
+✅ Fetched 11 assets for ETH wallet 0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98
+📊 Total assets fetched: 11
+🪙 Token addresses by network: {'ETH': 11}
+💵 Fetching Ethereum prices for 11 tokens...
+✅ ETH price: $3761.97
+✅ Found known Ethereum token: PENDLE -> pendle
+✅ Found known Ethereum token: WBTC -> wrapped-bitcoin
+✅ Got Ethereum price: 0x808507121b80c02388fad14726482e061b8da827 = $4.71
+✅ Got Ethereum price: 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599 = $118306
+✅ Fetched 3 prices for ETH
+💰 ETH Asset: ETH - Balance: 18.349432, Price: $3761.970000, Value: $69030.01
+💰 ETH Asset:  - Balance: 4.750000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: Visit https://usd-coin.net to claim rewards - Balance: 3999.990000, Price: $0.000000, Value: $0.00
+💰 ETH Asset:  - Balance: 801000000000000000000.000000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: olas.gift - Balance: 0.100000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: WBTC - Balance: 0.152524, Price: $118306.000000, Value: $18044.54
+💰 ETH Asset: Visit usdgift.net to claim rewards - Balance: 3999.990000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: Visit liquidETH.net to claim rewards - Balance: 1.700000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: Visit website wbtc.gifts to claim rewards - Balance: 1.200000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: PENDLE - Balance: 2500.000010, Price: $4.710000, Value: $11775.00
+💰 ETH Asset:  - Balance: 909000000000000000000.000000, Price: $0.000000, Value: $0.00
+🔍 Auto-hiding 8 zero-value assets...
+🙈 Auto-hidden: 
+🙈 Auto-hidden: Visit https://usd-coin.net to claim rewards
+🙈 Auto-hidden: 
+🙈 Auto-hidden: olas.gift
+🙈 Auto-hidden: Visit usdgift.net to claim rewards
+🙈 Auto-hidden: Visit liquidETH.net to claim rewards
+🙈 Auto-hidden: Visit website wbtc.gifts to claim rewards
+🙈 Auto-hidden: 
+✅ Portfolio updated successfully!
+📈 11 assets processed, $98,849.56 total value
+INFO:     172.31.128.113:49268 - "GET /portfolio HTTP/1.1" 200 OK
+INFO:     172.31.128.113:49268 - "GET /wallets/1/details HTTP/1.1" 200 OK
+INFO:     172.31.128.113:49268 - "GET /wallets/2/details HTTP/1.1" 404 Not Found
+INFO:     172.31.128.113:49268 - "OPTIONS / HTTP/1.1" 200 OK
+INFO:     172.31.128.113:49268 - "GET / HTTP/1.1" 200 OK
+INFO:     172.31.128.113:49268 - "POST /portfolio/update HTTP/1.1" 200 OK
+🚀 Starting portfolio update with new chain-agnostic system...
+🔗 Processing 1 ETH wallets...
+✅ Fetched 11 assets for ETH wallet 0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98
+📊 Total assets fetched: 11
+🪙 Token addresses by network: {'ETH': 11}
+💵 Fetching Ethereum prices for 11 tokens...
+✅ ETH price: $3761.97
+✅ Found known Ethereum token: PENDLE -> pendle
+✅ Found known Ethereum token: WBTC -> wrapped-bitcoin
+✅ Got Ethereum price: 0x808507121b80c02388fad14726482e061b8da827 = $4.71
+✅ Got Ethereum price: 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599 = $118306
+✅ Fetched 3 prices for ETH
+💰 ETH Asset: ETH - Balance: 18.349432, Price: $3761.970000, Value: $69030.01
+💰 ETH Asset:  - Balance: 4.750000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: Visit https://usd-coin.net to claim rewards - Balance: 3999.990000, Price: $0.000000, Value: $0.00
+💰 ETH Asset:  - Balance: 801000000000000000000.000000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: olas.gift - Balance: 0.100000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: WBTC - Balance: 0.152524, Price: $118306.000000, Value: $18044.54
+💰 ETH Asset: Visit usdgift.net to claim rewards - Balance: 3999.990000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: Visit liquidETH.net to claim rewards - Balance: 1.700000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: Visit website wbtc.gifts to claim rewards - Balance: 1.200000, Price: $0.000000, Value: $0.00
+💰 ETH Asset: PENDLE - Balance: 2500.000010, Price: $4.710000, Value: $11775.00
+💰 ETH Asset:  - Balance: 909000000000000000000.000000, Price: $0.000000, Value: $0.00
+🔍 Auto-hiding 8 zero-value assets...
+🙈 Auto-hidden: 
+🙈 Auto-hidden: Visit https://usd-coin.net to claim rewards
+🙈 Auto-hidden: 
+🙈 Auto-hidden: olas.gift
+🙈 Auto-hidden: Visit usdgift.net to claim rewards
+🙈 Auto-hidden: Visit liquidETH.net to claim rewards
+🙈 Auto-hidden: Visit website wbtc.gifts to claim rewards
+🙈 Auto-hidden: 
+✅ Portfolio updated successfully!
+📈 11 assets processed, $98,849.56 total value
+INFO:     172.31.128.113:51368 - "GET /portfolio HTTP/1.1" 200 OK
+INFO:     172.31.128.113:51368 - "GET /wallets/1/details HTTP/1.1" 200 OK
+INFO:     172.31.128.113:51368 - "GET /wallets/2/details HTTP/1.1" 404 Not Found
