@@ -19,8 +19,12 @@ localPort = 5173
 externalPort = 80
 exposeLocalhost = true
 
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
 [workflows]
-runButton = "Full Stack"
+runButton = "Start Frontend"
 
 [[workflows.workflow]]
 name = "Run"
@@ -75,3 +79,25 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python3 start_services.py"
+
+[[workflows.workflow]]
+name = "Start Frontend"
+author = 21724697
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+
+[[workflows.workflow]]
+name = "Full Stack (Both Services)"
+author = 21724697
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd server && python3 main.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
