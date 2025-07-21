@@ -872,9 +872,9 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
   );
 };
 
-// API Configuration for Replit environment
-const API_BASE_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:8000' 
+// API Configuration for deployment
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? `${window.location.protocol}//${window.location.hostname}:8000`
   : `${window.location.protocol}//${window.location.hostname}:8000`;
 
 // Main App Component

@@ -14,10 +14,10 @@ from abc import ABC, abstractmethod
 
 app = FastAPI(title="Crypto Fund API", version="1.0.0")
 
-# CORS middleware for frontend
+# CORS middleware for deployment
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # In production, replace with specific domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -2528,4 +2528,5 @@ async def update_portfolio_data_new():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
