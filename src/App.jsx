@@ -315,42 +315,8 @@ const App = () => {
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [portfolioData, setPortfolioData] = useState({
-    balanceHistory: [
-      { value: 1250000 },
-      { value: 1275000 },
-      { value: 1310000 },
-      { value: 1280000 },
-      { value: 1320000 },
-    ],
-    assets: [
-      {
-        id: 1,
-        name: "Ethereum",
-        symbol: "ETH",
-        balance: 450.5,
-        priceUSD: 2450.30,
-        valueUSD: 1103385.15,
-        notes: "",
-      },
-      {
-        id: 2,
-        name: "Bitcoin",
-        symbol: "BTC",
-        balance: 2.8,
-        priceUSD: 43250.00,
-        valueUSD: 121100.00,
-        notes: "",
-      },
-      {
-        id: 3,
-        name: "Chainlink",
-        symbol: "LINK",
-        balance: 15000,
-        priceUSD: 14.75,
-        valueUSD: 221250.00,
-        notes: "",
-      },
-    ],
+    balanceHistory: [],
+    assets: [],
   });
 
   const correctPassword = "bullrun";
@@ -436,29 +402,76 @@ const App = () => {
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       // Simulate fetching real wallet data and price updates
-      const updatedAssets = portfolioData.assets.map(asset => {
-        const priceChange = 0.95 + Math.random() * 0.1; // ±5% price change
-        const newPrice = asset.priceUSD * priceChange;
-        const balanceChange = 0.98 + Math.random() * 0.04; // ±2% balance change
-        const newBalance = asset.balance * balanceChange;
-        
-        return {
-          ...asset,
-          priceUSD: newPrice,
-          balance: parseFloat(newBalance.toFixed(6)),
-          valueUSD: newBalance * newPrice
-        };
-      });
+      let updatedAssets;
+      
+      if (portfolioData.assets.length === 0) {
+        // Generate sample data if no assets exist
+        updatedAssets = [
+          {
+            id: 1,
+            name: "Ethereum",
+            symbol: "ETH",
+            balance: 125.75,
+            priceUSD: 2420.50,
+            valueUSD: 125.75 * 2420.50,
+            notes: "",
+          },
+          {
+            id: 2,
+            name: "Bitcoin",
+            symbol: "BTC",
+            balance: 3.2,
+            priceUSD: 43180.00,
+            valueUSD: 3.2 * 43180.00,
+            notes: "",
+          },
+          {
+            id: 3,
+            name: "Solana",
+            symbol: "SOL",
+            balance: 850,
+            priceUSD: 98.40,
+            valueUSD: 850 * 98.40,
+            notes: "",
+          },
+        ];
+      } else {
+        // Update existing assets
+        updatedAssets = portfolioData.assets.map(asset => {
+          const priceChange = 0.95 + Math.random() * 0.1; // ±5% price change
+          const newPrice = asset.priceUSD * priceChange;
+          const balanceChange = 0.98 + Math.random() * 0.04; // ±2% balance change
+          const newBalance = asset.balance * balanceChange;
+          
+          return {
+            ...asset,
+            priceUSD: newPrice,
+            balance: parseFloat(newBalance.toFixed(6)),
+            valueUSD: newBalance * newPrice
+          };
+        });
+      }
 
       const newTotalValue = updatedAssets.reduce((sum, asset) => sum + asset.valueUSD, 0);
+      
+      // Generate or update balance history
+      const newBalanceHistory = portfolioData.balanceHistory.length === 0 
+        ? [
+            { value: newTotalValue * 0.85 },
+            { value: newTotalValue * 0.92 },
+            { value: newTotalValue * 0.88 },
+            { value: newTotalValue * 0.96 },
+            { value: newTotalValue }
+          ]
+        : [
+            ...portfolioData.balanceHistory.slice(1),
+            { value: newTotalValue }
+          ];
       
       setPortfolioData(prev => ({
         ...prev,
         assets: updatedAssets,
-        balanceHistory: [
-          ...prev.balanceHistory.slice(1),
-          { value: newTotalValue }
-        ]
+        balanceHistory: newBalanceHistory
       }));
       
       console.log('Portfolio updated successfully');
@@ -674,18 +687,39 @@ const App = () => {
             </span>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {visibleAssets.map((asset) => (
-              <AssetCard
-                key={asset.id}
-                asset={asset}
-                onClick={() => setSelectedAsset(asset)}
-                onHide={() => toggleHiddenAsset(asset.id)}
-                isEditor={isEditor}
-                totalValue={totalValue}
-              />
-            ))}
-          </div>
+          {visibleAssets.length === 0 ? (
+            <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 text-center">
+              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+              </div>
+              <h4 className="text-lg font-semibold text-white mb-2">No Asset Data Found</h4>
+              <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                Your portfolio appears to be empty. Click the "Update Database" button to fetch the latest wallet balances and asset data from your configured wallets.
+              </p>
+              <button
+                onClick={updatePortfolio}
+                disabled={isLoading}
+                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:bg-purple-800 disabled:cursor-not-allowed"
+              >
+                {isLoading ? <LoadingSpinner /> : "🔄 Update Database"}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {visibleAssets.map((asset) => (
+                <AssetCard
+                  key={asset.id}
+                  asset={asset}
+                  onClick={() => setSelectedAsset(asset)}
+                  onHide={() => toggleHiddenAsset(asset.id)}
+                  isEditor={isEditor}
+                  totalValue={totalValue}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Hidden Assets */}
