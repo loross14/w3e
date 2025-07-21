@@ -774,7 +774,8 @@ const App = () => {
       const portfolioData = await portfolioResponse.json();
 
       // Log the fetched data for debugging
-      console.log('Fetched portfolio data:', portfolioData);
+      ```python
+console.log('Fetched portfolio data:', portfolioData);
 
       // Step 6: Transform data
       setUpdateStatus('🔄 Processing asset data...');
@@ -852,7 +853,8 @@ const App = () => {
       setPortfolioData({
         assets: updatedAssets,
         balanceHistory: newBalanceHistory,
-        totalValue: newTotalValue
+        totalValue: newTotalValue,
+        performance24h: portfolioData.performance_24h || 0
       });
 
       // Step 9: Complete
@@ -907,9 +909,9 @@ const App = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-xs sm:text-sm">D</span>
+                <span className="text-white font-bold text-xs sm:text-sm">3</span>
               </div>
-              <h1 className="text-lg sm:text-2xl font-bold truncate">Crypto Fund Analytics</h1>
+              <h1 className="text-lg sm:text-2xl font-bold truncate">Web3Equities Portfolio</h1>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
               <button className="text-gray-400 hover:text-white transition-colors p-1">
