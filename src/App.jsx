@@ -1540,6 +1540,18 @@ const App = () => {
           />
 
           <MetricCard
+            title="Performance"
+            value={
+              <span className={performanceVsRaised >= 0 ? 'text-green-400' : 'text-red-400'}>
+                {performanceSign}{performanceVsRaised.toFixed(1)}%
+              </span>
+            }
+            change="Since inception"
+            changeType="white"
+            icon="#F59E0B"
+          />
+
+          <MetricCard
             title="Assets"
             value={visibleAssets.length}
             change="Active positions"
@@ -1553,18 +1565,6 @@ const App = () => {
             change={`${topAssetWeight}% of portfolio`}
             changeType="white"
             icon="#8B5CF6"
-          />
-
-          <MetricCard
-            title="Performance"
-            value={
-              <span className={performanceVsRaised >= 0 ? 'text-green-400' : 'text-red-400'}>
-                {performanceSign}{performanceVsRaised.toFixed(1)}%
-              </span>
-            }
-            change="Since inception"
-            changeType="white"
-            icon="#F59E0B"
           />
         </div>
 
