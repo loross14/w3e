@@ -433,13 +433,14 @@ async def get_wallet_assets(wallet_address: str, network: str) -> List[Dict]:
                 print(f"Error fetching token balances: {e}")
 
         elif network.upper() == "SOL":
-            # Solana wallet support using public RPC
+            # Solana wallet support using Alchemy RPC
+            solana_alchemy_url = f"https://solana-mainnet.g.alchemy.com/v2/{ALCHEMY_API_KEY}"
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     # Get SOL balance
                     if "solana" not in hidden_addresses:
                         sol_response = await client.post(
-                            "https://api.mainnet-beta.solana.com",
+                            solana_alchemy_url,
                             json={
                                 "jsonrpc": "2.0",
                                 "id": 1,
@@ -466,7 +467,7 @@ async def get_wallet_assets(wallet_address: str, network: str) -> List[Dict]:
 
                     # Get SPL token accounts
                     spl_response = await client.post(
-                        "https://api.mainnet-beta.solana.com",
+                        solana_alchemy_url,
                         json={
                             "jsonrpc": "2.0",
                             "id": 1,
