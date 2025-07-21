@@ -918,17 +918,40 @@ async def get_portfolio():
     conn = sqlite3.connect('crypto_fund.db')
     cursor = conn.cursor()
 
+    # Debug: Check what's in the assets table
+    cursor.execute("SELECT COUNT(*) FROM assets")
+    total_assets_count = cursor.fetchone()[0]
+    print(f"🔍 [PORTFOLIO DEBUG] Total assets in database: {total_assets_count}")
+
+    # Debug: Check hidden assets
+    cursor.execute("SELECT token_address, symbol FROM hidden_assets")
+    hidden_assets_debug = cursor.fetchall()
+    print(f"🔍 [PORTFOLIO DEBUG] Hidden assets: {hidden_assets_debug}")
+
+    # Debug: Check all assets before filtering
+    cursor.execute("SELECT token_address, symbol, name, value_usd FROM assets ORDER BY value_usd DESC")
+    all_assets_debug = cursor.fetchall()
+    print(f"🔍 [PORTFOLIO DEBUG] All assets before filtering: {all_assets_debug}")
+
     # Get all assets with notes, excluding hidden ones
     cursor.execute("""
         SELECT a.token_address, a.symbol, a.name, a.balance, a.balance_formatted, 
                a.price_usd, a.value_usd, COALESCE(n.notes, '') as notes
         FROM assets a
         LEFT JOIN asset_notes n ON a.symbol = n.symbol
-        LEFT JOIN hidden_assets h ON LOWER(a.token_address) = LOWER(h.token_address)
-        WHERE h.token_address IS NULL
+        WHERE NOT EXISTS (
+            SELECT 1 FROM hidden_assets h 
+            WHERE LOWER(h.token_address) = LOWER(a.token_address)
+        )
         ORDER BY a.value_usd DESC
     """)
     assets_data = cursor.fetchall()
+    print(f"🔍 [PORTFOLIO DEBUG] Assets after filtering: {len(assets_data)} assets")
+    
+    if len(assets_data) > 0:
+        print(f"🔍 [PORTFOLIO DEBUG] Sample asset: {assets_data[0]}")
+    else:
+        print(f"❌ [PORTFOLIO DEBUG] No assets returned by query!")
 
     assets = [
         AssetResponse(
