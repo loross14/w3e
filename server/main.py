@@ -1285,7 +1285,7 @@ def init_db():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS assets (
                 id SERIAL PRIMARY KEY,
-                wallet_id INTEGER REFERENCES wallets(id),
+                wallet_id INTEGER REFERENCES wallets(id) ON DELETE CASCADE,
                 token_address TEXT,
                 symbol TEXT NOT NULL,
                 name TEXT NOT NULL,
@@ -1497,13 +1497,16 @@ async def health_check():
 
         # Test database connection
         cursor.execute("SELECT COUNT(*) FROM wallets")
-        wallet_count = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        wallet_count = result['count'] if result else 0
 
         cursor.execute("SELECT COUNT(*) FROM assets")
-        asset_count = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        asset_count = result['count'] if result else 0
 
         cursor.execute("SELECT COUNT(*) FROM hidden_assets")
-        hidden_count = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        hidden_count = result['count'] if result else 0
 
         return {
             "status": "healthy",
@@ -1539,7 +1542,8 @@ async def create_wallet(wallet: WalletCreate):
             "INSERT INTO wallets (address, label, network) VALUES (%s, %s, %s) RETURNING id",
             (wallet.address, wallet.label, wallet.network)
         )
-        wallet_id = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        wallet_id = result['id'] if result else None
         conn.commit()
 
         return WalletResponse(
@@ -1607,7 +1611,7 @@ async def get_portfolio():
     # Debug: Check what's in the assets table
     cursor.execute("SELECT COUNT(*) FROM assets")
     result = cursor.fetchone()
-    total_assets_count = result[0] if result else 0
+    total_assets_count = result['count'] if result else 0
     print(f"🔍 [PORTFOLIO DEBUG] Total assets in database: {total_assets_count}")
 
     # Debug: Check hidden assets
@@ -1701,7 +1705,7 @@ async def get_portfolio():
         ORDER BY timestamp DESC LIMIT 1
     """)
     saved_total_result = cursor.fetchone()
-    saved_total_value = saved_total_result[0] if saved_total_result else 0
+    saved_total_value = saved_total_result['total_value_usd'] if saved_total_result else 0
 
     # Use saved value if available, otherwise calculate from current assets
     calculated_total = sum(asset.value_usd or 0 for asset in assets)
@@ -1710,7 +1714,7 @@ async def get_portfolio():
     # Get wallet count
     cursor.execute("SELECT COUNT(*) FROM wallets")
     result = cursor.fetchone()
-    wallet_count = result[0] if result else 0
+    wallet_count = result['count'] if result else 0
 
     # Calculate 24h performance using saved history
     cursor.execute("""
@@ -1720,8 +1724,8 @@ async def get_portfolio():
     history = cursor.fetchall()
     performance_24h = 0.0
     if len(history) >= 2:
-        current_value = history[0][0]
-        previous_value = history[1][0]
+        current_value = history[0]['total_value_usd']
+        previous_value = history[1]['total_value_usd']
         if previous_value > 0:
             performance_24h = ((current_value - previous_value) / previous_value) * 100
     elif len(history) == 1:
@@ -1903,6 +1907,53 @@ async def get_hidden_assets():
         }
         for h in hidden_assets
     ]
+
+@app.get("/debug/database")
+async def debug_database():
+    """Debug endpoint to test database connection and structure"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Test basic connection
+        cursor.execute("SELECT 1 as test")
+        test_result = cursor.fetchone()
+        
+        # Check if tables exist
+        cursor.execute("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_schema = 'public'
+            ORDER BY table_name
+        """)
+        tables = [row['table_name'] for row in cursor.fetchall()]
+        
+        # Get table counts
+        table_counts = {}
+        for table in tables:
+            try:
+                cursor.execute(f"SELECT COUNT(*) as count FROM {table}")
+                result = cursor.fetchone()
+                table_counts[table] = result['count'] if result else 0
+            except Exception as e:
+                table_counts[table] = f"Error: {str(e)}"
+        
+        conn.close()
+        
+        return {
+            "status": "connected",
+            "test_query": test_result['test'] if test_result else None,
+            "tables": tables,
+            "table_counts": table_counts,
+            "database_url_set": bool(DATABASE_URL),
+            "connection_type": "PostgreSQL with RealDictCursor"
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "database_url_set": bool(DATABASE_URL)
+        }
 
 @app.get("/debug/nfts/{wallet_address}")
 async def debug_nft_query(wallet_address: str):

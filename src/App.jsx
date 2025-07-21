@@ -1320,6 +1320,40 @@ const App = () => {
                     network: wallet.network
                   }),
                 });
+                
+                if (syncResponse.ok) {
+                  addDebugInfo(`✅ Synced wallet: ${wallet.label}`);
+                } else {
+                  const errorData = await syncResponse.json();
+                  addDebugInfo(`❌ Failed to sync wallet ${wallet.label}: ${errorData.detail || 'Unknown error'}`);
+                }
+              } catch (error) {
+                addDebugInfo(`❌ Error syncing wallet ${wallet.label}: ${error.message}`);
+              }
+            }
+            
+            // Reload backend wallets after sync
+            try {
+              const refreshResponse = await fetch(`${API_BASE_URL}/wallets`);
+              if (refreshResponse.ok) {
+                const refreshedWallets = await refreshResponse.json();
+                setWalletAddresses(refreshedWallets);
+                localStorage.setItem("fundWallets", JSON.stringify(refreshedWallets));
+                addDebugInfo(`✅ Refreshed wallet list: ${refreshedWallets.length} wallets`);
+              }
+            } catch (error) {
+              addDebugInfo(`⚠️ Could not refresh wallet list: ${error.message}`);
+            }
+          } else if (backendWallets.length > 0) {
+            // Backend has wallets, use them as the source of truth
+            setWalletAddresses(backendWallets);
+            localStorage.setItem("fundWallets", JSON.stringify(backendWallets));
+            addDebugInfo("✅ Using backend wallets as source of truth");
+          }ss: wallet.address,
+                    label: wallet.label,
+                    network: wallet.network
+                  }),
+                });
 
                 if (syncResponse.ok) {
                   addDebugInfo(`✅ Synced wallet: ${wallet.label}`);
