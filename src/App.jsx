@@ -639,8 +639,7 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
             <div className="text-center py-8 text-gray-400">No returns data available</div>
           )}
 
-          <div className="flex justify```python
-end mt-6">
+          <div className="flex justify-end mt-6">
             <button onClick={onClose} className="bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium">
               Close
             </button>
@@ -873,9 +872,9 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
   );
 };
 
-// API Configuration for deployment
-const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? `${window.location.protocol}//${window.location.hostname}:8000`
+// API Configuration for Replit environment
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:8000' 
   : `${window.location.protocol}//${window.location.hostname}:8000`;
 
 // Main App Component
@@ -1086,10 +1085,10 @@ const App = () => {
     }
   };
 
-  // API Configuration for autoscale deployment
+  // API Configuration for Replit environment
   const API_BASE_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:8000' 
-    : `${window.location.protocol}//${window.location.hostname.replace(':80', '')}:8000`;
+    : `${window.location.protocol}//${window.location.hostname}:8000`;
 
   // Status tracking state
   const [updateStatus, setUpdateStatus] = useState('');
@@ -1162,7 +1161,7 @@ const App = () => {
         if (savedData.assets && savedData.assets.length > 0) {
           console.log("🔄 [FRONTEND DEBUG] Starting asset transformation...");
           console.log("🖼️ [NFT SEARCH] Looking for NFTs in backend data...");
-
+          
           // First pass - identify NFTs
           const nftsFound = savedData.assets.filter(asset => 
             asset.is_nft === true || 
@@ -1171,14 +1170,14 @@ const App = () => {
             asset.name?.includes('Collection') ||
             (asset.nft_metadata && asset.nft_metadata !== null)
           );
-
+          
           console.log(`🖼️ [NFT SEARCH] Found ${nftsFound.length} potential NFTs:`, nftsFound.map(nft => ({
             symbol: nft.symbol,
             name: nft.name,
             is_nft: nft.is_nft,
             has_metadata: !!nft.nft_metadata
           })));
-
+          
           const transformedAssets = savedData.assets.map((asset, index) => {
         console.log(`🔄 [FRONTEND DEBUG] Transforming asset ${index + 1}:`, asset);
 
@@ -1227,7 +1226,7 @@ const App = () => {
           tokenIds: nftMetadata?.token_ids || [],
           nftMetadata: asset.nft_metadata || null
         };
-
+        
         if (isNFT) {
           console.log(`🖼️ [NFT DEBUG] Final NFT asset:`, transformed);
         } else {
@@ -1705,7 +1704,7 @@ const App = () => {
                     <div className="absolute inset-0 rounded-xl bg-blue-600/10 animate-pulse"></div>
                   )}
                 </button>
-
+                
                 {/* Status Tooltip */}
                 {(updateStatus || updateError) && (
                   <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-2xl z-50">
@@ -1716,7 +1715,7 @@ const App = () => {
                         updateError ? 'bg-red-400' : 'bg-green-400'
                       }`}></div>
                     </div>
-
+                    
                     {updateStatus && (
                       <div className="mb-3">
                         <div className="flex items-center space-x-2 mb-2">
@@ -1770,7 +1769,7 @@ const App = () => {
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
-
+        
 
         {/* Key Metrics - Mobile responsive grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
@@ -2021,7 +2020,7 @@ const App = () => {
           </div>
         </div>
 
-
+        
 
         {/* Current Positions Grid - Mobile responsive */}
         <div className="mb-6 sm:mb-8">

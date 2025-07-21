@@ -14,10 +14,10 @@ from abc import ABC, abstractmethod
 
 app = FastAPI(title="Crypto Fund API", version="1.0.0")
 
-# CORS middleware for deployment
+# CORS middleware for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,8 +26,7 @@ app.add_middleware(
 # Alchemy configuration
 ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
 if not ALCHEMY_API_KEY:
-    print("⚠️ ALCHEMY_API_KEY not found - using demo mode")
-    ALCHEMY_API_KEY = "demo_key"  # Allow startup without API key for demo functionality
+    raise RuntimeError("ALCHEMY_API_KEY environment variable is required")
 
 # ERC-20 ABI for token interactions
 ERC20_ABI = [
@@ -1257,9 +1256,7 @@ class ChainFactory:
 
 # Database initialization
 def init_db():
-    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
-    conn = sqlite3.connect(db_path, timeout=30.0)
-    conn.execute('PRAGMA journal_mode=WAL;')  # Better concurrency
+    conn = sqlite3.connect('crypto_fund.db')
     cursor = conn.cursor()
 
     # Wallets table
@@ -1526,8 +1523,7 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for debugging"""
-    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect('crypto_fund.db')
     cursor = conn.cursor()
 
     try:
@@ -1563,8 +1559,7 @@ async def health_check():
 
 @app.post("/wallets", response_model=WalletResponse)
 async def create_wallet(wallet: WalletCreate):
-    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect('crypto_fund.db')
     cursor = conn.cursor()
 
     try:
@@ -1588,8 +1583,7 @@ async def create_wallet(wallet: WalletCreate):
 
 @app.get("/wallets", response_model=List[WalletResponse])
 async def get_wallets():
-    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect('crypto_fund.db')
     cursor = conn.cursor()
 
     cursor.execute("SELECT id, address, label, network FROM wallets")
@@ -2217,9 +2211,7 @@ async def estimate_asset_purchase_price(symbol: str, name: str, current_price: f
 
 async def update_portfolio_data_new():
     """New background task using chain-agnostic fetchers with comprehensive error handling"""
-    db_path = os.path.join(os.path.dirname(__file__), 'crypto_fund.db')
-    conn = sqlite3.connect(db_path, timeout=30.0)
-    conn.execute('PRAGMA journal_mode=WAL;')
+    conn = sqlite3.connect('crypto_fund.db')
     cursor = conn.cursor()
 
     try:
@@ -2536,6 +2528,4 @@ async def update_portfolio_data_new():
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    print(f"🚀 Starting FastAPI server on 0.0.0.0:{port}")
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
