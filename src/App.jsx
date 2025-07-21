@@ -1223,7 +1223,8 @@ const App = () => {
           floorPrice: asset.floor_price || (nftMetadata?.floor_price) || 0,
           imageUrl: asset.image_url || (nftMetadata?.image_url) || null,
           performance24h: asset.price_change_24h || 0,
-          tokenIds: nftMetadata?.token_ids || []
+          tokenIds: nftMetadata?.token_ids || [],
+          nftMetadata: asset.nft_metadata || null
         };
         
         if (isNFT) {
@@ -1411,15 +1412,46 @@ const App = () => {
 
       // Step 6: Transform data
       setUpdateStatus('🔄 Processing asset data...');
-      const updatedAssets = portfolioData.assets.map(asset => ({
-        id: asset.id,
-        name: asset.name,
-        symbol: asset.symbol,
-        balance: asset.balance_formatted || asset.balance,
-        priceUSD: asset.price_usd || 0,
-        valueUSD: asset.value_usd || 0,
-        notes: asset.notes || "",
-      }));
+      const updatedAssets = portfolioData.assets.map(asset => {
+        // Parse NFT metadata if present
+        let nftMetadata = null;
+        if (asset.nft_metadata) {
+          try {
+            nftMetadata = JSON.parse(asset.nft_metadata);
+          } catch (e) {
+            console.warn("Failed to parse NFT metadata:", e);
+          }
+        }
+
+        // Enhanced NFT detection - check backend flag first
+        const isNFT = asset.is_nft === true || 
+                     asset.is_nft === 1 || 
+                     asset.symbol?.includes('NFT') || 
+                     asset.name?.includes('Collection') ||
+                     (asset.balance_formatted && asset.balance_formatted.includes('NFTs')) ||
+                     (nftMetadata && nftMetadata.token_ids);
+
+        return {
+          id: asset.id,
+          name: asset.name,
+          symbol: asset.symbol,
+          balance: asset.balance_formatted || asset.balance,
+          priceUSD: asset.price_usd || 0,
+          valueUSD: asset.value_usd || 0,
+          purchase_price: asset.purchase_price || 0,
+          total_invested: asset.total_invested || 0,
+          realized_pnl: asset.realized_pnl || 0,
+          unrealized_pnl: asset.unrealized_pnl || 0,
+          total_return_pct: asset.total_return_pct || 0,
+          notes: asset.notes || "",
+          isNFT: isNFT,
+          floorPrice: asset.floor_price || (nftMetadata?.floor_price) || 0,
+          imageUrl: asset.image_url || (nftMetadata?.image_url) || null,
+          performance24h: asset.price_change_24h || 0,
+          tokenIds: nftMetadata?.token_ids || [],
+          nftMetadata: asset.nft_metadata || null
+        };
+      });
 
       const newTotalValue = portfolioData.total_value || 0;
 
@@ -1450,15 +1482,46 @@ const App = () => {
 
           if (walletResponse.ok) {
             const walletDetails = await walletResponse.json();
-            const walletAssets = walletDetails.assets.map(asset => ({
-              id: asset.id,
-              name: asset.name,
-              symbol: asset.symbol,
-              balance: asset.balance_formatted || asset.balance,
-              priceUSD: asset.price_usd || 0,
-              valueUSD: asset.value_usd || 0,
-              notes: asset.notes || "",
-            }));
+            const walletAssets = walletDetails.assets.map(asset => {
+              // Parse NFT metadata if present
+              let nftMetadata = null;
+              if (asset.nft_metadata) {
+                try {
+                  nftMetadata = JSON.parse(asset.nft_metadata);
+                } catch (e) {
+                  console.warn("Failed to parse NFT metadata:", e);
+                }
+              }
+
+              // Enhanced NFT detection
+              const isNFT = asset.is_nft === true || 
+                           asset.is_nft === 1 || 
+                           asset.symbol?.includes('NFT') || 
+                           asset.name?.includes('Collection') ||
+                           (asset.balance_formatted && asset.balance_formatted.includes('NFTs')) ||
+                           (nftMetadata && nftMetadata.token_ids);
+
+              return {
+                id: asset.id,
+                name: asset.name,
+                symbol: asset.symbol,
+                balance: asset.balance_formatted || asset.balance,
+                priceUSD: asset.price_usd || 0,
+                valueUSD: asset.value_usd || 0,
+                purchase_price: asset.purchase_price || 0,
+                total_invested: asset.total_invested || 0,
+                realized_pnl: asset.realized_pnl || 0,
+                unrealized_pnl: asset.unrealized_pnl || 0,
+                total_return_pct: asset.total_return_pct || 0,
+                notes: asset.notes || "",
+                isNFT: isNFT,
+                floorPrice: asset.floor_price || (nftMetadata?.floor_price) || 0,
+                imageUrl: asset.image_url || (nftMetadata?.image_url) || null,
+                performance24h: asset.price_change_24h || 0,
+                tokenIds: nftMetadata?.token_ids || [],
+                nftMetadata: asset.nft_metadata || null
+              };
+            });
 
             const walletTotalValue = walletDetails.total_value;
 
