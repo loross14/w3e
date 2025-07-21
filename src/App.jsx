@@ -1353,27 +1353,29 @@ const App = () => {
           <MetricCard
             title="Performance"
             value={`${performanceSign}${performanceVsRaised.toFixed(1)}%`}
-            change={`vs $${raisedCapital.toLocaleString()} raised`}
+            change="all time unrealized return"
             changeType={performanceChangeType}
             icon="#F59E0B"
           />
         </div>
 
-        {/* Chart Section - Mobile optimized */}
-        <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-3 sm:space-y-0">
-            <h3 className="text-base sm:text-lg font-semibold text-white">Portfolio Performance</h3>
-            <div className="flex space-x-2 overflow-x-auto">
-              <button className="px-3 py-1 text-xs bg-purple-600 text-white rounded-md whitespace-nowrap">7D</button>
-              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">30D</button>
-              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">90D</button>
-              <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">1Y</button>
+        {/* Chart Section - Temporarily hidden until properly implemented */}
+        {false && (
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-3 sm:space-y-0">
+              <h3 className="text-base sm:text-lg font-semibold text-white">Portfolio Performance</h3>
+              <div className="flex space-x-2 overflow-x-auto">
+                <button className="px-3 py-1 text-xs bg-purple-600 text-white rounded-md whitespace-nowrap">7D</button>
+                <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">30D</button>
+                <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">90D</button>
+                <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">1Y</button>
+              </div>
+            </div>
+            <div className="h-48 sm:h-64 lg:h-80">
+              <PortfolioChart data={portfolioData.balanceHistory} />
             </div>
           </div>
-          <div className="h-48 sm:h-64 lg:h-80">
-            <PortfolioChart data={portfolioData.balanceHistory} />
-          </div>
-        </div>
+        )}
 
         {/* Action Cards for Editor */}
         {isEditor && (
