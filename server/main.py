@@ -1477,8 +1477,7 @@ async def get_wallet_details(wallet_id: int):
         conn.close()
         raise HTTPException(status_code=404, detail="Wallet not found")
 
-    wallet = Wallet<replit_final_file>
-Response(
+    wallet = WalletResponse(
         id=wallet_data[0], address=wallet_data[1], 
         label=wallet_data[2], network=wallet_data[3]
     )
