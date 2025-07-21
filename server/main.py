@@ -888,7 +888,7 @@ async def get_portfolio():
         FROM assets a
         LEFT JOIN asset_notes n ON a.symbol = n.symbol
         LEFT JOIN hidden_assets h ON LOWER(a.token_address) = LOWER(h.token_address)
-        WHERE h.token_address IS NULL
+        WHERE h.token_address IS NULL AND a.value_usd > 0
         ORDER BY a.value_usd DESC
     """)
     assets_data = cursor.fetchall()
@@ -1155,8 +1155,15 @@ async def update_portfolio_data_new():
 
                 print(f"💰 {asset['network']} Asset: {asset['symbol']} - Balance: {asset['balance']:.6f}, Price: ${price_usd:.6f}, Value: ${value_usd:.2f}")
 
-                # Track zero-value assets for auto-hiding
-                if value_usd == 0 and asset['balance'] > 0:
+                # Track zero-value assets for auto-hiding (only spam/scam tokens)
+                if value_usd == 0 and asset['balance'] > 0 and (
+                    "visit" in asset['name'].lower() or 
+                    "claim" in asset['name'].lower() or 
+                    "rewards" in asset['name'].lower() or
+                    "gift" in asset['name'].lower() or
+                    asset['symbol'] == "" or
+                    asset['name'] == ""
+                ):
                     zero_value_assets.append({
                         'token_address': token_address,
                         'symbol': asset['symbol'],
