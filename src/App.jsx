@@ -55,11 +55,13 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
     balance: asset?.balance || '0',
     priceUSD: asset?.priceUSD || 0,
     valueUSD: asset?.valueUSD || 0,
-    notes: asset?.notes || ''
+    notes: asset?.notes || '',
+    isNFT: asset?.symbol?.includes('NFT') || asset?.name?.includes('Collection')
   };
 
   const safeTotalValue = totalValue || 1; // Avoid division by zero
   const weight = ((safeAsset.valueUSD / safeTotalValue) * 100).toFixed(1);
+  const isNFTCollection = safeAsset.isNFT;
 
   return (
     <div 
@@ -68,12 +70,21 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center space-x-3 min-w-0 flex-1">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-sm">{safeAsset.symbol.slice(0, 2)}</span>
+          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+            isNFTCollection 
+              ? 'bg-gradient-to-r from-pink-500 to-purple-500' 
+              : 'bg-gradient-to-r from-purple-500 to-blue-500'
+          }`}>
+            <span className="text-white font-bold text-sm">
+              {isNFTCollection ? '🖼️' : safeAsset.symbol.slice(0, 2)}
+            </span>
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="font-medium text-white text-sm sm:text-base truncate">{safeAsset.name}</h3>
-            <p className="text-xs sm:text-sm text-gray-400 truncate">{safeAsset.symbol}</p>
+            <p className="text-xs sm:text-sm text-gray-400 truncate">
+              {safeAsset.symbol}
+              {isNFTCollection && <span className=" ml-1 text-pink-400">NFT Collection</span>}
+            </p>
           </div>
         </div>
         {isEditor && (
@@ -91,20 +102,28 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
 
       <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
         <div>
-          <span className="text-gray-400 block">Balance</span>
-          <span className="text-white font-mono">{safeAsset.balance}</span>
+          <span className="text-gray-400 block">{isNFTCollection ? 'Count' : 'Balance'}</span>
+          <span className="text-white font-mono">
+            {isNFTCollection ? `${Math.floor(safeAsset.balance)} NFTs` : safeAsset.balance}
+          </span>
         </div>
         <div>
-          <span className="text-gray-400 block">Price</span>
-          <span className="text-white font-mono">${safeAsset.priceUSD.toLocaleString()}</span>
+          <span className="text-gray-400 block">{isNFTCollection ? 'Floor Price' : 'Price'}</span>
+          <span className="text-white font-mono">
+            {isNFTCollection ? 'Coming Soon' : `$${safeAsset.priceUSD.toLocaleString()}`}
+          </span>
         </div>
         <div>
           <span className="text-gray-400 block">Value</span>
-          <span className="text-white font-mono">${safeAsset.valueUSD.toLocaleString()}</span>
+          <span className="text-white font-mono">
+            {isNFTCollection ? 'TBD' : `$${safeAsset.valueUSD.toLocaleString()}`}
+          </span>
         </div>
         <div>
           <span className="text-gray-400 block">Weight</span>
-          <span className="text-gray-300 font-mono">{weight}%</span>
+          <span className="text-gray-300 font-mono">
+            {isNFTCollection ? 'N/A' : `${weight}%`}
+          </span>
         </div>
       </div>
     </div>

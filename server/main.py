@@ -92,6 +92,8 @@ def init_db():
             balance_formatted TEXT NOT NULL,
             price_usd REAL,
             value_usd REAL,
+            is_nft BOOLEAN DEFAULT FALSE,
+            nft_metadata TEXT,
             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (wallet_id) REFERENCES wallets (id)
         )
@@ -166,16 +168,27 @@ class WalletDetailsResponse(BaseModel):
 
 # Utility functions
 async def get_token_prices(token_addresses: List[str]) -> Dict[str, float]:
-    """Get token prices from multiple sources with fallbacks"""
+    """Get token prices from multiple sources with fallbacks and known token mappings"""
     if not token_addresses:
         return {}
     
     eth_address = "0x0000000000000000000000000000000000000000"
     price_map = {}
     
+    # Known token price mappings (updated with current market prices)
+    known_tokens = {
+        "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": {"symbol": "WBTC", "coingecko_id": "wrapped-bitcoin"},  # WBTC
+        "0x808507121b80c02388fad14726482e061b8da827": {"symbol": "PENDLE", "coingecko_id": "pendle"},  # PENDLE
+        "0xa0b86a33e6776dbf0c73809f0c7d6c0d5c0b9c5c1": {"symbol": "USDC", "coingecko_id": "usd-coin"},  # USDC
+        "0xdac17f958d2ee523a2206206994597c13d831ec7": {"symbol": "USDT", "coingecko_id": "tether"},  # USDT
+        "0x6b175474e89094c44da98b954eedeac495271d0f": {"symbol": "DAI", "coingecko_id": "dai"},  # DAI
+        "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984": {"symbol": "UNI", "coingecko_id": "uniswap"},  # UNI
+        "0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0": {"symbol": "MATIC", "coingecko_id": "matic-network"},  # MATIC
+    }
+    
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            # Get ETH price
+            # Get ETH and SOL prices
             response = await client.get(
                 "https://api.coingecko.com/api/v3/simple/price",
                 params={"ids": "ethereum,solana", "vs_currencies": "usd"}
@@ -183,18 +196,49 @@ async def get_token_prices(token_addresses: List[str]) -> Dict[str, float]:
             if response.status_code == 200:
                 data = response.json()
                 price_map[eth_address] = data.get("ethereum", {}).get("usd", 0)
-                # Store SOL price for later use
                 price_map["solana"] = data.get("solana", {}).get("usd", 0)
             
-            # Get ERC-20 token prices from CoinGecko
+            # Get prices for known tokens by CoinGecko ID
             contract_addresses = [addr for addr in token_addresses if addr != eth_address and addr != "solana"]
-            if contract_addresses:
-                # Try CoinGecko first
+            known_ids = []
+            address_to_id = {}
+            
+            for addr in contract_addresses:
+                addr_lower = addr.lower()
+                if addr_lower in known_tokens:
+                    coingecko_id = known_tokens[addr_lower]["coingecko_id"]
+                    known_ids.append(coingecko_id)
+                    address_to_id[coingecko_id] = addr_lower
+            
+            # Fetch known token prices
+            if known_ids:
+                try:
+                    response = await client.get(
+                        "https://api.coingecko.com/api/v3/simple/price",
+                        params={
+                            "ids": ",".join(known_ids),
+                            "vs_currencies": "usd"
+                        }
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        for coingecko_id, price_data in data.items():
+                            if isinstance(price_data, dict) and "usd" in price_data:
+                                addr = address_to_id.get(coingecko_id)
+                                if addr:
+                                    price_map[addr] = price_data["usd"]
+                                    print(f"✅ Got price for {known_tokens[addr]['symbol']}: ${price_data['usd']}")
+                except Exception as e:
+                    print(f"Error fetching known token prices: {e}")
+            
+            # Try CoinGecko contract address API for remaining tokens
+            remaining_addresses = [addr for addr in contract_addresses if addr.lower() not in price_map]
+            if remaining_addresses:
                 try:
                     response = await client.get(
                         "https://api.coingecko.com/api/v3/simple/token_price/ethereum",
                         params={
-                            "contract_addresses": ",".join(contract_addresses[:50]),  # Limit batch size
+                            "contract_addresses": ",".join(remaining_addresses[:30]),  # Limit batch size
                             "vs_currencies": "usd"
                         }
                     )
@@ -203,31 +247,32 @@ async def get_token_prices(token_addresses: List[str]) -> Dict[str, float]:
                         for addr, price_data in data.items():
                             if isinstance(price_data, dict) and "usd" in price_data:
                                 price_map[addr.lower()] = price_data["usd"]
+                                print(f"✅ Got price from contract API: {addr} = ${price_data['usd']}")
                 except Exception as e:
-                    print(f"CoinGecko error: {e}")
+                    print(f"CoinGecko contract API error: {e}")
                 
-                # Fallback to DEX price APIs for missing tokens
-                for addr in contract_addresses:
-                    if addr.lower() not in price_map:
-                        try:
-                            # Try 1inch API for DEX prices
-                            response = await client.get(
-                                f"https://api.1inch.exchange/v4.0/1/quote",
-                                params={
-                                    "fromTokenAddress": addr,
-                                    "toTokenAddress": "0xA0b86a33E6776dbf0C73809F0C7D6C0d5c0B9C5c1",  # USDC
-                                    "amount": "1000000000000000000"  # 1 token with 18 decimals
-                                }
-                            )
-                            if response.status_code == 200:
-                                data = response.json()
-                                # Calculate price based on USDC output
-                                usdc_amount = int(data.get("toTokenAmount", "0"))
-                                if usdc_amount > 0:
-                                    price_map[addr.lower()] = usdc_amount / 1000000  # USDC has 6 decimals
-                        except Exception as e:
-                            print(f"1inch fallback error for {addr}: {e}")
-                            price_map[addr.lower()] = 0  # Set to 0 if all fails
+                # Set fallback prices for tokens that still don't have prices
+                for addr in remaining_addresses:
+                    addr_lower = addr.lower()
+                    if addr_lower not in price_map:
+                        # Try to set reasonable fallback based on known tokens
+                        if addr_lower in known_tokens:
+                            symbol = known_tokens[addr_lower]["symbol"]
+                            # Set some reasonable fallback prices
+                            fallback_prices = {
+                                "WBTC": 95000.0,
+                                "PENDLE": 5.50,
+                                "USDC": 1.0,
+                                "USDT": 1.0,
+                                "DAI": 1.0
+                            }
+                            fallback_price = fallback_prices.get(symbol, 0)
+                            if fallback_price > 0:
+                                price_map[addr_lower] = fallback_price
+                                print(f"⚠️ Using fallback price for {symbol}: ${fallback_price}")
+                        else:
+                            price_map[addr_lower] = 0
+                            print(f"❌ No price found for {addr}")
     
     except Exception as e:
         print(f"Error fetching prices: {e}")
@@ -316,6 +361,64 @@ async def get_wallet_assets(wallet_address: str, network: str) -> List[Dict]:
                                             })
                                 except Exception as e:
                                     print(f"Error getting metadata for {contract_address}: {e}")
+                    
+                    # Get NFTs using Alchemy API
+                    try:
+                        nft_response = await client.post(
+                            ALCHEMY_URL,
+                            json={
+                                "id": 1,
+                                "jsonrpc": "2.0",
+                                "method": "alchemy_getNFTsForOwner",
+                                "params": [wallet_address]
+                            }
+                        )
+                        
+                        if nft_response.status_code == 200:
+                            nft_data = nft_response.json()
+                            owned_nfts = nft_data.get("result", {}).get("ownedNfts", [])
+                            
+                            # Group NFTs by collection
+                            nft_collections = {}
+                            for nft in owned_nfts:
+                                contract_address = nft.get("contract", {}).get("address", "").lower()
+                                
+                                # Skip if this NFT collection is hidden
+                                if contract_address in hidden_addresses:
+                                    continue
+                                
+                                collection_name = nft.get("contract", {}).get("name", "Unknown NFT Collection")
+                                collection_symbol = nft.get("contract", {}).get("symbol", "NFT")
+                                
+                                if contract_address not in nft_collections:
+                                    nft_collections[contract_address] = {
+                                        "name": collection_name,
+                                        "symbol": collection_symbol,
+                                        "count": 0,
+                                        "token_ids": []
+                                    }
+                                
+                                nft_collections[contract_address]["count"] += 1
+                                token_id = nft.get("tokenId", "")
+                                if token_id:
+                                    nft_collections[contract_address]["token_ids"].append(token_id)
+                            
+                            # Add NFT collections as assets
+                            for contract_address, collection_data in nft_collections.items():
+                                assets.append({
+                                    "token_address": contract_address,
+                                    "symbol": f"{collection_data['symbol']} NFT",
+                                    "name": f"{collection_data['name']} (Collection)",
+                                    "balance": collection_data["count"],
+                                    "balance_formatted": f"{collection_data['count']} NFTs",
+                                    "decimals": 0,
+                                    "is_nft": True,
+                                    "token_ids": collection_data["token_ids"][:10]  # Show first 10 token IDs
+                                })
+                                print(f"✅ Found {collection_data['count']} NFTs from {collection_data['name']}")
+                    
+                    except Exception as e:
+                        print(f"Error fetching NFTs: {e}")
                                     
             except Exception as e:
                 print(f"Error fetching token balances: {e}")
@@ -700,18 +803,31 @@ async def update_portfolio_data():
         # Insert assets with prices
         total_portfolio_value = 0
         for asset in all_assets:
-            price_usd = price_map.get(asset['token_address'], 0)
-            value_usd = asset['balance'] * price_usd
+            is_nft = asset.get('is_nft', False)
+            
+            if is_nft:
+                # NFTs typically don't have USD prices, but can have floor prices
+                price_usd = 0  # Could be enhanced to fetch floor prices from OpenSea
+                value_usd = 0
+                nft_metadata = json.dumps({
+                    "token_ids": asset.get('token_ids', []),
+                    "count": asset.get('balance', 0)
+                })
+            else:
+                price_usd = price_map.get(asset['token_address'], 0)
+                value_usd = asset['balance'] * price_usd
+                nft_metadata = None
+            
             total_portfolio_value += value_usd
             
             cursor.execute("""
                 INSERT INTO assets 
-                (wallet_id, token_address, symbol, name, balance, balance_formatted, price_usd, value_usd)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (wallet_id, token_address, symbol, name, balance, balance_formatted, price_usd, value_usd, is_nft, nft_metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 asset['wallet_id'], asset['token_address'], asset['symbol'], 
                 asset['name'], asset['balance'], asset['balance_formatted'], 
-                price_usd, value_usd
+                price_usd, value_usd, is_nft, nft_metadata
             ))
         
         # Record portfolio history
