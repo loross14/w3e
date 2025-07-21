@@ -66,7 +66,7 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
   const safeTotalValue = totalValue || 1; // Avoid division by zero
   const weight = ((safeAsset.valueUSD / safeTotalValue) * 100).toFixed(1);
   const isNFTCollection = safeAsset.isNFT;
-  
+
   const returnColor = safeAsset.total_return_pct >= 0 ? 'text-green-400' : 'text-red-400';
   const returnIcon = safeAsset.total_return_pct >= 0 ? '📈' : '📉';
 
@@ -1466,7 +1466,7 @@ const App = () => {
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="w-6 h-6 sm:w-8 sm:h-8bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
                 <span className="text-white font-bold text-xs sm:text-sm">3</span>
               </div>
               <h1 className="text-lg sm:text-2xl font-bold truncate">Web3Equities Portfolio</h1>
@@ -1556,15 +1556,7 @@ const App = () => {
             change="Since inception"
             changeType={performanceChangeType}
             icon="#F59E0B"
-          >
-            {portfolioData.assets && portfolioData.assets.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-gray-700">
-                <div className="text-xs text-gray-400">
-                  Avg return: {(portfolioData.assets.reduce((sum, asset) => sum + (asset.total_return_pct || 0), 0) / portfolioData.assets.length).toFixed(1)}%
-                </div>
-              </div>
-            )}
-          </MetricCard>
+          />
         </div>
 
         {/* Chart Section - Temporarily hidden until properly implemented */}
@@ -1765,7 +1757,7 @@ const App = () => {
                     </div>
                   </div>
                 ))}
-              
+
               {/* Show placeholder if no performance data */}
               {visibleAssets.filter(asset => asset.performance24h !== undefined).length === 0 && (
                 <div className="col-span-3 text-center py-8">
@@ -1876,7 +1868,7 @@ const App = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {visibleAssets
                 .filter(asset => !asset.isNFT)
                 .map((asset) => (
