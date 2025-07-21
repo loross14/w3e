@@ -9,8 +9,8 @@ def start_backend():
     """Start the FastAPI backend server"""
     try:
         os.chdir('server')
-        subprocess.run(['python', '-m', 'pip', 'install', '-r', 'requirements.txt'], check=True)
-        subprocess.run(['python', 'main.py'], check=True)
+        subprocess.run(['python3', '-m', 'pip', 'install', '-r', 'requirements.txt'], check=True)
+        subprocess.run(['python3', 'main.py'], check=True)
     except Exception as e:
         print(f"Backend error: {e}")
 

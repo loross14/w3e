@@ -38,7 +38,7 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd server && python -m pip install -r requirements.txt && python main.py"
+args = "cd server && python3 -m pip install -r requirements.txt && python3 main.py"
 
 [[workflows.workflow]]
 name = "Full Stack Dev"
@@ -47,4 +47,4 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python start_services.py"
+args = "python3 start_services.py"
