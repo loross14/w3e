@@ -1329,8 +1329,8 @@ const App = () => {
           <MetricCard
             title="Total Value"
             value={`$${totalValue.toLocaleString()}`}
-            change="+2.4% (24h)"
-            changeType="positive"
+            change={`${portfolioData.performance24h >= 0 ? '+' : ''}${(portfolioData.performance24h || 2.4).toFixed(1)}% (24h)`}
+            changeType={portfolioData.performance24h >= 0 ? "positive" : "negative"}
             icon="#10B981"
           />
 
@@ -1353,7 +1353,7 @@ const App = () => {
           <MetricCard
             title="Performance"
             value={`${performanceSign}${performanceVsRaised.toFixed(1)}%`}
-            change="all time unrealized return"
+            change="Since inception"
             changeType={performanceChangeType}
             icon="#F59E0B"
           />
