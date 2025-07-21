@@ -5,8 +5,14 @@ export default defineConfig({
   plugins: [react()],
   define: {
     global: 'globalThis',
+    'process.env': {}
+  },
+  resolve: {
+    alias: {
+      buffer: 'buffer'
+    }
   },
   optimizeDeps: {
-    include: ['bcryptjs']
+    include: ['buffer']
   }
 });

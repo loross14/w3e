@@ -1,132 +1,111 @@
+
 import React, { useEffect, useState, useRef } from "react";
 import Chart from "chart.js/auto";
-import { Alchemy, Network } from "alchemy-sdk";
 import { jsPDF } from "jspdf";
-
-// Initialize Alchemy SDK for Ethereum
-const config = {
-  apiKey: "JlWnUY62Jlfn4RVNBULaIwZN916B58SA", // Replace with your Alchemy API key
-  network: Network.ETH_MAINNET,
-};
-const alchemy = new Alchemy(config);
 
 // Portfolio Chart Component
 const PortfolioChart = ({ data }) => {
-  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+  const chartInstance = useRef(null);
 
   useEffect(() => {
-    const ctx = canvasRef.current.getContext("2d");
-    const chart = new Chart(ctx, {
+    if (chartInstance.current) {
+      chartInstance.current.destroy();
+    }
+
+    const ctx = chartRef.current.getContext("2d");
+    chartInstance.current = new Chart(ctx, {
       type: "line",
       data: {
-        labels: data.map((d) => d.date),
+        labels: data.map((_, i) => `Day ${i + 1}`),
         datasets: [
           {
-            label: "Portfolio Value (USD)",
-            data: data.map((d) => d.value),
-            borderColor: "#10B981",
-            fill: false,
+            label: "Portfolio Value",
+            data: data.map((item) => item.value),
+            borderColor: "rgb(16, 185, 129)",
+            backgroundColor: "rgba(16, 185, 129, 0.1)",
+            fill: true,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        interaction: {
-          mode: "index",
-          intersect: false,
-        },
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context) =>
-                `$${context.parsed.y.toLocaleString()} on ${context.label}`,
+        scales: {
+          y: {
+            beginAtZero: false,
+            ticks: {
+              callback: (value) => `$${value.toLocaleString()}`,
             },
           },
         },
       },
     });
 
-    return () => chart.destroy();
+    return () => {
+      if (chartInstance.current) {
+        chartInstance.current.destroy();
+      }
+    };
   }, [data]);
 
-  return <canvas ref={canvasRef} className="chart-container" />;
+  return <canvas ref={chartRef} />;
 };
 
-// Asset List Component
-const AssetList = ({
-  assets,
-  hiddenAssets,
-  toggleHiddenAsset,
-  setSelectedAsset,
-  isEditor,
-}) => {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {assets
-        .filter((asset) => !hiddenAssets.includes(asset.id))
-        .map((asset) => (
-          <div key={asset.id} className="bg-gray-800 p-4 rounded-lg shadow">
-            <h3 className="text-lg font-semibold text-white">{asset.name}</h3>
-            <p className="text-gray-300">Type: {asset.type}</p>
-            <p className="text-gray-300">
-              Value: ${asset.valueUSD.toLocaleString()}
-            </p>
-            <p className="text-gray-300">
-              Wallet: {asset.wallet.slice(0, 6)}...{asset.wallet.slice(-4)}
-            </p>
-            <button
-              onClick={() => setSelectedAsset(asset)}
-              className="mt-2 bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700"
-            >
-              View Details
-            </button>
-            {isEditor && (
-              <button
-                onClick={() => toggleHiddenAsset(asset.id)}
-                className="mt-2 ml-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-              >
-                {hiddenAssets.includes(asset.id) ? "Show" : "Hide"}
-              </button>
-            )}
-          </div>
-        ))}
-    </div>
-  );
-};
+// Asset Details Modal
+const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
+  const [notes, setNotes] = useState(asset?.notes || "");
 
-// Asset Detail Component
-const AssetDetail = ({ asset, updateNotes, isEditor }) => {
   if (!asset) return null;
+
+  const handleSave = () => {
+    onUpdateNotes(asset.id, notes);
+    onClose();
+  };
+
   return (
-    <div className="bg-gray-800 p-6 rounded-lg shadow">
-      <h2 className="text-2xl font-bold text-white mb-4">{asset.name}</h2>
-      {asset.type === "nft" && (
-        <img
-          src={asset.image}
-          alt={asset.name}
-          className="w-32 h-32 mb-4 rounded"
-        />
-      )}
-      <p className="text-gray-300">Type: {asset.type}</p>
-      <p className="text-gray-300">Value: ${asset.valueUSD.toLocaleString()}</p>
-      <p className="text-gray-300">Wallet: {asset.wallet}</p>
-      {isEditor && (
-        <div className="mt-4">
-          <textarea
-            className="w-full p-2 bg-gray-700 text-white rounded"
-            value={asset.notes}
-            onChange={(e) => updateNotes(asset.id, e.target.value)}
-            placeholder="Add notes..."
-          />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg max-w-md w-full m-4">
+        <h2 className="text-xl font-bold mb-4">{asset.name}</h2>
+        <div className="space-y-2 mb-4">
+          <p>
+            <strong>Balance:</strong> {asset.balance} {asset.symbol}
+          </p>
+          <p>
+            <strong>Value:</strong> ${asset.valueUSD.toLocaleString()}
+          </p>
+          <p>
+            <strong>Price:</strong> ${asset.priceUSD.toFixed(4)}
+          </p>
         </div>
-      )}
-      <button
-        onClick={() => updateNotes(null, "")}
-        className="mt-4 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
-      >
-        Back to List
-      </button>
+        {isEditor && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Notes:</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full p-2 border rounded"
+              rows="3"
+            />
+          </div>
+        )}
+        <div className="flex space-x-2">
+          {isEditor && (
+            <button
+              onClick={handleSave}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            >
+              Save
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -141,7 +120,7 @@ const ReportGenerator = ({ portfolioData }) => {
     doc.text(`Crypto Fund Performance Report - ${period}`, 20, 20);
     doc.setFontSize(12);
     doc.text(
-      `Total Balance: $${portfolioData.balanceHistory[0].value.toLocaleString()}`,
+      `Total Balance: $${portfolioData.balanceHistory[0]?.value.toLocaleString() || "0"}`,
       20,
       40,
     );
@@ -157,12 +136,12 @@ const ReportGenerator = ({ portfolioData }) => {
   };
 
   return (
-    <div className="flex space-x-4">
+    <div className="flex flex-wrap gap-2">
       {periods.map((period) => (
         <button
           key={period}
           onClick={() => generateReport(period)}
-          className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700"
+          className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm"
         >
           Generate {period} Report
         </button>
@@ -180,10 +159,43 @@ const App = () => {
   );
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [portfolioData, setPortfolioData] = useState({
-    balanceHistory: [],
-    assets: [],
+    balanceHistory: [
+      { value: 1250000 },
+      { value: 1275000 },
+      { value: 1310000 },
+      { value: 1280000 },
+      { value: 1320000 },
+    ],
+    assets: [
+      {
+        id: 1,
+        name: "Ethereum",
+        symbol: "ETH",
+        balance: 450.5,
+        priceUSD: 2450.30,
+        valueUSD: 1103385.15,
+        notes: "",
+      },
+      {
+        id: 2,
+        name: "Bitcoin",
+        symbol: "BTC",
+        balance: 2.8,
+        priceUSD: 43250.00,
+        valueUSD: 121100.00,
+        notes: "",
+      },
+      {
+        id: 3,
+        name: "Chainlink",
+        symbol: "LINK",
+        balance: 15000,
+        priceUSD: 14.75,
+        valueUSD: 221250.00,
+        notes: "",
+      },
+    ],
   });
-  const [isLoading, setIsLoading] = useState(false);
 
   // Simple password check for "bullrun"
   const correctPassword = "bullrun";
@@ -220,180 +232,170 @@ const App = () => {
     }));
   };
 
-  // Fetch portfolio data
-  const updatePortfolio = async () => {
-    setIsLoading(true);
-    try {
-      // Mock wallet address for demo
-      const walletAddress = "0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98";
-      
-      // Ethereum wallet data using new Alchemy SDK
-      const ethBalance = await alchemy.core.getBalance(walletAddress);
-      const ethTokens = await alchemy.core.getTokenBalances(walletAddress);
-      const ethNfts = await alchemy.nft.getNftsForOwner(walletAddress);
+  const visibleAssets = portfolioData.assets.filter(
+    (asset) => !hiddenAssets.includes(asset.id),
+  );
 
-      // Mock price data (replace with CoinGecko or Alchemy price API)
-      const prices = {
-        ETH: 3500,
-        SOL: 150,
-      };
-
-      // Process assets
-      const assets = [
-        // ETH Balance
-        {
-          id: 'eth-balance',
-          type: "token",
-          name: "Ethereum",
-          amount: parseFloat(ethBalance._hex) / 1e18,
-          valueUSD: (parseFloat(ethBalance._hex) / 1e18) * prices.ETH,
-          wallet: walletAddress,
-          notes: "",
-        },
-        // ERC-20 Tokens
-        ...ethTokens.tokenBalances
-          .filter(token => token.tokenBalance !== "0x0")
-          .map((token, i) => ({
-            id: `eth-token-${i}`,
-            type: "token",
-            name: token.contractAddress.slice(0, 6), 
-            amount: parseInt(token.tokenBalance, 16) / 1e18,
-            valueUSD: (parseInt(token.tokenBalance, 16) / 1e18) * 100, // Mock price
-            wallet: walletAddress,
-            notes: "",
-          })),
-        // NFTs
-        ...ethNfts.ownedNfts.slice(0, 5).map((nft, i) => ({
-          id: `eth-nft-${i}`,
-          type: "nft",
-          name: nft.title || `NFT #${i}`,
-          valueUSD: 50000, // Mock value
-          wallet: walletAddress,
-          image: nft.media?.[0]?.gateway || "https://via.placeholder.com/150",
-          notes: "",
-        })),
-      ];
-
-      // Calculate historical balance (mocked for demo)
-      const balanceHistory = [
-        { date: "2024-01-01", value: 850000 },
-        { date: "2024-02-01", value: 920000 },
-        { date: "2024-03-01", value: 1100000 },
-        { date: "2024-04-01", value: 1050000 },
-        { date: "2024-05-01", value: 1200000 },
-        { date: new Date().toISOString().split("T")[0], value: assets.reduce((sum, asset) => sum + asset.valueUSD, 0) },
-      ];
-
-      setPortfolioData({ balanceHistory, assets });
-    } catch (error) {
-      console.error("Error fetching portfolio data:", error);
-      // Set mock data if API fails
-      const mockData = {
-        balanceHistory: [
-          { date: "2024-01-01", value: 850000 },
-          { date: "2024-02-01", value: 920000 },
-          { date: "2024-03-01", value: 1100000 },
-          { date: "2024-04-01", value: 1050000 },
-          { date: "2024-05-01", value: 1200000 },
-          { date: new Date().toISOString().split("T")[0], value: 1350000 },
-        ],
-        assets: [
-          {
-            id: 1,
-            name: 'Bitcoin',
-            type: 'token',
-            valueUSD: 450000,
-            wallet: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
-            notes: 'Primary BTC holdings'
-          },
-          {
-            id: 2,
-            name: 'Ethereum',
-            type: 'token',
-            valueUSD: 320000,
-            wallet: '0x742d35Cc6585C42161C0F57C0C5E6Ba5',
-            notes: 'ETH position for DeFi'
-          },
-          {
-            id: 3,
-            name: 'Bored Ape #1234',
-            type: 'nft',
-            valueUSD: 85000,
-            wallet: '0x742d35Cc6585C42161C0F57C0C5E6Ba5',
-            image: 'https://via.placeholder.com/150',
-            notes: 'Blue chip NFT'
-          }
-        ]
-      };
-      setPortfolioData(mockData);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Initialize hidden assets from localStorage
-  useEffect(() => {
-    const storedHiddenAssets =
-      JSON.parse(localStorage.getItem("hiddenAssets")) || [];
-    setHiddenAssets(storedHiddenAssets);
-  }, []);
+  const totalValue = visibleAssets.reduce(
+    (sum, asset) => sum + asset.valueUSD,
+    0,
+  );
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <h1 className="text-3xl font-bold mb-6">
-        Crypto Fund Portfolio Dashboard
-      </h1>
-      <button
-        onClick={updatePortfolio}
-        disabled={isLoading}
-        className={`mb-6 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-      >
-        {isLoading ? "Updating..." : "Update Portfolio"}
-      </button>
-      {!isEditor && (
-        <div className="mb-6">
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="p-2 bg-gray-700 text-white rounded mr-2"
-            placeholder="Enter password for editor view"
-          />
-          <button
-            onClick={checkPassword}
-            className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700"
-          >
-            Unlock Editor
-          </button>
+    <div className="min-h-screen bg-gray-900 text-white">
+      <div className="container mx-auto px-4 py-8">
+        <header className="mb-8">
+          <h1 className="text-4xl font-bold mb-2">
+            🏦 Crypto Fund Portfolio Dashboard
+          </h1>
+          <p className="text-gray-400">
+            Professional crypto asset management interface
+          </p>
+        </header>
+
+        {!isEditor && (
+          <div className="bg-gray-800 p-6 rounded-lg mb-6 max-w-md">
+            <h2 className="text-xl font-semibold mb-4">Editor Access</h2>
+            <div className="space-y-4">
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+                onKeyPress={(e) => e.key === "Enter" && checkPassword()}
+              />
+              <button
+                onClick={checkPassword}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              >
+                Access Editor Mode
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h3 className="text-lg font-semibold mb-2">Total Portfolio Value</h3>
+            <p className="text-3xl font-bold text-emerald-400">
+              ${totalValue.toLocaleString()}
+            </p>
+          </div>
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h3 className="text-lg font-semibold mb-2">Active Assets</h3>
+            <p className="text-3xl font-bold text-blue-400">
+              {visibleAssets.length}
+            </p>
+          </div>
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h3 className="text-lg font-semibold mb-2">24h Change</h3>
+            <p className="text-3xl font-bold text-green-400">+2.4%</p>
+          </div>
         </div>
+
+        <div className="bg-gray-800 p-6 rounded-lg mb-8">
+          <h3 className="text-xl font-semibold mb-4">Portfolio Performance</h3>
+          <div className="chart-container">
+            <PortfolioChart data={portfolioData.balanceHistory} />
+          </div>
+        </div>
+
+        <div className="bg-gray-800 p-6 rounded-lg mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold">Asset Holdings</h3>
+            {isEditor && (
+              <ReportGenerator portfolioData={portfolioData} />
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="text-left p-2">Asset</th>
+                  <th className="text-right p-2">Balance</th>
+                  <th className="text-right p-2">Price</th>
+                  <th className="text-right p-2">Value</th>
+                  <th className="text-right p-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleAssets.map((asset) => (
+                  <tr
+                    key={asset.id}
+                    className="border-b border-gray-700 hover:bg-gray-700 cursor-pointer"
+                    onClick={() => setSelectedAsset(asset)}
+                  >
+                    <td className="p-2">
+                      <div>
+                        <div className="font-semibold">{asset.name}</div>
+                        <div className="text-sm text-gray-400">
+                          {asset.symbol}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="text-right p-2">
+                      {asset.balance} {asset.symbol}
+                    </td>
+                    <td className="text-right p-2">
+                      ${asset.priceUSD.toLocaleString()}
+                    </td>
+                    <td className="text-right p-2">
+                      ${asset.valueUSD.toLocaleString()}
+                    </td>
+                    <td className="text-right p-2">
+                      {isEditor && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleHiddenAsset(asset.id);
+                          }}
+                          className="text-sm bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+                        >
+                          Hide
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {hiddenAssets.length > 0 && isEditor && (
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h3 className="text-xl font-semibold mb-4">Hidden Assets</h3>
+            <div className="space-y-2">
+              {portfolioData.assets
+                .filter((asset) => hiddenAssets.includes(asset.id))
+                .map((asset) => (
+                  <div
+                    key={asset.id}
+                    className="flex justify-between items-center p-2 bg-gray-700 rounded"
+                  >
+                    <span>{asset.name}</span>
+                    <button
+                      onClick={() => toggleHiddenAsset(asset.id)}
+                      className="text-sm bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                    >
+                      Show
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {selectedAsset && (
+        <AssetModal
+          asset={selectedAsset}
+          onClose={() => setSelectedAsset(null)}
+          onUpdateNotes={updateNotes}
+          isEditor={isEditor}
+        />
       )}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          {selectedAsset ? (
-            <AssetDetail
-              asset={selectedAsset}
-              updateNotes={updateNotes}
-              isEditor={isEditor}
-            />
-          ) : (
-            <AssetList
-              assets={portfolioData.assets}
-              hiddenAssets={hiddenAssets}
-              toggleHiddenAsset={toggleHiddenAsset}
-              setSelectedAsset={setSelectedAsset}
-              isEditor={isEditor}
-            />
-          )}
-        </div>
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Portfolio Value</h2>
-          <PortfolioChart data={portfolioData.balanceHistory} />
-        </div>
-      </div>
-      <div className="mt-6">
-        <h2 className="text-xl font-semibold mb-4">Generate Reports</h2>
-        <ReportGenerator portfolioData={portfolioData} />
-      </div>
     </div>
   );
 };
