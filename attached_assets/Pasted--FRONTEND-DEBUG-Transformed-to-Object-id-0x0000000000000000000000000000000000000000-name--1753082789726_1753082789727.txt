@@ -1,0 +1,32 @@
+✅ [FRONTEND DEBUG] Transformed to: 
+Object {id: "0x0000000000000000000000000000000000000000", name: "Ethereum", symbol: "ETH", balance: "18.349432", priceUSD: 3794.2, …}
+🔄 [FRONTEND DEBUG] Transforming asset 2: 
+Object {id: "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv", symbol: "PENGU", name: "Pudgy Penguins", balance: 487035.75889, balance_formatted: "487035.758890", …}
+✅ [FRONTEND DEBUG] Transformed to: 
+Object {id: "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv", name: "Pudgy Penguins", symbol: "PENGU", balance: "487035.758890", priceUSD: 0.03773, …}
+🔄 [FRONTEND DEBUG] Transforming asset 3: 
+Object {id: "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599", symbol: "WBTC", name: "Wrapped Bitcoin", balance: 0.15252433, balance_formatted: "0.152524", …}
+✅ [FRONTEND DEBUG] Transformed to: 
+Object {id: "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599", name: "Wrapped Bitcoin", symbol: "WBTC", balance: "0.152524", priceUSD: 119310, …}
+🔄 [FRONTEND DEBUG] Transforming asset 4: 
+Object {id: "solana", symbol: "SOL", name: "Solana", balance: 87.911928884, balance_formatted: "87.911929", …}
+✅ [FRONTEND DEBUG] Transformed to: 
+Object {id: "solana", name: "Solana", symbol: "SOL", balance: "87.911929", priceUSD: 189.5, …}
+🔄 [FRONTEND DEBUG] Transforming asset 5: 
+Object {id: "0x808507121b80c02388fad14726482e061b8da827", symbol: "PENDLE", name: "Pendle", balance: 2500.0000100855736, balance_formatted: "2500.000010", …}
+✅ [FRONTEND DEBUG] Transformed to: 
+Object {id: "0x808507121b80c02388fad14726482e061b8da827", name: "Pendle", symbol: "PENDLE", balance: "2500.000010", priceUSD: 4.77, …}
+🔄 [FRONTEND DEBUG] Transforming asset 6: 
+Object {id: "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump", symbol: "Fartcoin ", name: "Fartcoin ", balance: 4074.041665, balance_formatted: "4074.041665", …}
+✅ [FRONTEND DEBUG] Transformed to: 
+Object {id: "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump", name: "Fartcoin ", symbol: "Fartcoin ", balance: "4074.041665", priceUSD: 1.56, …}
+🎯 [FRONTEND DEBUG] Final transformed assets: 
+(6) [{…}, {…}, {…}, {…}, {…}, {…}]
+🐛 [3:25:41 AM] ✅ Portfolio data set successfully 
+Object {assetCount: 6, totalValue: 141134.8524254292, sampleAsset: {…}}
+🐛 [3:25:41 AM] Loading wallets from backend... 
+🐛 [3:25:41 AM] 📋 Backend has 2 wallets 
+(2) [{…}, {…}]
+🐛 [3:25:41 AM] ✅ Local wallets synced with backend (with preservation) 
+🐛 [3:25:41 AM] 📊 Loaded wallet status for 2 wallets 
+🐛 [3:25:41 AM] 🎉 Portfolio load completed successfully 
