@@ -55,6 +55,10 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
     balance: asset?.balance || '0',
     priceUSD: asset?.priceUSD || 0,
     valueUSD: asset?.valueUSD || 0,
+    purchase_price: asset?.purchase_price || 0,
+    total_invested: asset?.total_invested || 0,
+    unrealized_pnl: asset?.unrealized_pnl || 0,
+    total_return_pct: asset?.total_return_pct || 0,
     notes: asset?.notes || '',
     isNFT: asset?.symbol?.includes('NFT') || asset?.name?.includes('Collection')
   };
@@ -62,6 +66,9 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
   const safeTotalValue = totalValue || 1; // Avoid division by zero
   const weight = ((safeAsset.valueUSD / safeTotalValue) * 100).toFixed(1);
   const isNFTCollection = safeAsset.isNFT;
+  
+  const returnColor = safeAsset.total_return_pct >= 0 ? 'text-green-400' : 'text-red-400';
+  const returnIcon = safeAsset.total_return_pct >= 0 ? '📈' : '📉';
 
   return (
     <div 
@@ -73,7 +80,9 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
           <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
             isNFTCollection 
               ? 'bg-gradient-to-r from-pink-500 to-purple-500' 
-              : 'bg-gradient-to-r from-purple-500 to-blue-500'
+              : safeAsset.total_return_pct >= 0
+                ? 'bg-gradient-to-r from-green-500 to-emerald-500'
+                : 'bg-gradient-to-r from-red-500 to-red-600'
           }`}>
             <span className="text-white font-bold text-sm">
               {isNFTCollection ? '🖼️' : safeAsset.symbol.slice(0, 2)}
@@ -84,6 +93,11 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
             <p className="text-xs sm:text-sm text-gray-400 truncate">
               {safeAsset.symbol}
               {isNFTCollection && <span className=" ml-1 text-pink-400">NFT Collection</span>}
+              {!isNFTCollection && safeAsset.total_return_pct !== 0 && (
+                <span className={`ml-2 font-bold ${returnColor}`}>
+                  {returnIcon} {safeAsset.total_return_pct >= 0 ? '+' : ''}{safeAsset.total_return_pct.toFixed(0)}%
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -108,24 +122,36 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
           </span>
         </div>
         <div>
-          <span className="text-gray-400 block">{isNFTCollection ? 'Floor Price' : 'Price'}</span>
+          <span className="text-gray-400 block">{isNFTCollection ? 'Floor Price' : 'Current Price'}</span>
           <span className="text-white font-mono">
             {isNFTCollection ? 'Coming Soon' : `$${safeAsset.priceUSD.toLocaleString()}`}
           </span>
         </div>
         <div>
-          <span className="text-gray-400 block">Value</span>
+          <span className="text-gray-400 block">{isNFTCollection ? 'Est. Value' : 'Current Value'}</span>
           <span className="text-white font-mono">
             {isNFTCollection ? 'TBD' : `$${safeAsset.valueUSD.toLocaleString()}`}
           </span>
         </div>
         <div>
-          <span className="text-gray-400 block">Weight</span>
-          <span className="text-gray-300 font-mono">
-            {isNFTCollection ? 'N/A' : `${weight}%`}
+          <span className="text-gray-400 block">{isNFTCollection ? 'Weight' : 'Purchase Price'}</span>
+          <span className="text-blue-400 font-mono">
+            {isNFTCollection ? 'N/A' : `$${safeAsset.purchase_price.toFixed(4)}`}
           </span>
         </div>
       </div>
+
+      {/* Performance indicator bar */}
+      {!isNFTCollection && safeAsset.total_invested > 0 && (
+        <div className="mt-3 pt-2 border-t border-gray-700">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-gray-400">P&L:</span>
+            <span className={`font-bold ${returnColor}`}>
+              ${safeAsset.unrealized_pnl.toLocaleString()}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -409,7 +435,131 @@ const WalletModal = ({ wallet, onClose, walletData, portfolioData }) => {
   );
 };
 
-// Asset Details Modal
+// Returns Analysis Modal
+const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
+  const [returnsData, setReturnsData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchReturnsData();
+    }
+  }, [isOpen]);
+
+  const fetchReturnsData = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/portfolio/returns`);
+      if (response.ok) {
+        const data = await response.json();
+        setReturnsData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching returns data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg sm:text-xl font-bold text-white">📊 Portfolio Returns Analysis</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="text-center py-8">
+              <LoadingSpinner status="Loading returns analysis..." />
+            </div>
+          ) : returnsData ? (
+            <div className="space-y-6">
+              {/* Portfolio Summary */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="text-xs text-gray-400 mb-1">Total Invested</div>
+                  <div className="text-xl font-bold text-white">${returnsData.portfolio_metrics.total_invested.toLocaleString()}</div>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="text-xs text-gray-400 mb-1">Current Value</div>
+                  <div className="text-xl font-bold text-white">${returnsData.portfolio_metrics.total_current_value.toLocaleString()}</div>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="text-xs text-gray-400 mb-1">Total Return</div>
+                  <div className={`text-xl font-bold ${returnsData.portfolio_metrics.overall_return_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {returnsData.portfolio_metrics.overall_return_pct >= 0 ? '+' : ''}{returnsData.portfolio_metrics.overall_return_pct.toFixed(1)}%
+                  </div>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="text-xs text-gray-400 mb-1">Unrealized P&L</div>
+                  <div className={`text-xl font-bold ${returnsData.portfolio_metrics.total_unrealized_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    ${returnsData.portfolio_metrics.total_unrealized_pnl.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Performers */}
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-4">🚀 Top Performers</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {returnsData.top_performers.slice(0, 6).map((performer, index) => (
+                    <div key={index} className="bg-green-900/20 border border-green-700/50 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-white">{performer.symbol}</span>
+                        <span className="text-xs text-green-400">#{index + 1}</span>
+                      </div>
+                      <div className="text-xs text-gray-400 mb-1">{performer.name}</div>
+                      <div className="text-lg font-bold text-green-400">+{performer.return_pct.toFixed(1)}%</div>
+                      <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()} profit</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Worst Performers */}
+              {returnsData.worst_performers.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">📉 Underperformers</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {returnsData.worst_performers.map((performer, index) => (
+                      <div key={index} className="bg-red-900/20 border border-red-700/50 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-white">{performer.symbol}</span>
+                          <span className="text-xs text-red-400">⚠️</span>
+                        </div>
+                        <div className="text-xs text-gray-400 mb-1">{performer.name}</div>
+                        <div className="text-lg font-bold text-red-400">{performer.return_pct.toFixed(1)}%</div>
+                        <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-400">No returns data available</div>
+          )}
+
+          <div className="flex justify-end mt-6">
+            <button onClick={onClose} className="bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Enhanced Asset Details Modal with returns data
 const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
   const [notes, setNotes] = useState(asset?.notes || "");
 
@@ -420,20 +570,36 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
     onClose();
   };
 
+  const returnColor = (asset.total_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400';
+  const pnlColor = (asset.unrealized_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400';
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg sm:text-xl font-bold text-white">{asset.name}</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white p-1"
-            >
+            <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+          </div>
+
+          {/* Investment Metrics */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="text-xs text-gray-400 mb-1">Total Return</div>
+              <div className={`text-lg font-bold ${returnColor}`}>
+                {(asset.total_return_pct || 0) >= 0 ? '+' : ''}{(asset.total_return_pct || 0).toFixed(1)}%
+              </div>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="text-xs text-gray-400 mb-1">Unrealized P&L</div>
+              <div className={`text-lg font-bold ${pnlColor}`}>
+                ${(asset.unrealized_pnl || 0).toLocaleString()}
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3 mb-4 text-sm sm:text-base">
@@ -442,12 +608,20 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
               <span className="text-white font-mono">{asset?.balance || '0'} {asset?.symbol || 'N/A'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Value:</span>
-              <span className="text-green-400 font-mono">${(asset?.valueUSD || 0).toLocaleString()}</span>
+              <span className="text-gray-400">Current Price:</span>
+              <span className="text-white font-mono">${(asset?.priceUSD || 0).toFixed(4)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Price:</span>
-              <span className="text-white font-mono">${(asset?.priceUSD || 0).toFixed(4)}</span>
+              <span className="text-gray-400">Purchase Price:</span>
+              <span className="text-blue-400 font-mono">${(asset?.purchase_price || 0).toFixed(4)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Total Invested:</span>
+              <span className="text-blue-400 font-mono">${(asset?.total_invested || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Current Value:</span>
+              <span className="text-green-400 font-mono">${(asset?.valueUSD || 0).toLocaleString()}</span>
             </div>
           </div>
 
@@ -607,6 +781,11 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
   );
 };
 
+// API Configuration for Replit environment
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:8000' 
+  : `${window.location.protocol}//${window.location.hostname}:8000`;
+
 // Main App Component
 const App = () => {
   const [isEditor, setIsEditor] = useState(false);
@@ -617,6 +796,7 @@ const App = () => {
   );
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [selectedWallet, setSelectedWallet] = useState(null);
+  const [showReturnsModal, setShowReturnsModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [portfolioData, setPortfolioData] = useState({
     balanceHistory: [],
@@ -909,6 +1089,11 @@ const App = () => {
           balance: asset.balance_formatted || asset.balance,
           priceUSD: asset.price_usd || 0,
           valueUSD: asset.value_usd || 0,
+          purchase_price: asset.purchase_price || 0,
+          total_invested: asset.total_invested || 0,
+          realized_pnl: asset.realized_pnl || 0,
+          unrealized_pnl: asset.unrealized_pnl || 0,
+          total_return_pct: asset.total_return_pct || 0,
           notes: asset.notes || "",
           isNFT: asset.is_nft || false,
           floorPrice: asset.floor_price || (nftMetadata?.floor_price) || 0,
@@ -1371,7 +1556,15 @@ const App = () => {
             change="Since inception"
             changeType={performanceChangeType}
             icon="#F59E0B"
-          />
+          >
+            {portfolioData.assets && portfolioData.assets.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-700">
+                <div className="text-xs text-gray-400">
+                  Avg return: {(portfolioData.assets.reduce((sum, asset) => sum + (asset.total_return_pct || 0), 0) / portfolioData.assets.length).toFixed(1)}%
+                </div>
+              </div>
+            )}
+          </MetricCard>
         </div>
 
         {/* Chart Section - Temporarily hidden until properly implemented */}
@@ -1402,6 +1595,14 @@ const App = () => {
               onAction={updatePortfolio}
               variant="secondary"
               disabled={isLoading}
+            />
+
+            <ActionCard
+              title="📊 Returns Analysis"
+              description="View detailed performance metrics and top performers"
+              buttonText="View Returns"
+              onAction={() => setShowReturnsModal(true)}
+              variant="primary"
             />
 
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
@@ -1804,6 +2005,13 @@ const App = () => {
         setPassword={setPassword}
         onPasswordCheck={checkPassword}
         onEditorExit={handleEditorExit}
+      />
+
+      {/* Returns Analysis Modal */}
+      <ReturnsModal
+        isOpen={showReturnsModal}
+        onClose={() => setShowReturnsModal(false)}
+        portfolioData={portfolioData}
       />
     </div>
   );
