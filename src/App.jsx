@@ -1557,9 +1557,13 @@ const App = () => {
 
           <MetricCard
             title="Performance"
-            value={`${performanceSign}${performanceVsRaised.toFixed(1)}%`}
+            value={
+              <span className={performanceVsRaised >= 0 ? 'text-green-400' : 'text-red-400'}>
+                {performanceSign}{performanceVsRaised.toFixed(1)}%
+              </span>
+            }
             change="Since inception"
-            changeType={performanceChangeType}
+            changeType="white"
             icon="#F59E0B"
           />
         </div>
