@@ -1,5 +1,5 @@
 run = "npm run dev"
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "python-3.11"]
 hidden = [".config", "package-lock.json"]
 entrypoint = "index.html"
 
@@ -20,7 +20,7 @@ externalPort = 80
 exposeLocalhost = true
 
 [workflows]
-runButton = "Full Stack Dev"
+runButton = "Full Stack"
 
 [[workflows.workflow]]
 name = "Run"
@@ -42,6 +42,33 @@ args = "cd server && python3 -m pip install -r requirements.txt && python3 main.
 
 [[workflows.workflow]]
 name = "Full Stack Dev"
+author = 21724697
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 start_services.py"
+
+[[workflows.workflow]]
+name = "Start Backend Only"
+author = 21724697
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd server && python3 -m pip install -r requirements.txt && python3 main.py"
+
+[[workflows.workflow]]
+name = "Start Frontend Only"
+author = 21724697
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+
+[[workflows.workflow]]
+name = "Full Stack"
 author = 21724697
 mode = "sequential"
 
