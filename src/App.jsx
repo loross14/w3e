@@ -509,10 +509,84 @@ const LoadingSpinner = ({ status }) => (
   </div>
 );
 
+// Settings Modal Component
+const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPasswordCheck, onEditorExit }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-md w-full">
+        <div className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg sm:text-xl font-bold text-white">Settings</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white p-1"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {!isEditor ? (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base font-semibold text-white mb-2">🔐 Editor Access</h3>
+                <p className="text-sm text-gray-400 mb-4">Enter access key to unlock dashboard editing features</p>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter access key"
+                  className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-sm mb-4"
+                  onKeyPress={(e) => e.key === "Enter" && onPasswordCheck()}
+                />
+                <button
+                  onClick={onPasswordCheck}
+                  className="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                >
+                  Unlock Dashboard
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
+                <h3 className="text-base font-semibold text-green-400 mb-2">✅ Editor Mode Active</h3>
+                <p className="text-sm text-gray-300 mb-4">You're currently in editor mode with full dashboard access.</p>
+                <div className="text-sm text-green-400 mb-4">
+                  🔧 Editor features enabled: Hide assets, manage wallets, update notes
+                </div>
+                <button
+                  onClick={onEditorExit}
+                  className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium"
+                >
+                  Save & Exit Editor
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end mt-6">
+            <button
+              onClick={onClose}
+              className="bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Main App Component
 const App = () => {
   const [isEditor, setIsEditor] = useState(false);
   const [password, setPassword] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
   const [hiddenAssets, setHiddenAssets] = useState(
     () => JSON.parse(localStorage.getItem("hiddenAssets")) || [],
   );
@@ -534,9 +608,19 @@ const App = () => {
     if (password === correctPassword) {
       setIsEditor(true);
       setPassword("");
+      setShowSettings(false);
     } else {
       alert("Incorrect password");
     }
+  };
+
+  const handleEditorExit = () => {
+    setIsEditor(false);
+    setPassword("");
+    setShowSettings(false);
+    // Show a temporary success message
+    setUpdateStatus("✅ Changes saved! Returned to viewer mode.");
+    setTimeout(() => setUpdateStatus(''), 3000);
   };
 
   const toggleHiddenAsset = async (asset) => {
@@ -1143,7 +1227,16 @@ const App = () => {
               <h1 className="text-lg sm:text-2xl font-bold truncate">Web3Equities Portfolio</h1>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-              {/* Reserved for future actions */}
+              <button 
+                onClick={() => setShowSettings(true)}
+                className="text-gray-400 hover:text-white transition-colors p-1"
+                title="Settings"
+              >
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -1550,51 +1643,7 @@ const App = () => {
           </div>
         )}
 
-        {/* Editor Exit */}
-        {isEditor && (
-          <div className="mb-6">
-            <ActionCard
-              title="✅ Editor Mode Active"
-              description="You're currently in editor mode. Save your changes and return to viewer mode."
-              buttonText="Save & Exit Editor"
-              onAction={() => {
-                setIsEditor(false);
-                setPassword("");
-                // Show a temporary success message
-                setUpdateStatus("✅ Changes saved! Returned to viewer mode.");
-                setTimeout(() => setUpdateStatus(''), 3000);
-              }}
-              variant="secondary"
-            >
-              <div className="text-sm text-green-400 mt-2">
-                🔧 Editor features enabled: Hide assets, manage wallets, update notes
-              </div>
-            </ActionCard>
-          </div>
-        )}
-
-        {/* Editor Access */}
-        {!isEditor && (
-          <div className="mb-6">
-            <ActionCard
-              title="🔐 Editor Access"
-              description="Enter access key to unlock dashboard editing features"
-              buttonText="Unlock Dashboard"
-              onAction={checkPassword}
-            >
-              <div className="mb-4">
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter access key"
-                  className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-sm"
-                  onKeyPress={(e) => e.key === "Enter" && checkPassword()}
-                />
-              </div>
-            </ActionCard>
-          </div>
-        )}
+        
       </div>
 
       {/* Asset Modal */}
@@ -1616,6 +1665,17 @@ const App = () => {
           portfolioData={portfolioData}
         />
       )}
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        isEditor={isEditor}
+        password={password}
+        setPassword={setPassword}
+        onPasswordCheck={checkPassword}
+        onEditorExit={handleEditorExit}
+      />
     </div>
   );
 };
