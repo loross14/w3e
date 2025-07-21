@@ -1426,8 +1426,7 @@ const App = () => {
         addDebugInfo("🎉 Portfolio load completed successfully");
 
       } catch (error) {
-        ```
-addDebugInfo(`❌ Portfolio load error (attempt ${retryCount + 1}/${maxRetries + 1})`, error.message);
+        addDebugInfo(`❌ Portfolio load error (attempt ${retryCount + 1}/${maxRetries + 1})`, error.message);
 
         // Retry with exponential backoff if backend isn't ready yet
         if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('Backend not ready'))) {
@@ -1501,7 +1500,7 @@ addDebugInfo(`❌ Portfolio load error (attempt ${retryCount + 1}/${maxRetries +
 
       // Step 6: Transform data
       setUpdateStatus('🔄 Processing asset data...');
-      const updatedAssets = portfolioData.assets.map(asset =>{
+      const updatedAssets = portfolioData.assets.map(asset => {
         // Parse NFT metadata if present
         let nftMetadata = null;
         if (asset.nft_metadata) {
