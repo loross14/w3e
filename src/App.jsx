@@ -713,6 +713,15 @@ const App = () => {
   // Status tracking state
   const [updateStatus, setUpdateStatus] = useState('');
   const [updateError, setUpdateError] = useState('');
+  const [debugInfo, setDebugInfo] = useState([]);
+
+  // Debug logging function
+  const addDebugInfo = (message, data = null) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const debugEntry = { timestamp, message, data };
+    console.log(`🐛 [${timestamp}] ${message}`, data || '');
+    setDebugInfo(prev => [...prev.slice(-9), debugEntry]); // Keep last 10 entries
+  };
 
   // Load saved portfolio data on startup and sync wallets
   useEffect(() => {
@@ -720,7 +729,10 @@ const App = () => {
       const maxRetries = 3;
 
       try {
+        addDebugInfo("Starting portfolio data load", { retryCount, API_BASE_URL });
+
         // Test backend connection first
+        addDebugInfo("Testing backend connection...");
         const healthResponse = await fetch(`${API_BASE_URL}/`, {
           method: 'GET',
           headers: {
@@ -729,84 +741,94 @@ const App = () => {
         });
 
         if (!healthResponse.ok) {
-          throw new Error('Backend not ready');
+          throw new Error(`Backend not ready (${healthResponse.status})`);
         }
+        addDebugInfo("✅ Backend connection successful");
 
         // Load hidden assets from backend
         try {
+          addDebugInfo("Loading hidden assets...");
           const hiddenResponse = await fetch(`${API_BASE_URL}/assets/hidden`);
           if (hiddenResponse.ok) {
             const hiddenData = await hiddenResponse.json();
             const hiddenIds = hiddenData.map(asset => asset.token_address);
             setHiddenAssets(hiddenIds);
             localStorage.setItem("hiddenAssets", JSON.stringify(hiddenIds));
-            console.log(`📋 Loaded ${hiddenIds.length} hidden assets`);
+            addDebugInfo(`✅ Loaded ${hiddenIds.length} hidden assets`, hiddenIds);
+          } else {
+            addDebugInfo(`⚠️ Hidden assets response: ${hiddenResponse.status}`);
           }
         } catch (error) {
-          console.error('Error loading hidden assets:', error);
+          addDebugInfo("❌ Error loading hidden assets", error.message);
         }
 
         // Load saved portfolio data
-        console.log('📊 Loading saved portfolio data...');
-        // Load hidden assets from backend first
-        try {
-          const hiddenResponse = await fetch(`${API_BASE_URL}/assets/hidden`);
-          if (hiddenResponse.ok) {
-            const hiddenData = await hiddenResponse.json();
-            const hiddenIds = hiddenData.map(asset => asset.token_address);
-            setHiddenAssets(hiddenIds);
-            localStorage.setItem("hiddenAssets", JSON.stringify(hiddenIds));
-            console.log(`📋 Loaded ${hiddenIds.length} hidden assets from backend`);
-          }
-        } catch (error) {
-          console.error('Error loading hidden assets:', error);
-        }
-
+        addDebugInfo("Loading portfolio data...");
         const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
-        if (portfolioResponse.ok) {
-          const savedData = await portfolioResponse.json();
-
-          if (savedData.assets && savedData.assets.length > 0) {
-            const transformedAssets = savedData.assets.map(asset => ({
-              id: asset.id,
-              name: asset.name,
-              symbol: asset.symbol,
-              balance: asset.balance,
-              priceUSD: asset.price_usd || 0,
-              valueUSD: asset.value_usd || 0,
-              notes: asset.notes || "",
-            }));
-
-            const savedTotalValue = savedData.total_value || 0;
-
-            // Generate balance history based on saved data
-            const balanceHistory = savedTotalValue > 0 ? [
-              { value: savedTotalValue * 0.92 },
-              { value: savedTotalValue * 0.95 },
-              { value: savedTotalValue * 0.88 },
-              { value: savedTotalValue * 0.96 },
-              { value: savedTotalValue }
-            ] : [{ value: 0 }];
-
-            setPortfolioData({
-              assets: transformedAssets,
-              balanceHistory: balanceHistory,
-              totalValue: savedTotalValue,
-              performance24h: savedData.performance_24h || 0
-            });
-
-            console.log(`✅ Loaded ${transformedAssets.length} assets worth $${savedTotalValue.toLocaleString()}`);
-          }
+        
+        if (!portfolioResponse.ok) {
+          throw new Error(`Portfolio fetch failed: ${portfolioResponse.status} ${portfolioResponse.statusText}`);
         }
 
-        // Get current wallets from backend
-        const response = await fetch(`${API_BASE_URL}/wallets`);
-        if (response.ok) {
-          const backendWallets = await response.json();
+        const savedData = await portfolioResponse.json();
+        addDebugInfo("📊 Raw portfolio data received", savedData);
+
+        if (savedData.assets && savedData.assets.length > 0) {
+          const transformedAssets = savedData.assets.map(asset => ({
+            id: asset.id,
+            name: asset.name,
+            symbol: asset.symbol,
+            balance: asset.balance,
+            priceUSD: asset.price_usd || 0,
+            valueUSD: asset.value_usd || 0,
+            notes: asset.notes || "",
+          }));
+
+          const savedTotalValue = savedData.total_value || 0;
+
+          // Generate balance history based on saved data
+          const balanceHistory = savedTotalValue > 0 ? [
+            { value: savedTotalValue * 0.92 },
+            { value: savedTotalValue * 0.95 },
+            { value: savedTotalValue * 0.88 },
+            { value: savedTotalValue * 0.96 },
+            { value: savedTotalValue }
+          ] : [{ value: 0 }];
+
+          const portfolioUpdate = {
+            assets: transformedAssets,
+            balanceHistory: balanceHistory,
+            totalValue: savedTotalValue,
+            performance24h: savedData.performance_24h || 0
+          };
+
+          setPortfolioData(portfolioUpdate);
+          addDebugInfo(`✅ Portfolio data set successfully`, {
+            assetCount: transformedAssets.length,
+            totalValue: savedTotalValue,
+            sampleAsset: transformedAssets[0]
+          });
+        } else {
+          addDebugInfo("⚠️ No assets found in portfolio data", savedData);
+        }
+
+        // Get current wallets from backend and sync with local state
+        addDebugInfo("Loading wallets from backend...");
+        const walletsResponse = await fetch(`${API_BASE_URL}/wallets`);
+        if (walletsResponse.ok) {
+          const backendWallets = await walletsResponse.json();
+          addDebugInfo(`📋 Backend has ${backendWallets.length} wallets`, backendWallets);
+
+          // Update local wallet state to match backend
+          if (backendWallets.length > 0) {
+            setWalletAddresses(backendWallets);
+            localStorage.setItem("fundWallets", JSON.stringify(backendWallets));
+            addDebugInfo("✅ Local wallets synced with backend");
+          }
 
           // If backend is empty but we have local wallets, sync them
           if (backendWallets.length === 0 && walletAddresses.length > 0) {
-            console.log('Syncing local wallets to backend...');
+            addDebugInfo("Syncing local wallets to backend...");
             for (const wallet of walletAddresses) {
               try {
                 const syncResponse = await fetch(`${API_BASE_URL}/wallets`, {
@@ -822,26 +844,31 @@ const App = () => {
                 });
 
                 if (syncResponse.ok) {
-                  console.log(`✅ Synced wallet: ${wallet.label}`);
+                  addDebugInfo(`✅ Synced wallet: ${wallet.label}`);
                 } else {
-                  console.log(`⚠️ Wallet ${wallet.label} may already exist in backend`);
+                  addDebugInfo(`⚠️ Wallet ${wallet.label} may already exist in backend`);
                 }
               } catch (error) {
-                console.error(`❌ Failed to sync wallet ${wallet.label}:`, error.message);
+                addDebugInfo(`❌ Failed to sync wallet ${wallet.label}`, error.message);
               }
             }
-          } else {
-            console.log(`✅ Backend already has ${backendWallets.length} wallets configured`);
           }
+        } else {
+          addDebugInfo(`❌ Wallets fetch failed: ${walletsResponse.status}`);
         }
+
+        addDebugInfo("🎉 Portfolio load completed successfully");
+
       } catch (error) {
-        console.error(`❌ Error loading portfolio data (attempt ${retryCount + 1}/${maxRetries + 1}):`, error.message);
+        addDebugInfo(`❌ Portfolio load error (attempt ${retryCount + 1}/${maxRetries + 1})`, error.message);
 
         // Retry with exponential backoff if backend isn't ready yet
         if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('Backend not ready'))) {
           const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s delays
-          console.log(`🔄 Retrying portfolio load in ${delay / 1000}s...`);
+          addDebugInfo(`🔄 Retrying portfolio load in ${delay / 1000}s...`);
           setTimeout(() => loadPortfolioAndSyncWallets(retryCount + 1), delay);
+        } else {
+          setUpdateError(`Failed to load portfolio: ${error.message}`);
         }
       }
     };
@@ -935,10 +962,15 @@ const App = () => {
       const newWalletData = {};
       let walletCount = 0;
 
-      for (const wallet of walletAddresses) {
+      // First, get updated wallet list from backend
+      const walletsListResponse = await fetch(`${API_BASE_URL}/wallets`);
+      const currentWallets = walletsListResponse.ok ? await walletsListResponse.json() : walletAddresses;
+
+      for (const wallet of currentWallets) {
         try {
-          setUpdateStatus(`💼 Processing ${wallet.label} (${++walletCount}/${walletAddresses.length})...`);
+          setUpdateStatus(`💼 Processing ${wallet.label} (${++walletCount}/${currentWallets.length})...`);
           const walletResponse = await fetch(`${API_BASE_URL}/wallets/${wallet.id}/details`);
+          
           if (walletResponse.ok) {
             const walletDetails = await walletResponse.json();
             const walletAssets = walletDetails.assets.map(asset => ({
@@ -964,26 +996,55 @@ const App = () => {
                 { value: walletTotalValue }
               ]
             };
+            console.log(`✅ Loaded wallet ${wallet.label} with ${walletAssets.length} assets worth $${walletTotalValue.toLocaleString()}`);
+          } else if (walletResponse.status === 404) {
+            console.warn(`⚠️ Wallet ${wallet.label} (ID: ${wallet.id}) not found in backend`);
+            setUpdateStatus(`⚠️ Wallet ${wallet.label} not found - it may need to be re-added`);
+          } else {
+            console.error(`❌ Error fetching wallet ${wallet.label}: ${walletResponse.status} ${walletResponse.statusText}`);
+            setUpdateStatus(`❌ Error fetching ${wallet.label}: ${walletResponse.status}`);
           }
         } catch (error) {
-          console.error(`Error fetching wallet ${wallet.id} details:`, error);
-          setUpdateStatus(`⚠️ Warning: Could not fetch ${wallet.label} details`);
+          console.error(`❌ Network error fetching wallet ${wallet.label}:`, error);
+          setUpdateStatus(`⚠️ Network error fetching ${wallet.label}`);
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
 
-      // Step 8: Save data
+      // Step 8: Save data and force refresh
       setUpdateStatus('💾 Saving data...');
       setWalletData(newWalletData);
       localStorage.setItem("walletData", JSON.stringify(newWalletData));
 
       // Force update portfolio data
-      setPortfolioData({
+      const newPortfolioData = {
         assets: updatedAssets,
         balanceHistory: newBalanceHistory,
         totalValue: newTotalValue,
         performance24h: portfolioData.performance_24h || 0
+      };
+      setPortfolioData(newPortfolioData);
+      
+      addDebugInfo("💾 Portfolio data updated after fetch", {
+        assetCount: updatedAssets.length,
+        totalValue: newTotalValue,
+        sampleAsset: updatedAssets[0]
       });
+
+      // Force a fresh load from the API to ensure sync
+      setUpdateStatus('🔄 Verifying update...');
+      try {
+        const verifyResponse = await fetch(`${API_BASE_URL}/portfolio`);
+        if (verifyResponse.ok) {
+          const verifyData = await verifyResponse.json();
+          addDebugInfo("✅ Verification successful", {
+            backendAssets: verifyData.assets.length,
+            backendTotal: verifyData.total_value
+          });
+        }
+      } catch (verifyError) {
+        addDebugInfo("⚠️ Verification failed", verifyError.message);
+      }
 
       // Step 9: Complete
       const assetCount = updatedAssets.length;
@@ -991,7 +1052,10 @@ const App = () => {
       setUpdateStatus(`✅ Updated ${assetCount} assets • $${valueFormatted}`);
       setTimeout(() => setUpdateStatus(''), 5000);
 
-      console.log('Portfolio updated successfully with real data');
+      addDebugInfo('🎉 Portfolio update completed successfully', {
+        totalAssets: assetCount,
+        totalValue: newTotalValue
+      });
     } catch (error) {
       console.error('Error updating portfolio:', error);
       let errorMessage = 'Unknown error occurred';
@@ -1085,6 +1149,66 @@ const App = () => {
                 </div>
               </div>
             )}
+
+            {/* Debug Information */}
+            {debugInfo.length > 0 && (
+              <div className="mt-3 p-3 bg-gray-800/50 border border-gray-600/50 rounded-lg">
+                <details className="cursor-pointer">
+                  <summary className="text-sm text-gray-300 font-medium mb-2">
+                    🐛 Debug Log ({debugInfo.length} entries)
+                  </summary>
+                  <div className="max-h-48 overflow-y-auto space-y-1 text-xs">
+                    {debugInfo.map((entry, index) => (
+                      <div key={index} className="flex flex-col space-y-1">
+                        <div className="text-gray-400">
+                          [{entry.timestamp}] {entry.message}
+                        </div>
+                        {entry.data && (
+                          <pre className="text-green-400 ml-4 text-xs bg-gray-900/50 p-1 rounded">
+                            {typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            )}
+
+            {/* Portfolio State Debug */}
+            <div className="mt-3 p-3 bg-purple-900/20 border border-purple-700/50 rounded-lg">
+              <details className="cursor-pointer">
+                <summary className="text-sm text-purple-300 font-medium mb-2">
+                  📊 Current Portfolio State
+                </summary>
+                <div className="text-xs space-y-2">
+                  <div>
+                    <span className="text-gray-400">Total Value:</span>
+                    <span className="text-white ml-2">${totalValue.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Assets Count:</span>
+                    <span className="text-white ml-2">{visibleAssets.length} visible / {portfolioData.assets?.length || 0} total</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Hidden Assets:</span>
+                    <span className="text-white ml-2">{hiddenAssets.length}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Wallets:</span>
+                    <span className="text-white ml-2">{walletAddresses.length}</span>
+                  </div>
+                  {portfolioData.assets && portfolioData.assets.length > 0 && (
+                    <div>
+                      <span className="text-gray-400">Sample Asset:</span>
+                      <pre className="text-green-400 mt-1 text-xs bg-gray-900/50 p-1 rounded">
+                        {JSON.stringify(portfolioData.assets[0], null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </details>
+            </div>
           </ActionCard>
         </div>
 

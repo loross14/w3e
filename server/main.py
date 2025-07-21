@@ -748,8 +748,7 @@ class AssetResponse(BaseModel):
     value_usd: Optional[float]
     notes: Optional[str] = ""
 
-class PortfolioResponse(BaseModel):
-    total_value: float
+class PortfolioResponse(BaseModel):total_value: float
     assets: List[AssetResponse]
     wallet_count: int
     performance_24h: float
