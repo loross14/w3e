@@ -641,6 +641,45 @@ const App = () => {
   const [updateStatus, setUpdateStatus] = useState('');
   const [updateError, setUpdateError] = useState('');
 
+  // Sync wallets with backend on app load
+  useEffect(() => {
+    const syncWalletsWithBackend = async () => {
+      try {
+        // Get current wallets from backend
+        const response = await fetch(`${API_BASE_URL}/wallets`);
+        if (response.ok) {
+          const backendWallets = await response.json();
+          
+          // If backend is empty but we have local wallets, sync them
+          if (backendWallets.length === 0 && walletAddresses.length > 0) {
+            console.log('Syncing local wallets to backend...');
+            for (const wallet of walletAddresses) {
+              try {
+                await fetch(`${API_BASE_URL}/wallets`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    address: wallet.address,
+                    label: wallet.label,
+                    network: wallet.network
+                  }),
+                });
+              } catch (error) {
+                console.error(`Failed to sync wallet ${wallet.label}:`, error);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error syncing wallets:', error);
+      }
+    };
+
+    syncWalletsWithBackend();
+  }, []);
+
   const updatePortfolio = async () => {
     setIsLoading(true);
     setUpdateError('');
@@ -678,7 +717,11 @@ const App = () => {
       setUpdateStatus('⏳ Processing wallet data...');
       await new Promise(resolve => setTimeout(resolve, 3000));
       
-      // Step 4: Fetch updated portfolio data
+      // Step 4: Wait a bit more for backend processing
+      setUpdateStatus('⏳ Waiting for backend processing...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Step 5: Fetch updated portfolio data
       setUpdateStatus('📊 Fetching portfolio data...');
       const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
       if (!portfolioResponse.ok) {
@@ -688,7 +731,10 @@ const App = () => {
       
       const portfolioData = await portfolioResponse.json();
       
-      // Step 5: Transform data
+      // Log the fetched data for debugging
+      console.log('Fetched portfolio data:', portfolioData);
+      
+      // Step 6: Transform data
       setUpdateStatus('🔄 Processing asset data...');
       const updatedAssets = portfolioData.assets.map(asset => ({
         id: asset.id,
@@ -700,18 +746,20 @@ const App = () => {
         notes: asset.notes || "",
       }));
 
-      const newTotalValue = portfolioData.total_value;
+      const newTotalValue = portfolioData.total_value || 0;
       
       // Generate balance history (simplified - in production you'd fetch from backend)
-      const newBalanceHistory = [
+      const newBalanceHistory = newTotalValue > 0 ? [
         { value: newTotalValue * 0.92 },
         { value: newTotalValue * 0.95 },
         { value: newTotalValue * 0.88 },
         { value: newTotalValue * 0.96 },
         { value: newTotalValue }
-      ];
+      ] : [{ value: 0 }];
       
-      // Step 6: Fetch individual wallet data
+      console.log(`Found ${updatedAssets.length} assets with total value $${newTotalValue}`);
+      
+      // Step 7: Fetch individual wallet data
       setUpdateStatus('💼 Updating wallet details...');
       const newWalletData = {};
       let walletCount = 0;
@@ -753,21 +801,23 @@ const App = () => {
         }
       }
       
-      // Step 7: Save data
+      // Step 8: Save data
       setUpdateStatus('💾 Saving data...');
       setWalletData(newWalletData);
       localStorage.setItem("walletData", JSON.stringify(newWalletData));
       
-      setPortfolioData(prev => ({
-        ...prev,
+      // Force update portfolio data
+      setPortfolioData({
         assets: updatedAssets,
         balanceHistory: newBalanceHistory,
         totalValue: newTotalValue
-      }));
+      });
       
-      // Step 8: Complete
-      setUpdateStatus('✅ Portfolio updated successfully!');
-      setTimeout(() => setUpdateStatus(''), 3000);
+      // Step 9: Complete
+      const assetCount = updatedAssets.length;
+      const valueFormatted = newTotalValue.toLocaleString();
+      setUpdateStatus(`✅ Updated ${assetCount} assets • $${valueFormatted}`);
+      setTimeout(() => setUpdateStatus(''), 5000);
       
       console.log('Portfolio updated successfully with real data');
     } catch (error) {
