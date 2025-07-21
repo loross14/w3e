@@ -14,7 +14,7 @@ def serve_frontend():
         # Change to the dist directory where Vite builds the frontend
         if os.path.exists('dist'):
             os.chdir('dist')
-            port = 5173
+            port = 80  # Use port 80 for deployment
             
             class Handler(SimpleHTTPRequestHandler):
                 def end_headers(self):
@@ -22,6 +22,12 @@ def serve_frontend():
                     self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
                     self.send_header('Access-Control-Allow-Headers', 'Content-Type')
                     super().end_headers()
+                
+                def do_GET(self):
+                    # Handle SPA routing - serve index.html for all routes
+                    if not os.path.exists(self.path.lstrip('/')):
+                        self.path = '/index.html'
+                    return super().do_GET()
             
             with socketserver.TCPServer(("0.0.0.0", port), Handler) as httpd:
                 print(f"✅ Frontend server running on port {port}")
@@ -35,15 +41,16 @@ def serve_backend():
     """Start the FastAPI backend"""
     try:
         print("🚀 Starting FastAPI backend...")
-        os.chdir('server')
         
-        # Install dependencies
-        subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt'], check=True)
+        # Install dependencies first
+        subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', 'server/requirements.txt'], check=True)
         
-        # Set environment variable for production
+        # Set environment variables for production
         os.environ['NODE_ENV'] = 'production'
+        os.environ['PORT'] = '8000'
         
-        # Start the FastAPI server
+        # Change to server directory and start the FastAPI server
+        os.chdir('server')
         subprocess.run([sys.executable, 'main.py'], check=True)
     except Exception as e:
         print(f"❌ Backend server error: {e}")
