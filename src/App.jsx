@@ -774,8 +774,7 @@ const App = () => {
       const portfolioData = await portfolioResponse.json();
 
       // Log the fetched data for debugging
-      ```python
-console.log('Fetched portfolio data:', portfolioData);
+      console.log('Fetched portfolio data:', portfolioData);
 
       // Step 6: Transform data
       setUpdateStatus('🔄 Processing asset data...');
