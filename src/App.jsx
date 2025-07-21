@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
 import Chart from "chart.js/auto";
-import bcrypt from "bcryptjs";
 import { Alchemy, Network } from "alchemy-sdk";
 import { jsPDF } from "jspdf";
 
@@ -186,12 +185,11 @@ const App = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Hashed password for "bullrun"
-  const hashedPassword =
-    "$2a$10$6s9QzX7Y8v2j2z2Qz2z2Qz2z2Qz2z2Qz2z2Qz2z2Qz2z2Qz2z2Qz2";
+  // Simple password check for "bullrun"
+  const correctPassword = "bullrun";
 
   const checkPassword = () => {
-    if (bcrypt.compareSync(password, hashedPassword)) {
+    if (password === correctPassword) {
       setIsEditor(true);
       setPassword("");
     } else {
