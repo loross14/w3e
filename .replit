@@ -12,7 +12,7 @@ language = "nodejs"
 [deployment]
 deploymentTarget = "cloudrun"
 build = ["sh", "-c", "npm run build"]
-run = ["sh", "-c", "python3 start_services.py"]
+run = ["sh", "-c", "cd server && python3 main.py"]
 
 [[ports]]
 localPort = 80
