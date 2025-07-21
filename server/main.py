@@ -654,57 +654,85 @@ class SolanaAssetFetcher(AssetFetcher):
 class SolanaPriceFetcher(PriceFetcher):
     def __init__(self):
         self.known_tokens = {
-            "epjfwdd5aufqssqem2qn1xzybapC8g4wegghkzwytdt1v": {"symbol": "USDC", "coingecko_id": "usd-coin"},
-            "es9vmfrzacermjfrf4h2fyd4kconky11mce8benwnyb": {"symbol": "USDT", "coingecko_id": "tether"},
-            "so11111111111111111111111111111111111111112": {"symbol": "WSOL", "coingecko_id": "wrapped-solana"},
-            "mnderfzgvmt87ueuhvvu9vctqsap5b3ftgpshuupa5ey": {"symbol": "MNDE", "coingecko_id": "marinade"},
-            "7atgf8kqo4wjrd5atgx7t1v2zvvykpjbffnevf1icfv1": {"symbol": "CHAT", "coingecko_id": "chatcoin"},
-            # Add more known SPL tokens as needed
+            # Use proper case-sensitive addresses for known tokens
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {"symbol": "USDC", "coingecko_id": "usd-coin"},
+            "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": {"symbol": "USDT", "coingecko_id": "tether"},
+            "So11111111111111111111111111111111111111112": {"symbol": "WSOL", "coingecko_id": "wrapped-solana"},
+            "MNDEFzGvMt87ueuHvVU9VcTqsAP5b3fTGPsHuuPA5ey": {"symbol": "MNDE", "coingecko_id": "marinade"},
+            "7atgF8KQo4wJrD5ATGX7t1V2zVvykPJbFfNeVf1icFv1": {"symbol": "CHAT", "coingecko_id": "chatcoin"},
+            "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So": {"symbol": "mSOL", "coingecko_id": "marinade-staked-sol"},
+            "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": {"symbol": "BONK", "coingecko_id": "bonk"},
+            "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs": {"symbol": "ETH", "coingecko_id": "ethereum"},
         }
 
     async def fetch_prices(self, token_addresses: List[str]) -> Dict[str, float]:
         price_map = {}
-
-        print(f"💵 Fetching Solana prices for {len(token_addresses)} tokens...")
+        
+        print(f"💵 [SOLANA PRICES] Starting price fetch for {len(token_addresses)} tokens...")
+        print(f"🔍 [SOLANA PRICES] Token addresses: {token_addresses}")
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:  # Increased timeout
                 # Get SOL price first
-                response = await client.get(
-                    "https://api.coingecko.com/api/v3/simple/price",
-                    params={"ids": "solana", "vs_currencies": "usd"}
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    sol_price = data.get("solana", {}).get("usd", 0)
-                    price_map["solana"] = sol_price
-                    print(f"✅ SOL price: ${sol_price}")
+                try:
+                    response = await client.get(
+                        "https://api.coingecko.com/api/v3/simple/price",
+                        params={"ids": "solana", "vs_currencies": "usd"},
+                        timeout=15.0
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        sol_price = data.get("solana", {}).get("usd", 0)
+                        price_map["solana"] = sol_price
+                        print(f"✅ [SOLANA PRICES] SOL price: ${sol_price}")
+                    else:
+                        print(f"❌ [SOLANA PRICES] SOL price fetch error: HTTP {response.status_code}")
+                except Exception as e:
+                    print(f"❌ [SOLANA PRICES] SOL price fetch exception: {e}")
 
                 # Process mint addresses
                 mint_addresses = [addr for addr in token_addresses if addr != "solana"]
+                print(f"🪙 [SOLANA PRICES] Processing {len(mint_addresses)} mint addresses...")
                 
                 # Method 1: Try known tokens first
+                print(f"1️⃣ [SOLANA PRICES] Trying known tokens...")
                 await self._fetch_known_token_prices(client, mint_addresses, price_map)
                 
                 # Method 2: Try Jupiter API for SPL token prices
+                print(f"2️⃣ [SOLANA PRICES] Trying Jupiter API...")
                 await self._fetch_jupiter_prices(client, mint_addresses, price_map)
                 
                 # Method 3: Try DexScreener API for pump.fun and other tokens
+                print(f"3️⃣ [SOLANA PRICES] Trying DexScreener API...")
                 await self._fetch_dexscreener_prices(client, mint_addresses, price_map)
                 
                 # Method 4: Try Birdeye API as fallback
+                print(f"4️⃣ [SOLANA PRICES] Trying Birdeye API...")
                 await self._fetch_birdeye_prices(client, mint_addresses, price_map)
 
-                # Set fallback prices for remaining unknown tokens
+                # Method 5: Try CoinGecko SPL Token API
+                print(f"5️⃣ [SOLANA PRICES] Trying CoinGecko SPL API...")
+                await self._fetch_coingecko_spl_prices(client, mint_addresses, price_map)
+
+                # Final logging and fallback
+                print(f"📊 [SOLANA PRICES] Price fetch complete. Found prices for {len([k for k in price_map.keys() if k != 'solana'])} SPL tokens")
+                
                 for addr in mint_addresses:
                     if addr.lower() not in price_map and addr not in price_map:
                         price_map[addr.lower()] = 0
                         price_map[addr] = 0
-                        print(f"❌ No price found for Solana token: {addr}")
+                        print(f"❌ [SOLANA PRICES] No price found for: {addr[:12]}...")
+                    else:
+                        price = price_map.get(addr, price_map.get(addr.lower(), 0))
+                        if price > 0:
+                            print(f"✅ [SOLANA PRICES] Found price for {addr[:12]}...: ${price}")
 
         except Exception as e:
-            print(f"❌ Error fetching Solana prices: {e}")
+            print(f"❌ [SOLANA PRICES] Critical error in price fetching: {e}")
+            import traceback
+            print(f"📋 [SOLANA PRICES] Full traceback: {traceback.format_exc()}")
 
+        print(f"🎯 [SOLANA PRICES] Final result: {len(price_map)} total prices")
         return price_map
 
     async def _fetch_known_token_prices(self, client: httpx.AsyncClient, mint_addresses: List[str], price_map: Dict[str, float]):
@@ -740,37 +768,160 @@ class SolanaPriceFetcher(PriceFetcher):
                 print(f"⚠️ Error fetching known token prices: {e}")
 
     async def _fetch_jupiter_prices(self, client: httpx.AsyncClient, mint_addresses: List[str], price_map: Dict[str, float]):
-        """Fetch prices using Jupiter API"""
+        """Fetch prices using Jupiter API with enhanced error handling"""
         try:
             # Jupiter API expects comma-separated mints
             remaining_mints = [addr for addr in mint_addresses if addr.lower() not in price_map and addr not in price_map]
             if not remaining_mints:
+                print(f"🔍 [JUPITER] No remaining mints to process")
                 return
 
-            # Jupiter price API (free, no auth required)
-            mints_param = ",".join(remaining_mints[:50])  # Limit to 50 tokens per request
+            print(f"🪙 [JUPITER] Processing {len(remaining_mints)} mints...")
             
-            response = await client.get(
-                f"https://price.jup.ag/v4/price?ids={mints_param}",
-                timeout=15.0
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if "data" in data:
-                    for mint, price_info in data["data"].items():
-                        if isinstance(price_info, dict) and "price" in price_info:
-                            price = float(price_info["price"])
-                            price_map[mint.lower()] = price
-                            price_map[mint] = price
-                            print(f"✅ Jupiter price: {mint[:12]}... = ${price}")
-                else:
-                    print(f"⚠️ Jupiter API returned unexpected format: {data}")
-            else:
-                print(f"⚠️ Jupiter API error: {response.status_code}")
+            # Process in batches to avoid URL length limits
+            for i in range(0, len(remaining_mints), 30):
+                batch_mints = remaining_mints[i:i+30]
+                mints_param = ",".join(batch_mints)
+                
+                print(f"📡 [JUPITER] Batch {i//30 + 1}: {len(batch_mints)} mints")
+                print(f"🔍 [JUPITER] Request URL: https://price.jup.ag/v4/price?ids={mints_param[:100]}...")
+                
+                try:
+                    response = await client.get(
+                        f"https://price.jup.ag/v4/price?ids={mints_param}",
+                        timeout=20.0,
+                        headers={
+                            "User-Agent": "Mozilla/5.0 (compatible; CryptoFund/1.0)",
+                            "Accept": "application/json"
+                        }
+                    )
+                    
+                    print(f"📊 [JUPITER] Response status: {response.status_code}")
+                    
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            print(f"📈 [JUPITER] Response structure: {list(data.keys()) if isinstance(data, dict) else type(data)}")
+                            
+                            if "data" in data and isinstance(data["data"], dict):
+                                found_prices = 0
+                                for mint, price_info in data["data"].items():
+                                    if isinstance(price_info, dict) and "price" in price_info:
+                                        try:
+                                            price = float(price_info["price"])
+                                            if price > 0:  # Only accept positive prices
+                                                price_map[mint.lower()] = price
+                                                price_map[mint] = price
+                                                found_prices += 1
+                                                print(f"✅ [JUPITER] Found price: {mint[:12]}... = ${price}")
+                                            else:
+                                                print(f"⚠️ [JUPITER] Zero price for {mint[:12]}...")
+                                        except (ValueError, TypeError) as e:
+                                            print(f"❌ [JUPITER] Invalid price format for {mint[:12]}...: {price_info}")
+                                    else:
+                                        print(f"⚠️ [JUPITER] Invalid price data for {mint[:12]}...: {price_info}")
+                                
+                                print(f"📊 [JUPITER] Batch result: {found_prices}/{len(batch_mints)} prices found")
+                            else:
+                                print(f"❌ [JUPITER] Unexpected response format: {data}")
+                                if isinstance(data, dict) and "error" in data:
+                                    print(f"❌ [JUPITER] API Error: {data['error']}")
+                        except Exception as json_error:
+                            print(f"❌ [JUPITER] JSON parsing error: {json_error}")
+                            print(f"📋 [JUPITER] Raw response: {response.text[:200]}...")
+                    elif response.status_code == 429:
+                        print(f"⏰ [JUPITER] Rate limited, waiting 2 seconds...")
+                        await asyncio.sleep(2)
+                    else:
+                        print(f"❌ [JUPITER] HTTP error {response.status_code}")
+                        print(f"📋 [JUPITER] Error response: {response.text[:200]}...")
+                
+                except httpx.TimeoutException:
+                    print(f"⏰ [JUPITER] Request timeout for batch {i//30 + 1}")
+                except Exception as batch_error:
+                    print(f"❌ [JUPITER] Batch error: {batch_error}")
+                
+                # Rate limiting between batches
+                if i + 30 < len(remaining_mints):
+                    await asyncio.sleep(0.5)
                 
         except Exception as e:
-            print(f"⚠️ Error fetching Jupiter prices: {e}")
+            print(f"❌ [JUPITER] Critical error: {e}")
+            import traceback
+            print(f"📋 [JUPITER] Traceback: {traceback.format_exc()}")
+
+    async def _fetch_coingecko_spl_prices(self, client: httpx.AsyncClient, mint_addresses: List[str], price_map: Dict[str, float]):
+        """Try CoinGecko's Solana token price API as additional fallback"""
+        try:
+            remaining_mints = [addr for addr in mint_addresses if addr.lower() not in price_map and addr not in price_map]
+            if not remaining_mints:
+                print(f"🔍 [COINGECKO SPL] No remaining mints to process")
+                return
+
+            print(f"🪙 [COINGECKO SPL] Processing {len(remaining_mints)} mints...")
+            
+            # Process in smaller batches for CoinGecko
+            for i in range(0, len(remaining_mints), 20):
+                batch_mints = remaining_mints[i:i+20]
+                mints_param = ",".join(batch_mints)
+                
+                print(f"📡 [COINGECKO SPL] Batch {i//20 + 1}: {len(batch_mints)} mints")
+                
+                try:
+                    response = await client.get(
+                        "https://api.coingecko.com/api/v3/simple/token_price/solana",
+                        params={
+                            "contract_addresses": mints_param,
+                            "vs_currencies": "usd"
+                        },
+                        timeout=20.0,
+                        headers={
+                            "User-Agent": "Mozilla/5.0 (compatible; CryptoFund/1.0)",
+                            "Accept": "application/json"
+                        }
+                    )
+                    
+                    print(f"📊 [COINGECKO SPL] Response status: {response.status_code}")
+                    
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            print(f"📈 [COINGECKO SPL] Found data for {len(data)} tokens")
+                            
+                            found_prices = 0
+                            for mint, price_data in data.items():
+                                if isinstance(price_data, dict) and "usd" in price_data:
+                                    try:
+                                        price = float(price_data["usd"])
+                                        if price > 0:
+                                            price_map[mint.lower()] = price
+                                            price_map[mint] = price
+                                            found_prices += 1
+                                            print(f"✅ [COINGECKO SPL] Found price: {mint[:12]}... = ${price}")
+                                    except (ValueError, TypeError):
+                                        print(f"❌ [COINGECKO SPL] Invalid price for {mint[:12]}...: {price_data}")
+                            
+                            print(f"📊 [COINGECKO SPL] Batch result: {found_prices}/{len(batch_mints)} prices found")
+                            
+                        except Exception as json_error:
+                            print(f"❌ [COINGECKO SPL] JSON parsing error: {json_error}")
+                    elif response.status_code == 429:
+                        print(f"⏰ [COINGECKO SPL] Rate limited, waiting 3 seconds...")
+                        await asyncio.sleep(3)
+                    else:
+                        print(f"❌ [COINGECKO SPL] HTTP error {response.status_code}")
+                        if response.status_code == 404:
+                            print(f"❌ [COINGECKO SPL] Solana token endpoint not found")
+                
+                except Exception as batch_error:
+                    print(f"❌ [COINGECKO SPL] Batch error: {batch_error}")
+                
+                # Rate limiting between batches
+                if i + 20 < len(remaining_mints):
+                    await asyncio.sleep(1)
+                
+        except Exception as e:
+            print(f"❌ [COINGECKO SPL] Critical error: {e}")
 
     async def _fetch_dexscreener_prices(self, client: httpx.AsyncClient, mint_addresses: List[str], price_map: Dict[str, float]):
         """Fetch prices using DexScreener API for pump.fun and other DEX tokens"""
