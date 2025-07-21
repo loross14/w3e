@@ -47,7 +47,19 @@ const ActionCard = ({ title, description, buttonText, onAction, variant = "prima
 );
 
 const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
-  const weight = ((asset.valueUSD / totalValue) * 100).toFixed(1);
+  // Defensive programming to handle undefined values
+  const safeAsset = {
+    id: asset?.id || '',
+    name: asset?.name || 'Unknown Asset',
+    symbol: asset?.symbol || 'N/A',
+    balance: asset?.balance || '0',
+    priceUSD: asset?.priceUSD || 0,
+    valueUSD: asset?.valueUSD || 0,
+    notes: asset?.notes || ''
+  };
+
+  const safeTotalValue = totalValue || 1; // Avoid division by zero
+  const weight = ((safeAsset.valueUSD / safeTotalValue) * 100).toFixed(1);
 
   return (
     <div 
@@ -57,11 +69,11 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center space-x-3 min-w-0 flex-1">
           <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-sm">{asset.symbol.slice(0, 2)}</span>
+            <span className="text-white font-bold text-sm">{safeAsset.symbol.slice(0, 2)}</span>
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="font-medium text-white text-sm sm:text-base truncate">{asset.name}</h3>
-            <p className="text-xs sm:text-sm text-gray-400 truncate">{asset.symbol}</p>
+            <h3 className="font-medium text-white text-sm sm:text-base truncate">{safeAsset.name}</h3>
+            <p className="text-xs sm:text-sm text-gray-400 truncate">{safeAsset.symbol}</p>
           </div>
         </div>
         {isEditor && (
@@ -80,15 +92,15 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
       <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
         <div>
           <span className="text-gray-400 block">Balance</span>
-          <span className="text-white font-mono">{asset.balance}</span>
+          <span className="text-white font-mono">{safeAsset.balance}</span>
         </div>
         <div>
           <span className="text-gray-400 block">Price</span>
-          <span className="text-white font-mono">${asset.priceUSD.toLocaleString()}</span>
+          <span className="text-white font-mono">${safeAsset.priceUSD.toLocaleString()}</span>
         </div>
         <div>
           <span className="text-gray-400 block">Value</span>
-          <span className="text-white font-mono">${asset.valueUSD.toLocaleString()}</span>
+          <span className="text-white font-mono">${safeAsset.valueUSD.toLocaleString()}</span>
         </div>
         <div>
           <span className="text-gray-400 block">Weight</span>
@@ -383,15 +395,15 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
           <div className="space-y-3 mb-4 text-sm sm:text-base">
             <div className="flex justify-between">
               <span className="text-gray-400">Balance:</span>
-              <span className="text-white font-mono">{asset.balance} {asset.symbol}</span>
+              <span className="text-white font-mono">{asset?.balance || '0'} {asset?.symbol || 'N/A'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Value:</span>
-              <span className="text-green-400 font-mono">${asset.valueUSD.toLocaleString()}</span>
+              <span className="text-green-400 font-mono">${(asset?.valueUSD || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Price:</span>
-              <span className="text-white font-mono">${asset.priceUSD.toFixed(4)}</span>
+              <span className="text-white font-mono">${(asset?.priceUSD || 0).toFixed(4)}</span>
             </div>
           </div>
 
@@ -771,7 +783,7 @@ const App = () => {
         name: asset.name,
         symbol: asset.symbol,
         balance: asset.balance,
-        price_usd: asset.price_usd || 0,
+        priceUSD: asset.price_usd || 0,
         valueUSD: asset.value_usd || 0,
         notes: asset.notes || "",
       }));
@@ -871,13 +883,13 @@ const App = () => {
     }
   };
 
-  // Calculate metrics
-  const visibleAssets = portfolioData.assets.filter(
-    (asset) => !hiddenAssets.includes(asset.id),
+  // Calculate metrics with safe fallbacks
+  const visibleAssets = (portfolioData.assets || []).filter(
+    (asset) => asset && !hiddenAssets.includes(asset.id),
   );
 
   const totalValue = visibleAssets.reduce(
-    (sum, asset) => sum + asset.valueUSD,
+    (sum, asset) => sum + (asset?.valueUSD || 0),
     0,
   );
 
