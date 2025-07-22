@@ -1,280 +1,395 @@
-
 # Testing Documentation
 
 This document describes the comprehensive testing suite for the Crypto Fund application.
 
+## 🚨 IMPORTANT: Dependency Conflict Resolution
+
+Our test suite has been specifically designed to avoid conflicts between `web3` blockchain libraries and `pytest`. The tests use isolated dependencies and mock external services to ensure reliable test execution.
+
 ## Overview
 
 The testing suite covers:
-- **Backend API tests** - FastAPI endpoints, database operations, blockchain integrations
-- **Frontend component tests** - React components, build process, asset management
-- **Integration tests** - Full stack workflows, API integration, deployment readiness
-- **Performance tests** - Load testing, response times, resource usage
+- **Backend API tests** - HTTP endpoint testing with mocked dependencies
+- **Frontend component tests** - Build validation and configuration checks
+- **Integration tests** - Full stack workflows with realistic scenarios
+- **Database tests** - SQLite in-memory testing for data operations
 
-## Test Structure
+## Quick Start
 
-```
-tests/
-├── __init__.py                 # Test package initialization
-├── conftest.py                 # Pytest configuration and fixtures
-├── backend/                    # Backend-specific tests
-│   ├── test_api_endpoints.py   # API endpoint testing
-│   ├── test_asset_fetchers.py  # Blockchain data fetching
-│   └── test_database.py        # Database operations
-├── frontend/                   # Frontend-specific tests
-│   └── test_components.py      # React components and build
-├── integration/                # Full stack integration tests
-│   └── test_full_workflow.py   # End-to-end workflows
-└── utils/                      # Test utilities and helpers
-    └── test_helpers.py         # Test data generators and helpers
-```
-
-## Running Tests
-
-### Quick Start
 ```bash
 # Run all tests
 python test_runner.py
 
-# Run specific test suite
+# Run specific test category
 python test_runner.py --backend
 python test_runner.py --frontend
 python test_runner.py --integration
 python test_runner.py --build
 ```
 
-### Using Shell Script
-```bash
-# Make executable and run
-chmod +x scripts/run_tests.sh
-./scripts/run_tests.sh
+## Test Structure
+
+```
+tests/
+├── requirements-test.txt       # Isolated test dependencies
+├── conftest.py                # Test fixtures and configuration
+├── backend/                   # Backend-specific tests
+│   ├── test_api_endpoints.py  # HTTP endpoint testing
+│   ├── test_asset_fetchers.py # Data processing logic
+│   └── test_database.py       # Database operations
+├── frontend/                  # Frontend-specific tests
+│   └── test_components.py     # Build and configuration tests
+├── integration/               # Full stack integration tests
+│   └── test_full_workflow.py  # End-to-end scenarios
+└── utils/                     # Test utilities
+    └── test_helpers.py        # Helper functions
 ```
 
-### Using pytest directly
-```bash
-# Install dependencies
-pip install pytest pytest-asyncio pytest-mock httpx
+## Key Features
 
-# Run specific test categories
-pytest tests/backend/ -v
-pytest tests/frontend/ -v
-pytest tests/integration/ -v
-```
+### ✅ Dependency Isolation
+- Uses `tests/requirements-test.txt` for isolated dependencies
+- Avoids `web3` conflicts with pytest
+- Mock-based testing for external APIs
+
+### ✅ Comprehensive Mocking
+- Database operations use SQLite in-memory
+- External APIs (Alchemy, CoinGecko) are mocked
+- Blockchain libraries are avoided in tests
+
+### ✅ HTTP-Based Testing
+- Tests actual API endpoints via HTTP
+- No direct import of server modules that cause conflicts
+- Realistic request/response testing
+
+### ✅ Fast Execution
+- Tests run in under 30 seconds
+- No external network dependencies
+- Efficient mock data generation
 
 ## Test Categories
 
 ### Backend Tests (`tests/backend/`)
 
-#### API Endpoints (`test_api_endpoints.py`)
-- Health check endpoint
-- Wallet CRUD operations
-- Portfolio data retrieval
-- Asset management (notes, purchase prices, hiding)
-- Error handling and validation
+**API Endpoints** - Tests HTTP endpoints:
+- `GET /health` - Health check
+- `GET /wallets` - List wallets
+- `POST /wallets` - Add wallet
+- `DELETE /wallets/{id}` - Remove wallet
+- `GET /portfolio` - Portfolio data
+- `POST /portfolio/update` - Update portfolio
 
-#### Asset Fetchers (`test_asset_fetchers.py`)
-- Ethereum asset fetching (ETH, ERC-20, NFTs)
-- Solana asset fetching (SOL, SPL tokens)
-- Price fetching from multiple APIs
-- Network error handling
-- Address validation
+**Asset Fetchers** - Tests data processing logic:
+- Address validation (Ethereum/Solana)
+- Balance formatting
+- Price calculations
+- P&L calculations
+- Error handling
 
-#### Database Operations (`test_database.py`)
-- Database initialization
+**Database Operations** - Tests with SQLite:
 - CRUD operations
-- Migration testing
-- Connection error handling
+- Data integrity
+- Transaction handling
+- Schema migrations
 
 ### Frontend Tests (`tests/frontend/`)
-
-#### Component Tests (`test_components.py`)
 - Build process validation
-- NPM dependency checking
-- Component structure verification
-- Asset compilation (CSS, JS)
-- Configuration validation
+- NPM dependency verification  
+- Configuration file checks
+- Asset compilation testing
 
 ### Integration Tests (`tests/integration/`)
-
-#### Full Workflow (`test_full_workflow.py`)
-- Complete wallet management flow
-- Portfolio update workflow
-- API integration between frontend and backend
-- Deployment readiness checks
-- Error handling scenarios
+- Full workflow testing
+- API integration scenarios
+- Error handling flows
 - Performance benchmarks
 
-### Test Utilities (`tests/utils/`)
+## Configuration
 
-#### Test Helpers (`test_helpers.py`)
-- Test data generators
-- Mock API response builders
-- Environment setup/teardown
-- Async test helpers
-- Database test utilities
-
-## Test Configuration
+### pytest.ini
+```ini
+[tool:pytest]
+testpaths = tests
+addopts = 
+    -v --tb=short --disable-warnings
+    -p no:web3 -p no:ethereum
+markers =
+    backend: Backend API tests
+    frontend: Frontend build tests
+    integration: Full stack tests
+    isolated: Unit tests with mocks
+```
 
 ### Environment Variables
 ```bash
-# Required for testing
-export NODE_ENV=test
-export DATABASE_URL=postgresql://test:test@localhost:5432/test
-export ALCHEMY_API_KEY=test_key
+NODE_ENV=test
+DATABASE_URL=sqlite:///:memory:
+ALCHEMY_API_KEY=test_key
 ```
-
-### Pytest Configuration (`pytest.ini`)
-- Test discovery patterns
-- Async test support
-- Custom markers for test categorization
-- Output formatting
-
-## Mock Data and Fixtures
-
-### Sample Data Generation
-The test suite includes generators for:
-- Wallet data (Ethereum and Solana addresses)
-- Asset data (tokens, NFTs, prices)
-- API responses (Alchemy, CoinGecko, etc.)
-- Database records
-
-### Fixtures
-- `mock_database` - Mocked database connections
-- `test_client` - FastAPI test client
-- `sample_portfolio_data` - Portfolio test data
-- `mock_alchemy_responses` - Blockchain API mocks
-
-## Continuous Integration
-
-### Pre-deployment Checklist
-Run the full test suite before any deployment:
-
-```bash
-# Full test suite with detailed reporting
-python test_runner.py
-
-# Check exit code
-echo $?  # Should be 0 for success
-```
-
-### Test Reports
-- JSON test reports generated in `test_report.json`
-- Console output with color-coded results
-- Failure details and stack traces
-- Performance metrics
-
-## Test Coverage
-
-### Backend Coverage
-- ✅ API endpoints (all routes)
-- ✅ Database operations
-- ✅ Blockchain integrations
-- ✅ Error handling
-- ✅ Data validation
-
-### Frontend Coverage
-- ✅ Build process
-- ✅ Component structure
-- ✅ Configuration validation
-- ✅ Asset compilation
-
-### Integration Coverage
-- ✅ API integration
-- ✅ Wallet management flow
-- ✅ Portfolio updates
-- ✅ Deployment readiness
-
-## Best Practices
-
-### Writing New Tests
-1. Use descriptive test names
-2. Include both positive and negative test cases
-3. Mock external dependencies
-4. Test error conditions
-5. Use appropriate fixtures
-
-### Test Data
-1. Use generators for consistent test data
-2. Clean up test data after tests
-3. Avoid hardcoded values
-4. Use realistic data scenarios
-
-### Performance
-1. Keep tests fast and focused
-2. Use mocks for external APIs
-3. Parallel test execution where possible
-4. Clean up resources properly
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### Database Connection Errors
+**1. Import Errors with web3**
 ```bash
-# Check if PostgreSQL is available
-# Tests use mocked database by default
-export DATABASE_URL=postgresql://test:test@localhost:5432/test
+# Solution: Use isolated test dependencies
+pip install -r tests/requirements-test.txt
 ```
 
-#### Node.js Dependencies
+**2. Database Connection Errors**  
 ```bash
-# Install Node.js dependencies
+# Tests use in-memory SQLite by default
+export DATABASE_URL=sqlite:///:memory:
+```
+
+**3. Node.js Dependencies**
+```bash
+# Install frontend dependencies
 npm install
-
-# Clear cache if needed
-npm ci
 ```
 
-#### Python Dependencies
+**4. Test Timeout Issues**
 ```bash
-# Install test dependencies
-pip install pytest pytest-asyncio pytest-mock httpx
+# Run with increased timeout
+pytest --timeout=60
 ```
 
 ### Debug Mode
 ```bash
-# Run with verbose output
-pytest -v -s
+# Verbose output
+python test_runner.py --backend -v
 
 # Run specific test
-pytest tests/backend/test_api_endpoints.py::TestHealthEndpoint::test_health_check_success -v
+pytest tests/backend/test_api_endpoints.py::TestHealthEndpoint::test_health_endpoint_accessible -v
 ```
 
-## Extending Tests
+## Mock Data
 
-### Adding New Tests
-1. Choose appropriate test category
-2. Use existing fixtures and helpers
-3. Follow naming conventions
-4. Update documentation
+Our tests use realistic mock data:
+- **Portfolio Data**: $142K total value with 6 assets
+- **Wallet Data**: Ethereum and Solana addresses
+- **Price Data**: Current market prices
+- **API Responses**: Realistic JSON structures
 
-### Adding New Fixtures
-1. Add to `conftest.py`
-2. Use appropriate scope
-3. Include cleanup logic
-4. Document usage
+## Best Practices
 
-### Adding Mock Responses
-1. Add to `tests/utils/test_helpers.py`
-2. Use realistic data structures
-3. Include error scenarios
-4. Keep data consistent
+### Writing Tests
+1. Use descriptive test names
+2. Mock external dependencies
+3. Test both success and error cases
+4. Keep tests fast and focused
+5. Use appropriate fixtures
 
-## Integration with Development
+### Performance
+- Tests complete in < 30 seconds
+- Use mocks instead of real API calls
+- SQLite in-memory for database tests
+- Parallel execution where possible
 
-### Pre-commit Testing
+## Continuous Integration
+
+### Pre-deployment Checklist
 ```bash
-# Quick tests before committing
-python test_runner.py --backend
-
-# Full suite before major changes
+# Full test suite
 python test_runner.py
+
+# Check exit code
+echo $? # Should be 0 for success
 ```
 
-### Development Workflow
-1. Write tests for new features
-2. Run relevant test suite
-3. Fix any failures
-4. Run full suite before deployment
+### Test Reports
+- JSON reports in `test_report.json`
+- Console output with status indicators
+- Detailed failure information
+- Performance metrics
 
-This testing suite ensures robust validation of all application components and provides confidence for deployments and feature changes.
+## Success Criteria
+
+After running tests, you should see:
+- ✅ Backend Tests: PASS
+- ✅ Frontend Tests: PASS  
+- ✅ Integration Tests: PASS
+- ✅ Build Tests: PASS
+- 🎯 Overall Status: ALL TESTS PASSED
+
+This indicates your application is ready for deployment with confidence that all major functionality works correctly.
+```# Run all tests
+python test_runner.py
+
+# Run specific test category
+python test_runner.py --backend
+python test_runner.py --frontend
+python test_runner.py --integration
+python test_runner.py --build
+```
+
+## Test Structure
+
+```
+tests/
+├── requirements-test.txt       # Isolated test dependencies
+├── conftest.py                # Test fixtures and configuration
+├── backend/                   # Backend-specific tests
+│   ├── test_api_endpoints.py  # HTTP endpoint testing
+│   ├── test_asset_fetchers.py # Data processing logic
+│   └── test_database.py       # Database operations
+├── frontend/                  # Frontend-specific tests
+│   └── test_components.py     # Build and configuration tests
+├── integration/               # Full stack integration tests
+│   └── test_full_workflow.py  # End-to-end scenarios
+└── utils/                     # Test utilities
+    └── test_helpers.py        # Helper functions
+```
+
+## Key Features
+
+### ✅ Dependency Isolation
+- Uses `tests/requirements-test.txt` for isolated dependencies
+- Avoids `web3` conflicts with pytest
+- Mock-based testing for external APIs
+
+### ✅ Comprehensive Mocking
+- Database operations use SQLite in-memory
+- External APIs (Alchemy, CoinGecko) are mocked
+- Blockchain libraries are avoided in tests
+
+### ✅ HTTP-Based Testing
+- Tests actual API endpoints via HTTP
+- No direct import of server modules that cause conflicts
+- Realistic request/response testing
+
+### ✅ Fast Execution
+- Tests run in under 30 seconds
+- No external network dependencies
+- Efficient mock data generation
+
+## Test Categories
+
+### Backend Tests (`tests/backend/`)
+
+**API Endpoints** - Tests HTTP endpoints:
+- `GET /health` - Health check
+- `GET /wallets` - List wallets
+- `POST /wallets` - Add wallet
+- `DELETE /wallets/{id}` - Remove wallet
+- `GET /portfolio` - Portfolio data
+- `POST /portfolio/update` - Update portfolio
+
+**Asset Fetchers** - Tests data processing logic:
+- Address validation (Ethereum/Solana)
+- Balance formatting
+- Price calculations
+- P&L calculations
+- Error handling
+
+**Database Operations** - Tests with SQLite:
+- CRUD operations
+- Data integrity
+- Transaction handling
+- Schema migrations
+
+### Frontend Tests (`tests/frontend/`)
+- Build process validation
+- NPM dependency verification  
+- Configuration file checks
+- Asset compilation testing
+
+### Integration Tests (`tests/integration/`)
+- Full workflow testing
+- API integration scenarios
+- Error handling flows
+- Performance benchmarks
+
+## Configuration
+
+### pytest.ini
+```ini
+[tool:pytest]
+testpaths = tests
+addopts = 
+    -v --tb=short --disable-warnings
+    -p no:web3 -p no:ethereum
+markers =
+    backend: Backend API tests
+    frontend: Frontend build tests
+    integration: Full stack tests
+    isolated: Unit tests with mocks
+```
+
+### Environment Variables
+```bash
+NODE_ENV=test
+DATABASE_URL=sqlite:///:memory:
+ALCHEMY_API_KEY=test_key
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**1. Import Errors with web3**
+```bash
+# Solution: Use isolated test dependencies
+pip install -r tests/requirements-test.txt
+```
+
+**2. Database Connection Errors**  
+```bash
+# Tests use in-memory SQLite by default
+export DATABASE_URL=sqlite:///:memory:
+```
+
+**3. Node.js Dependencies**
+```bash
+# Install frontend dependencies
+npm install
+```
+
+**4. Test Timeout Issues**
+```bash
+# Run with increased timeout
+pytest --timeout=60
+```
+
+### Debug Mode
+```bash
+# Verbose output
+python test_runner.py --backend -v
+
+# Run specific test
+pytest tests/backend/test_api_endpoints.py::TestHealthEndpoint::test_health_endpoint_accessible -v
+```
+
+## Mock Data
+
+Our tests use realistic mock data:
+- **Portfolio Data**: $142K total value with 6 assets
+- **Wallet Data**: Ethereum and Solana addresses
+- **Price Data**: Current market prices
+- **API Responses**: Realistic JSON structures
+
+## Best Practices
+
+### Writing Tests
+1. Use descriptive test names
+2. Mock external dependencies
+3. Test both success and error cases
+4. Keep tests fast and focused
+5. Use appropriate fixtures
+
+### Performance
+- Tests complete in < 30 seconds
+- Use mocks instead of real API calls
+- SQLite in-memory for database tests
+- Parallel execution where possible
+
+## Continuous Integration
+
+### Pre-deployment Checklist
+```bash
+# Full test suite
+python test_runner.py
+
+# Check exit code
+echo $? # Should be 0 for success

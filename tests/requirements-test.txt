@@ -1,0 +1,19 @@
+
+# Core testing framework
+pytest==7.4.4
+pytest-asyncio==0.21.1
+pytest-mock==3.14.1
+
+# HTTP testing without web3 conflicts
+httpx==0.25.2
+requests==2.31.0
+responses==0.23.3
+
+# Mocking utilities
+unittest-mock==1.0.1
+
+# JSON handling
+orjson==3.9.10
+
+# Async support
+aiofiles==23.2.1
