@@ -2284,7 +2284,8 @@ const App = () => {
         portfolioData={portfolioData}
       />
       
-    
+      </div>
+    </div>
   );
 };
 
