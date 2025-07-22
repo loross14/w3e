@@ -696,8 +696,7 @@ class SolanaAssetFetcher(AssetFetcher):
                             print(f"❌ [SPL TOKENS] Invalid parameters for {program_id}")
                         continue
 
-                    if "result" in data```python
- and "value" in data["result"]:
+                    if "result" in data and "value" in data["result"]:
                         token_accounts = data["result"]["value"]
                         print(f"📊 [SPL TOKENS] Found {len(token_accounts)} token accounts from {program_id}")
 
@@ -2599,7 +2598,7 @@ async def update_portfolio_data_new():
         conn.close()
 
 # Catch-all route for SPA routing (must be last)
-@app.get("/api/{full_path:path}")
+@app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
     # Don't catch API routes
     if full_path.startswith("api/"):

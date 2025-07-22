@@ -903,7 +903,7 @@ const API_BASE_URL = (() => {
     return 'http://localhost:8000';
   }
   // For Replit deployment, the backend runs on the same origin
-  return `${window.location.origin}`;
+  return window.location.origin;
 })();
 
 // Main App Component
