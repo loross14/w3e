@@ -1874,77 +1874,126 @@ const App = () => {
               </div>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-              {/* Refresh Button */}
-              <div className="relative">
+              {/* Refresh Button with Rebuilt Status System */}
+              <div className="relative group">
                 <button 
                   onClick={updatePortfolio}
                   disabled={isLoading}
-                  className={`p-2 sm:p-3 rounded-xl transition-all duration-300 ${
+                  className={`relative p-2 sm:p-3 rounded-xl transition-all duration-300 overflow-hidden ${
                     isLoading 
-                      ? 'bg-blue-600/20 text-blue-400 cursor-not-allowed' 
+                      ? 'bg-blue-600/30 text-blue-300 cursor-not-allowed ring-2 ring-blue-400/50' 
+                      : updateError 
+                      ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30 ring-1 ring-red-500/50'
+                      : updateStatus && !isLoading
+                      ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30 ring-1 ring-green-500/50'
                       : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg hover:shadow-blue-500/25'
-                  } relative group`}
-                  title="Update Portfolio Database"
+                  }`}
+                  title={isLoading ? "Updating..." : updateError ? "Update failed" : "Update Portfolio"}
                 >
+                  {/* Background Animation for Loading */}
+                  {isLoading && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 animate-pulse"></div>
+                  )}
+                  
+                  {/* Icon */}
                   <svg 
-                    className={`w-5 h-5 sm:w-6 sm:h-6 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-300'}`} 
+                    className={`relative z-10 w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-500 ${
+                      isLoading ? 'animate-spin' : 
+                      updateError ? 'text-red-400' :
+                      updateStatus && !isLoading ? 'text-green-400' :
+                      'group-hover:rotate-180'
+                    }`} 
                     fill="none" 
                     stroke="currentColor" 
                     viewBox="0 0 24 24"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    {updateError ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    ) : updateStatus && !isLoading ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    )}
                   </svg>
+                  
+                  {/* Loading Progress Ring */}
                   {isLoading && (
-                    <div className="absolute inset-0 rounded-xl bg-blue-600/10 animate-pulse"></div>
+                    <div className="absolute inset-0 z-20 flex items-center justify-center">
+                      <div className="w-8 h-8 border-2 border-transparent border-t-blue-400 rounded-full animate-spin"></div>
+                    </div>
                   )}
                 </button>
 
-                {/* Status Tooltip */}
-                {(updateStatus || updateError) && (
-                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-2xl z-50">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-white">Portfolio Update Status</h4>
-                      <div className={`w-2 h-2 rounded-full ${
-                        isLoading ? 'bg-blue-400 animate-pulse' : 
-                        updateError ? 'bg-red-400' : 'bg-green-400'
-                      }`}></div>
+                {/* Enhanced Status Tooltip */}
+                <div className={`absolute right-0 top-full mt-2 w-96 bg-gray-900 border-2 rounded-xl shadow-2xl z-50 transition-all duration-300 ${
+                  (updateStatus || updateError || isLoading) ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
+                }`}>
+                  <div className="p-4">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-base font-bold text-white flex items-center space-x-2">
+                        <span>Portfolio Update</span>
+                        {isLoading && <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>}
+                        {updateError && <div className="w-2 h-2 bg-red-400 rounded-full"></div>}
+                        {updateStatus && !isLoading && !updateError && <div className="w-2 h-2 bg-green-400 rounded-full"></div>}
+                      </h4>
                     </div>
 
-                    {updateStatus && (
-                      <div className="mb-3">
-                        <div className="flex items-center space-x-2 mb-2">
-                          {isLoading && <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>}
-                          <p className="text-sm text-blue-300">{updateStatus}</p>
+                    {/* Loading Status */}
+                    {isLoading && updateStatus && (
+                      <div className="mb-4">
+                        <div className="flex items-center space-x-3 mb-3">
+                          <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                          <p className="text-sm text-blue-300 flex-1">{updateStatus}</p>
                         </div>
-                        {isLoading && (
-                          <div className="w-full bg-gray-700 rounded-full h-1">
-                            <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-1 rounded-full animate-pulse" style={{width: '60%'}}></div>
-                          </div>
-                        )}
+                        <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse transition-all duration-1000" 
+                               style={{width: '75%'}}></div>
+                        </div>
                       </div>
                     )}
 
+                    {/* Success Status */}
+                    {updateStatus && !isLoading && !updateError && (
+                      <div className="mb-4 p-3 bg-green-900/20 border border-green-700/50 rounded-lg">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <p className="text-sm text-green-300 font-medium">Update Complete!</p>
+                        </div>
+                        <p className="text-xs text-green-400">{updateStatus}</p>
+                      </div>
+                    )}
+
+                    {/* Error Status */}
                     {updateError && (
-                      <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-3">
-                        <p className="text-sm text-red-300 mb-2">{updateError}</p>
-                        <div className="text-xs text-red-400">
-                          <p className="font-medium mb-1">💡 Troubleshooting:</p>
-                          <ul className="list-disc list-inside space-y-0.5">
-                            <li>Check if backend is running</li>
-                            <li>Verify API keys are set</li>
-                            <li>Check network connection</li>
+                      <div className="mb-4 p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <p className="text-sm text-red-300 font-medium">Update Failed</p>
+                        </div>
+                        <p className="text-xs text-red-400 mb-3">{updateError}</p>
+                        
+                        <div className="bg-red-900/30 rounded p-2">
+                          <p className="text-xs font-medium text-red-300 mb-1">🔧 Troubleshooting:</p>
+                          <ul className="text-xs text-red-400 space-y-1">
+                            <li>• Check if backend is running on port 8000</li>
+                            <li>• Verify environment variables are set</li>
+                            <li>• Try refreshing the page</li>
                           </ul>
                         </div>
                       </div>
                     )}
 
-                    {!isLoading && !updateError && updateStatus && (
-                      <div className="text-xs text-gray-400">
-                        Last updated: {new Date().toLocaleTimeString()}
-                      </div>
-                    )}
+                    {/* Footer */}
+                    <div className="text-xs text-gray-500 text-center">
+                      {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString()}` : 'Never updated'}
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
 
               <button 
@@ -2187,30 +2236,39 @@ const App = () => {
           </div>
 		  {/* Adding conditional rendering for portfolio overview section */}
 		  {!isOverviewCollapsed && (
-          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+          <div className="grid grid-cols-2 gap-4 sm:gap-6 mb-6">
             {/* Top Performers Card */}
-            <div className="bg-gradient-to-br from-green-900/20 via-emerald-900/20 to-gray-900 border border-green-500/30 rounded-lg p-3 sm:p-4">
-              <div className="flex items-center space-x-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-green-400"></div>
-                <h4 className="text-sm font-semibold text-green-100">🚀 Top Performers</h4>
+            <div className="bg-gradient-to-br from-green-900/20 via-emerald-900/20 to-gray-900 border border-green-500/30 rounded-lg p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                  <h4 className="text-sm font-semibold text-green-100">🚀 Top Performers</h4>
+                </div>
+                <div className="text-xs text-green-400 font-mono">
+                  {visibleAssets.filter(asset => asset.total_return_pct > 0).length} profitable
+                </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {visibleAssets
                   .filter(asset => asset.total_return_pct > 0)
                   .sort((a, b) => b.total_return_pct - a.total_return_pct)
-                  .slice(0, 2)
+                  .slice(0, 3)
                   .map((asset, index) => (
-                    <div key={asset.id} className="flex items-center justify-between py-1.5 px-2 bg-green-900/20 rounded border border-green-700/30">
-                      <div className="flex items-center space-x-1.5 min-w-0 flex-1">
-                        <span className="text-xs text-green-400 font-bold">#{index + 1}</span>
+                    <div key={asset.id} className="flex items-center justify-between py-2 px-3 bg-green-900/20 rounded-lg border border-green-700/30">
+                      <div className="flex items-center space-x-2 min-w-0 flex-1">
+                        <span className="text-xs text-green-400 font-bold w-6">#{index + 1}</span>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-medium text-green-100 truncate">{asset.symbol}</div>
+                          <div className="text-sm font-medium text-green-100 truncate">{asset.symbol}</div>
+                          <div className="text-xs text-green-300">${asset.valueUSD.toLocaleString()}</div>
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="text-xs font-bold text-green-400">
+                        <div className="text-sm font-bold text-green-400">
                           +{asset.total_return_pct.toFixed(0)}%
+                        </div>
+                        <div className="text-xs text-green-300">
+                          +${asset.unrealized_pnl.toLocaleString()}
                         </div>
                       </div>
                     </div>
@@ -2218,99 +2276,53 @@ const App = () => {
                 }
 
                 {visibleAssets.filter(asset => asset.total_return_pct > 0).length === 0 && (
-                  <div className="text-center py-2">
-                    <div className="text-green-300 text-xs">No profitable positions yet</div>
+                  <div className="text-center py-4">
+                    <div className="text-green-300 text-sm">No profitable positions yet</div>
+                    <div className="text-green-400 text-xs mt-1">Keep hodling! 💎🙌</div>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Largest Holdings Card */}
-            <div className="bg-gradient-to-br from-blue-900/20 via-indigo-900/20 to-gray-900 border border-blue-500/30 rounded-lg p-3 sm:p-4">
-              <div className="flex items-center space-x-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                <h4 className="text-sm font-semibold text-blue-100">💰 Largest Holdings</h4>
+            <div className="bg-gradient-to-br from-blue-900/20 via-indigo-900/20 to-gray-900 border border-blue-500/30 rounded-lg p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                  <h4 className="text-sm font-semibold text-blue-100">💰 Largest Holdings</h4>
+                </div>
+                <div className="text-xs text-blue-400 font-mono">
+                  ${totalValue.toLocaleString()} total
+                </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {visibleAssets
                   .sort((a, b) => b.valueUSD - a.valueUSD)
-                  .slice(0, 2)
-                  .map((asset, index) => (
-                    <div key={asset.id} className="flex items-center justify-between py-1.5 px-2 bg-blue-900/20 rounded border border-blue-700/30">
-                      <div className="flex items-center space-x-1.5 min-w-0 flex-1">
-                        <span className="text-xs text-blue-400 font-bold">#{index + 1}</span>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-medium text-blue-100 truncate">{asset.symbol}</div>
+                  .slice(0, 3)
+                  .map((asset, index) => {
+                    const weight = ((asset.valueUSD / totalValue) * 100).toFixed(1);
+                    return (
+                      <div key={asset.id} className="flex items-center justify-between py-2 px-3 bg-blue-900/20 rounded-lg border border-blue-700/30">
+                        <div className="flex items-center space-x-2 min-w-0 flex-1">
+                          <span className="text-xs text-blue-400 font-bold w-6">#{index + 1}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium text-blue-100 truncate">{asset.symbol}</div>
+                            <div className="text-xs text-blue-300">{asset.balance} tokens</div>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-sm font-bold text-blue-300">
+                            {weight}%
+                          </div>
+                          <div className="text-xs text-blue-400">
+                            ${asset.valueUSD.toLocaleString()}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-xs font-bold text-blue-300">
-                          {((asset.valueUSD / totalValue) * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 }
-              </div>
-            </div>
-
-            {/* Portfolio Health Card */}
-            <div className={`bg-gradient-to-br ${
-              performanceVsRaised >= 0 
-                ? 'from-purple-900/20 via-pink-900/20 to-gray-900 border-purple-500/30' 
-                : 'from-orange-900/20 via-red-900/20 to-gray-900 border-orange-500/30'
-            } border rounded-lg p-3 sm:p-4`}>
-              <div className="flex items-center space-x-2 mb-3">
-                <div className={`w-2 h-2 rounded-full ${
-                  performanceVsRaised >= 0 ? 'bg-purple-400' : 'bg-orange-400'
-                }`}></div>
-                <h4 className={`text-sm font-semibold ${
-                  performanceVsRaised >= 0 ? 'text-purple-100' : 'text-orange-100'
-                }`}>
-                  📈 Portfolio Health
-                </h4>
-              </div>
-
-              <div className="space-y-2">
-                {/* Overall Performance */}
-                <div className={`p-2 rounded border ${
-                  performanceVsRaised >= 0 
-                    ? 'bg-purple-900/20 border-purple-700/30' 
-                    : 'bg-orange-900/20 border-orange-700/30'
-                }`}>
-                  <div className={`text-xs ${
-                    performanceVsRaised >= 0 ? 'text-purple-300' : 'text-orange-300'
-                  } mb-1`}>
-                    Total Return
-                  </div>
-                  <div className={`text-sm font-bold ${
-                    performanceVsRaised >= 0 ? 'text-purple-300' : 'text-orange-300'
-                  }`}>
-                    {performanceVsRaised >= 0 ? '+' : ''}{performanceVsRaised.toFixed(1)}%
-                  </div>
-                </div>
-
-                {/* Asset Distribution */}
-                <div className="space-y-1">
-                  <div className={`text-xs ${
-                    performanceVsRaised >= 0 ? 'text-purple-300' : 'text-orange-300'
-                  }`}>
-                    {visibleAssets.length} positions
-                  </div>
-                  <div className="flex items-center space-x-2 text-xs">
-                    <span className={`${
-                      performanceVsRaised >= 0 ? 'text-purple-400' : 'text-orange-400'
-                    }`}>
-                      ↗ {visibleAssets.filter(a => a.total_return_pct > 0).length}
-                    </span>
-                    <span className={`${
-                      performanceVsRaised >= 0 ? 'text-purple-400' : 'text-orange-400'
-                    }`}>
-                      ↘ {visibleAssets.filter(a => a.total_return_pct < 0).length}
-                    </span>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
