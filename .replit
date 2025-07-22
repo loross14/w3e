@@ -11,6 +11,29 @@ language = "nodejs"
 
 [deployment]
 deploymentTarget = "cloudrun"
+
+# CRITICAL DEPLOYMENT CONFIGURATION
+# 
+# This configuration determines how the app is built and deployed.
+# ANY CHANGES TO THIS SECTION CAN BREAK THE DEPLOYMENT!
+#
+# build: Runs BEFORE the application starts
+# 1. "npm run build" - Builds the React frontend into dist/ directory
+# 2. "cp -r dist server/dist" - CRITICAL: Copies frontend files to where backend expects them
+#
+# run: Starts the application after build completes
+# 1. Changes to server directory where main.py is located
+# 2. Installs Python dependencies 
+# 3. Starts the FastAPI backend server
+#
+# The backend serves static files from ./dist (relative to server/)
+# Without the copy step, frontend files won't be found and users will get API JSON instead of the UI
+#
+# IF DEPLOYMENT BREAKS:
+# - Check that both build commands completed successfully
+# - Verify dist/ directory exists after npm run build
+# - Verify server/dist/ directory exists after cp command
+# - Check server logs for "STATIC FILES" messages
 build = ["sh", "-c", "npm run build && cp -r dist server/dist"]
 run = ["sh", "-c", "cd server && python3 -m pip install --break-system-packages -r requirements.txt && python3 main.py"]
 
