@@ -635,8 +635,7 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium text-white">{performer.symbol}</span>
                         <span className="text-xs text-green-400">#{index + 1}</span>
-                      </div>
-                      <div className="text-xs text-gray-400 mb-1">{performer.name}</div>
+                      </div>                      <div className="text-xs text-gray-400 mb-1">{performer.name}</div>
                       <div className="text-lg font-bold text-green-400">+{performer.return_pct.toFixed(1)}%</div>
                       <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()} profit</div>
                                         </div>
@@ -698,26 +697,26 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEd
 
   const handlePurchasePriceUpdate = async () => {
     setPriceError("");
-    
+
     // Validate input
     const priceValue = parseFloat(purchasePrice);
     if (isNaN(priceValue)) {
       setPriceError("Please enter a valid number");
       return;
     }
-    
+
     if (priceValue < 0) {
       setPriceError("Purchase price cannot be negative");
       return;
     }
-    
+
     // Allow zero for airdrops or free tokens, but warn user
     if (priceValue === 0 && !confirm("Setting purchase price to $0. This is typically used for airdrops or free tokens. Continue?")) {
       return;
     }
 
     setIsUpdatingPrice(true);
-    
+
     try {
       const success = await onUpdatePurchasePrice(asset.symbol, priceValue);
       if (success) {
@@ -776,7 +775,7 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEd
               <span className="text-gray-400">Current Price:</span>
               <span className="text-white font-mono">${(asset?.priceUSD || 0).toFixed(4)}</span>
             </div>
-            
+
             {/* Purchase Price - Editable in editor mode */}
             <div className="flex justify-between items-center">
               <span className="text-gray-400">Purchase Price:</span>
@@ -805,11 +804,11 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEd
                 <span className="text-blue-400 font-mono">${(asset?.purchase_price || 0).toFixed(4)}</span>
               )}
             </div>
-            
+
             {priceError && (
               <div className="text-red-400 text-xs">{priceError}</div>
             )}
-            
+
             <div className="flex justify-between">
               <span className="text-gray-400">Total Invested:</span>
               <span className="text-blue-400 font-mono">${(asset?.total_invested || 0).toLocaleString()}</span>
@@ -984,17 +983,17 @@ const API_BASE_URL = (() => {
 
   // For Replit, use the same base URL but with port 8000
   const currentUrl = new URL(window.location.href);
-  
+
   // Extract the base Replit URL (remove port if present)
   let hostname = currentUrl.hostname;
-  
+
   // If we're on a Replit domain, construct the backend URL properly
   if (hostname.includes('.replit.dev')) {
     // Replace port in the URL or add port 8000
     const protocol = currentUrl.protocol;
     return `${protocol}//${hostname.replace(':5000', '')}:8000`;
   }
-  
+
   // Fallback for other environments
   return `${currentUrl.protocol}//${hostname}:8000`;
 })();
@@ -1030,7 +1029,7 @@ const App = () => {
   const getLiveStatus = () => {
     // If we have portfolio data, don't show "No data"
     const hasData = portfolioData.assets && portfolioData.assets.length > 0;
-    
+
     if (!lastUpdated && !hasData) {
       return {
         text: "No data",
@@ -1038,7 +1037,7 @@ const App = () => {
         dot: "bg-gray-400"
       };
     }
-    
+
     if (!lastUpdated && hasData) {
       return {
         text: "Data loaded",
@@ -1271,7 +1270,7 @@ const App = () => {
       }));
 
       addDebugInfo(`✅ Purchase price updated for ${symbol}`);
-      
+
       // Show success message briefly
       setUpdateStatus(`✅ Updated ${symbol} purchase price to $${purchasePrice.toFixed(4)}`);
       setTimeout(() => setUpdateStatus(''), 3000);
@@ -1724,13 +1723,12 @@ const App = () => {
     setIsLoading(true);
     setUpdateError('');
     setUpdateStatus('🔗 Connecting to backend...');
-    
-    console.log(`🔍 [UPDATE] Using API_BASE_URL: ${API_BASE_URL}`);
 
-    try {
+    addDebugInfo(`🔍 [UPDATE] Using API_BASE_URL: ${API_BASE_URL}`);
+
       // Step 1: Test backend connection
       setUpdateStatus('🔗 Testing backend connection...');
-      
+
       // Try the health endpoint first
       const healthResponse = await fetch(`${API_BASE_URL}/health`, {
         method: 'GET',
@@ -1743,9 +1741,9 @@ const App = () => {
       if (!healthResponse.ok) {
         throw new Error(`Backend health check failed (${healthResponse.status})`);
       }
-      
+
       const healthData = await healthResponse.json();
-      console.log(`✅ [UPDATE] Backend health check passed:`, healthData);
+      addDebugInfo(`✅ [UPDATE] Backend health check passed`, healthData);
 
       // Step 2: Trigger portfolio update
       setUpdateStatus('🚀 Starting portfolio update...');
@@ -1994,7 +1992,7 @@ const App = () => {
       console.log(`🔍 [UPDATE ERROR] API_BASE_URL was: ${API_BASE_URL}`);
       console.log(`🔍 [UPDATE ERROR] Error type: ${error.name}`);
       console.log(`🔍 [UPDATE ERROR] Error message: ${error.message}`);
-      
+
       let errorMessage = 'Unknown error occurred';
 
       if (error.name === 'TimeoutError' || error.message.includes('timeout')) {
@@ -2040,7 +2038,7 @@ const App = () => {
   const performanceSign = performanceVsRaised >= 0 ? "+" : "";
   const performanceChangeType = performanceVsRaised >= 0 ? "positive" : "negative";
 
-  
+
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -2088,7 +2086,7 @@ const App = () => {
                   {isLoading && (
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 animate-pulse"></div>
                   )}
-                  
+
                   {/* Icon */}
                   <svg 
                     className={`relative z-10 w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-500 ${
@@ -2109,7 +2107,7 @@ const App = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     )}
                   </svg>
-                  
+
                   {/* Loading Progress Ring */}
                   {isLoading && (
                     <div className="absolute inset-0 z-20 flex items-center justify-center">
@@ -2170,7 +2168,7 @@ const App = () => {
                           <p className="text-sm text-red-300 font-medium">Update Failed</p>
                         </div>
                         <p className="text-xs text-red-400 mb-3">{updateError}</p>
-                        
+
                         <div className="bg-red-900/30 rounded p-2">
                           <p className="text-xs font-medium text-red-300 mb-1">🔧 Troubleshooting:</p>
                           <ul className="text-xs text-red-400 space-y-1">
@@ -2408,7 +2406,7 @@ const App = () => {
           </div>
         )}
 
-        
+
 
 
 

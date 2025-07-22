@@ -26,14 +26,22 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Crypto Fund API", version="1.0.0", lifespan=lifespan)
 
 # Serve static files in production
+dist_path = None
 if os.path.exists("../dist"):
+    dist_path = "../dist"
     print("🌐 [DEPLOYMENT] Serving static files from ../dist")
-    app.mount("/static", StaticFiles(directory="../dist/assets"), name="static")
-    app.mount("/assets", StaticFiles(directory="../dist/assets"), name="assets")
 elif os.path.exists("./dist"):
+    dist_path = "./dist"
     print("🌐 [DEPLOYMENT] Serving static files from ./dist")
-    app.mount("/static", StaticFiles(directory="./dist/assets"), name="static")
-    app.mount("/assets", StaticFiles(directory="./dist/assets"), name="assets")
+
+if dist_path:
+    # Mount static assets
+    assets_path = os.path.join(dist_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+    
+    # Mount any other static files
+    app.mount("/static", StaticFiles(directory=dist_path, html=True), name="static")
 
 # CORS middleware for frontend
 app.add_middleware(
@@ -1533,14 +1541,12 @@ async def get_token_prices_new(token_addresses_by_network: Dict[str, List[str]])
 @app.get("/")
 async def root():
     # In deployment, serve the React app
-    if os.path.exists("../dist/index.html"):
-        print("🌐 [DEPLOYMENT] Serving React app from ../dist/index.html")
-        return FileResponse("../dist/index.html")
-    elif os.path.exists("./dist/index.html"):
-        print("🌐 [DEPLOYMENT] Serving React app from ./dist/index.html")
-        return FileResponse("./dist/index.html")
-    else:
-        return {"message": "Crypto Fund API", "status": "running", "mode": "api-only"}
+    for path in ["../dist/index.html", "./dist/index.html", "dist/index.html"]:
+        if os.path.exists(path):
+            print(f"🌐 [DEPLOYMENT] Serving React app from {path}")
+            return FileResponse(path)
+    
+    return {"message": "Crypto Fund API", "status": "running", "mode": "api-only"}
 
 @app.get("/health")
 async def health_check():
@@ -2784,38 +2790,43 @@ async def serve_static_assets(file_path: str):
 # Catch-all route for SPA routing - only for non-API routes
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
-    # Only serve SPA for routes that don't conflict with API endpoints
-    # This should only catch routes like /dashboard, /settings, etc.
+    # Skip API and asset routes
     if (full_path.startswith("api/") or 
         full_path.startswith("health") or 
-        full_path.startswith("assets/")):
+        full_path.startswith("assets/") or
+        full_path.startswith("static/")):
         raise HTTPException(status_code=404, detail="Not found")
 
-    # Serve the React app for all other routes
-    dist_path = "../dist" if os.path.exists("../dist") else "./dist" if os.path.exists("./dist") else None
-
-    if dist_path and os.path.exists(f"{dist_path}/index.html"):
-        return FileResponse(f"{dist_path}/index.html")
-    else:
-        return {"error": "Frontend not built", "route": full_path, "message": "Run 'npm run build' to build the frontend"}
+    # Find and serve the React app
+    for path in ["../dist/index.html", "./dist/index.html", "dist/index.html"]:
+        if os.path.exists(path):
+            return FileResponse(path)
+    
+    raise HTTPException(status_code=404, detail="Frontend not found")
 
 if __name__ == "__main__":
     import uvicorn
-    # Use PORT from environment, fallback to 80 for deployment, 8000 for development
-    port = int(os.environ.get("PORT", 8000))
+    # Use PORT from environment, fallback to 80 for deployment
+    port = int(os.environ.get("PORT", 80))
     print(f"🚀 [SERVER] Starting server on port {port}")
     print(f"🔍 [SERVER] Checking for static files...")
-    if os.path.exists("../dist"):
-        print("✅ [SERVER] Found ../dist directory")
-    elif os.path.exists("./dist"):
-        print("✅ [SERVER] Found ./dist directory")  
-    else:
+    
+    # Check for dist directories
+    static_found = False
+    for path in ["../dist", "./dist", "dist"]:
+        if os.path.exists(path):
+            print(f"✅ [SERVER] Found {path} directory")
+            static_found = True
+            break
+    
+    if not static_found:
         print("⚠️ [SERVER] No dist directory found - running API-only mode")
 
-    # Ensure server starts quickly and binds to all interfaces
+    # Production-ready server configuration
     uvicorn.run(
         app, 
         host="0.0.0.0", 
         port=port,
-        log_level="info"
+        log_level="warning",  # Reduce log verbosity in production
+        access_log=False      # Disable access logs for better performance
     )
