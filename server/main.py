@@ -19,9 +19,25 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    init_db()
+    print("🚀 [STARTUP] Initializing application...")
+    
+    # Test database connection first
+    if not test_database_connection():
+        print("❌ [STARTUP FAILED] Cannot start without database connection")
+        raise RuntimeError("Database connection failed during startup")
+    
+    # Initialize database tables
+    try:
+        init_db()
+        print("✅ [STARTUP] Database initialized successfully")
+    except Exception as e:
+        print(f"❌ [STARTUP] Database initialization failed: {e}")
+        raise e
+    
+    print("🎉 [STARTUP] Application ready!")
     yield
     # Shutdown (if needed)
+    print("🛑 [SHUTDOWN] Application shutting down...")
 
 app = FastAPI(title="Crypto Fund API", version="1.0.0", lifespan=lifespan)
 
@@ -52,18 +68,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database and Alchemy configuration
+# Database and Alchemy configuration with better error handling
 DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is required")
-
 ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
+
+print(f"🔍 [STARTUP] DATABASE_URL set: {bool(DATABASE_URL)}")
+print(f"🔍 [STARTUP] ALCHEMY_API_KEY set: {bool(ALCHEMY_API_KEY)}")
+
+if not DATABASE_URL:
+    print("❌ [STARTUP ERROR] DATABASE_URL environment variable is required")
+    print("❌ [STARTUP ERROR] Please set up PostgreSQL database in Replit")
+    raise RuntimeError("DATABASE_URL environment variable is required - Please add PostgreSQL database in Replit")
+
 if not ALCHEMY_API_KEY:
-    raise RuntimeError("ALCHEMY_API_KEY environment variable is required")
+    print("❌ [STARTUP ERROR] ALCHEMY_API_KEY environment variable is required")
+    print("❌ [STARTUP ERROR] Please add ALCHEMY_API_KEY to Replit Secrets")
+    raise RuntimeError("ALCHEMY_API_KEY environment variable is required - Please add to Replit Secrets")
 
 def get_db_connection():
     """Get a PostgreSQL database connection"""
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    try:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        return conn
+    except Exception as e:
+        print(f"❌ [DATABASE ERROR] Failed to connect to database: {e}")
+        print(f"❌ [DATABASE ERROR] DATABASE_URL: {DATABASE_URL[:50]}...")
+        raise e
+
+def test_database_connection():
+    """Test database connection at startup"""
+    try:
+        print("🔍 [STARTUP] Testing database connection...")
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        print("✅ [STARTUP] Database connection successful")
+        return True
+    except Exception as e:
+        print(f"❌ [STARTUP] Database connection failed: {e}")
+        return False
 
 # ERC-20 ABI for token interactions
 ERC20_ABI = [

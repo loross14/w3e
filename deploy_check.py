@@ -13,15 +13,34 @@ def check_environment_variables():
     required_vars = ['DATABASE_URL', 'ALCHEMY_API_KEY']
     missing_vars = []
     
+    print("🔍 Checking environment variables...")
+    
     for var in required_vars:
-        if not os.environ.get(var):
+        value = os.environ.get(var)
+        if not value:
             missing_vars.append(var)
+            print(f"❌ Missing: {var}")
+        else:
+            # Show partial value for security
+            if var == 'DATABASE_URL':
+                masked_value = value[:20] + "..." + value[-10:] if len(value) > 30 else value[:10] + "..."
+            else:
+                masked_value = value[:8] + "..." if len(value) > 8 else "***"
+            print(f"✅ Found: {var} = {masked_value}")
     
     if missing_vars:
-        print(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
+        print(f"\n❌ Missing required environment variables: {', '.join(missing_vars)}")
+        print("\n📋 To fix this in Replit:")
+        if 'DATABASE_URL' in missing_vars:
+            print("  1. Go to the Database tab in Replit")
+            print("  2. Click 'Create Database' and select PostgreSQL")
+            print("  3. The DATABASE_URL will be automatically set")
+        if 'ALCHEMY_API_KEY' in missing_vars:
+            print("  4. Go to the Secrets tab (🔒) in Replit")
+            print("  5. Add a new secret: ALCHEMY_API_KEY = your_alchemy_key")
         return False
     else:
-        print("✅ All required environment variables are set")
+        print("\n✅ All required environment variables are set")
         return True
 
 def check_build_files():
