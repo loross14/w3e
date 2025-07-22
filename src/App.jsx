@@ -902,10 +902,20 @@ const API_BASE_URL = (() => {
     return 'http://localhost:8000';
   }
 
-  // For Replit, construct the backend URL properly
+  // For Replit, use the same base URL but with port 8000
   const currentUrl = new URL(window.location.href);
-  // Remove any port from hostname and add 8000
-  const hostname = currentUrl.hostname.split(':')[0];
+  
+  // Extract the base Replit URL (remove port if present)
+  let hostname = currentUrl.hostname;
+  
+  // If we're on a Replit domain, construct the backend URL properly
+  if (hostname.includes('.replit.dev')) {
+    // Replace port in the URL or add port 8000
+    const protocol = currentUrl.protocol;
+    return `${protocol}//${hostname.replace(':5000', '')}:8000`;
+  }
+  
+  // Fallback for other environments
   return `${currentUrl.protocol}//${hostname}:8000`;
 })();
 
@@ -938,11 +948,22 @@ const App = () => {
 
   // Function to get live status with real-time updates
   const getLiveStatus = () => {
-    if (!lastUpdated) {
+    // If we have portfolio data, don't show "No data"
+    const hasData = portfolioData.assets && portfolioData.assets.length > 0;
+    
+    if (!lastUpdated && !hasData) {
       return {
         text: "No data",
         color: "text-gray-400",
         dot: "bg-gray-400"
+      };
+    }
+    
+    if (!lastUpdated && hasData) {
+      return {
+        text: "Data loaded",
+        color: "text-blue-400",
+        dot: "bg-blue-400"
       };
     }
 
@@ -1546,20 +1567,28 @@ const App = () => {
     setIsLoading(true);
     setUpdateError('');
     setUpdateStatus('🔗 Connecting to backend...');
+    
+    console.log(`🔍 [UPDATE] Using API_BASE_URL: ${API_BASE_URL}`);
 
     try {
       // Step 1: Test backend connection
       setUpdateStatus('🔗 Testing backend connection...');
-      const healthResponse = await fetch(`${API_BASE_URL}/`, {
+      
+      // Try the health endpoint first
+      const healthResponse = await fetch(`${API_BASE_URL}/health`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       });
 
       if (!healthResponse.ok) {
-        throw new Error(`Backend not responding (${healthResponse.status})`);
+        throw new Error(`Backend health check failed (${healthResponse.status})`);
       }
+      
+      const healthData = await healthResponse.json();
+      console.log(`✅ [UPDATE] Backend health check passed:`, healthData);
 
       // Step 2: Trigger portfolio update
       setUpdateStatus('🚀 Starting portfolio update...');
@@ -1805,14 +1834,22 @@ const App = () => {
       });
     } catch (error) {
       console.error('Error updating portfolio:', error);
+      console.log(`🔍 [UPDATE ERROR] API_BASE_URL was: ${API_BASE_URL}`);
+      console.log(`🔍 [UPDATE ERROR] Error type: ${error.name}`);
+      console.log(`🔍 [UPDATE ERROR] Error message: ${error.message}`);
+      
       let errorMessage = 'Unknown error occurred';
 
-      if (error.message.includes('Failed to fetch')) {
-        errorMessage = '🔌 Cannot connect to backend server. Make sure the backend is running on port 8000.';
+      if (error.name === 'TimeoutError' || error.message.includes('timeout')) {
+        errorMessage = '⏰ Request timeout - backend is taking too long to respond.';
+      } else if (error.message.includes('Failed to fetch') || error.message.includes('fetch')) {
+        errorMessage = `🔌 Cannot connect to backend server at ${API_BASE_URL}. Backend may be down.`;
       } else if (error.message.includes('CORS')) {
         errorMessage = '🚫 CORS error - backend not configured for frontend domain.';
       } else if (error.message.includes('Network')) {
         errorMessage = '🌐 Network error - check your internet connection.';
+      } else if (error.message.includes('health check failed')) {
+        errorMessage = `❌ Backend health check failed. Backend is not responding properly.`;
       } else {
         errorMessage = `❌ ${error.message}`;
       }
