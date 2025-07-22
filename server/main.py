@@ -198,7 +198,7 @@ def get_db_connection():
         conn = psycopg2.connect(DATABASE_URL,
                                 cursor_factory=RealDictCursor,
                                 connect_timeout=10,
-                                application_name="crypto_fund_app")
+                                application_name="w3e")
         return conn
     except psycopg2.OperationalError as e:
         error_msg = str(e).lower()
@@ -478,19 +478,23 @@ class EthereumAssetFetcher(AssetFetcher):
         Returns AssetData objects with is_nft=True for each collection.
         """
         assets = []
-        
+
         try:
-            print(f"🖼️ [ETH NFT] Starting NFT query for wallet: {wallet_address[:10]}...")
-            
+            print(
+                f"🖼️ [ETH NFT] Starting NFT query for wallet: {wallet_address[:10]}..."
+            )
+
             async with httpx.AsyncClient(timeout=45.0) as client:
                 # Use the primary Alchemy getNFTs method with optimized parameters
                 nft_payload = {
-                    "id": 1,
-                    "jsonrpc": "2.0",
-                    "method": "alchemy_getNFTs",
+                    "id":
+                    1,
+                    "jsonrpc":
+                    "2.0",
+                    "method":
+                    "alchemy_getNFTs",
                     "params": [
-                        wallet_address,
-                        {
+                        wallet_address, {
                             "withMetadata": True,
                             "tokenUriTimeoutInMs": 8000,
                             "omitMetadata": False
@@ -499,16 +503,17 @@ class EthereumAssetFetcher(AssetFetcher):
                 }
 
                 print(f"🖼️ [ETH NFT] Making API request to Alchemy...")
-                
+
                 response = await client.post(
                     self.alchemy_url,
                     json=nft_payload,
                     timeout=30.0,
-                    headers={"Content-Type": "application/json"}
-                )
+                    headers={"Content-Type": "application/json"})
 
                 if response.status_code != 200:
-                    print(f"❌ [ETH NFT] HTTP error {response.status_code}: {response.text[:200]}...")
+                    print(
+                        f"❌ [ETH NFT] HTTP error {response.status_code}: {response.text[:200]}..."
+                    )
                     return assets
 
                 # Parse response
@@ -526,65 +531,78 @@ class EthereumAssetFetcher(AssetFetcher):
                 # Extract NFTs from response
                 result = data.get("result", {})
                 owned_nfts = result.get("ownedNfts", [])
-                
+
                 if not owned_nfts:
                     print(f"🖼️ [ETH NFT] No NFTs found for wallet")
                     return assets
 
-                print(f"🖼️ [ETH NFT] Found {len(owned_nfts)} NFTs, processing collections...")
+                print(
+                    f"🖼️ [ETH NFT] Found {len(owned_nfts)} NFTs, processing collections..."
+                )
 
                 # Group NFTs by collection (contract address)
                 collections = {}
-                
+
                 for nft in owned_nfts:
                     try:
                         # Extract contract information
                         contract = nft.get("contract", {})
                         contract_address = contract.get("address", "").lower()
-                        
+
                         if not contract_address:
                             continue
-                            
+
                         # Skip hidden collections
-                        if (contract_address in hidden_addresses or 
-                            any(addr.lower() == contract_address for addr in hidden_addresses)):
+                        if (contract_address in hidden_addresses
+                                or any(addr.lower() == contract_address
+                                       for addr in hidden_addresses)):
                             continue
 
                         # Initialize collection if not seen before
                         if contract_address not in collections:
                             collections[contract_address] = {
-                                "name": contract.get("name", "Unknown Collection"),
-                                "symbol": contract.get("symbol", "NFT"),
-                                "count": 0,
+                                "name":
+                                contract.get("name", "Unknown Collection"),
+                                "symbol":
+                                contract.get("symbol", "NFT"),
+                                "count":
+                                0,
                                 "token_ids": [],
-                                "image_url": None,
-                                "opensea_slug": contract.get("openSea", {}).get("collectionSlug")
+                                "image_url":
+                                None,
+                                "opensea_slug":
+                                contract.get("openSea",
+                                             {}).get("collectionSlug")
                             }
 
                         # Add this NFT to the collection
                         collection = collections[contract_address]
                         collection["count"] += 1
-                        
+
                         # Add token ID if available
                         token_id = nft.get("tokenId")
-                        if token_id and len(collection["token_ids"]) < 20:  # Limit stored token IDs
+                        if token_id and len(collection["token_ids"]
+                                            ) < 20:  # Limit stored token IDs
                             collection["token_ids"].append(str(token_id))
 
                         # Extract image URL from metadata if not already set
                         if not collection["image_url"]:
                             metadata = nft.get("metadata", {})
                             if metadata:
-                                image_url = (metadata.get("image") or 
-                                           metadata.get("image_url") or 
-                                           metadata.get("imageUrl"))
+                                image_url = (metadata.get("image")
+                                             or metadata.get("image_url")
+                                             or metadata.get("imageUrl"))
                                 if image_url:
                                     collection["image_url"] = image_url
 
                     except Exception as nft_error:
-                        print(f"⚠️ [ETH NFT] Error processing NFT: {nft_error}")
+                        print(
+                            f"⚠️ [ETH NFT] Error processing NFT: {nft_error}")
                         continue
 
-                print(f"🖼️ [ETH NFT] Processed {len(collections)} unique collections")
+                print(
+                    f"🖼️ [ETH NFT] Processed {len(collections)} unique collections"
+                )
 
                 # Convert collections to AssetData objects
                 for contract_address, collection_data in collections.items():
@@ -594,16 +612,17 @@ class EthereumAssetFetcher(AssetFetcher):
                         try:
                             floor_price = await asyncio.wait_for(
                                 self._get_nft_floor_price(
-                                    client, 
-                                    contract_address,
-                                    collection_data.get("opensea_slug")
-                                ),
-                                timeout=10.0
-                            )
+                                    client, contract_address,
+                                    collection_data.get("opensea_slug")),
+                                timeout=10.0)
                         except asyncio.TimeoutError:
-                            print(f"⏰ [ETH NFT] Floor price timeout for {collection_data['name']}")
+                            print(
+                                f"⏰ [ETH NFT] Floor price timeout for {collection_data['name']}"
+                            )
                         except Exception as price_error:
-                            print(f"⚠️ [ETH NFT] Floor price error for {collection_data['name']}: {price_error}")
+                            print(
+                                f"⚠️ [ETH NFT] Floor price error for {collection_data['name']}: {price_error}"
+                            )
 
                         # Create NFT asset
                         nft_asset = AssetData(
@@ -611,21 +630,25 @@ class EthereumAssetFetcher(AssetFetcher):
                             symbol=collection_data["symbol"],
                             name=collection_data["name"],
                             balance=collection_data["count"],
-                            balance_formatted=f"{collection_data['count']} NFTs",
+                            balance_formatted=
+                            f"{collection_data['count']} NFTs",
                             decimals=0,
                             is_nft=True,
                             token_ids=collection_data["token_ids"],
                             floor_price=floor_price,
-                            image_url=collection_data.get("image_url")
-                        )
-                        
+                            image_url=collection_data.get("image_url"))
+
                         assets.append(nft_asset)
-                        
-                        print(f"✅ [ETH NFT] Added collection: {collection_data['name']} "
-                              f"({collection_data['count']} items, floor: ${floor_price})")
-                        
+
+                        print(
+                            f"✅ [ETH NFT] Added collection: {collection_data['name']} "
+                            f"({collection_data['count']} items, floor: ${floor_price})"
+                        )
+
                     except Exception as asset_error:
-                        print(f"❌ [ETH NFT] Error creating asset for {contract_address}: {asset_error}")
+                        print(
+                            f"❌ [ETH NFT] Error creating asset for {contract_address}: {asset_error}"
+                        )
                         continue
 
         except asyncio.TimeoutError:
@@ -633,7 +656,7 @@ class EthereumAssetFetcher(AssetFetcher):
         except Exception as e:
             print(f"❌ [ETH NFT] Unexpected error: {e}")
             # Don't fail the entire asset fetch if NFTs fail
-        
+
         print(f"🖼️ [ETH NFT] Final result: {len(assets)} NFT collections")
         return assets
 
@@ -1313,7 +1336,7 @@ class SolanaAssetFetcher(AssetFetcher):
             dex_response = await client.get(dex_url, timeout=15.0)
             if dex_response.status_code == 200:
                 dex_data = dex_response.json()
-                print(f"🔍 [TOKEN METADATA] DexScreener response: {dex_data}")
+                # print(f"🔍 [TOKEN METADATA] DexScreener response: {dex_data}")
 
                 if 'pairs' in dex_data and len(dex_data['pairs']) > 0:
                     for pair in dex_data['pairs']:
@@ -3012,7 +3035,8 @@ async def get_purchase_price_overrides():
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT token_address, symbol, override_price, updated_at FROM purchase_price_overrides ORDER BY updated_at DESC")
+        "SELECT token_address, symbol, override_price, updated_at FROM purchase_price_overrides ORDER BY updated_at DESC"
+    )
     overrides = cursor.fetchall()
     conn.close()
 
@@ -3030,8 +3054,9 @@ async def delete_purchase_price_override(token_address: str):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM purchase_price_overrides WHERE token_address = %s",
-                   (token_address, ))
+    cursor.execute(
+        "DELETE FROM purchase_price_overrides WHERE token_address = %s",
+        (token_address, ))
 
     if cursor.rowcount == 0:
         conn.close()
@@ -3104,18 +3129,25 @@ async def debug_nft_query(wallet_address: str):
         async with httpx.AsyncClient(timeout=60.0) as client:
             test_payload = {
                 "id": 1,
-                "jsonrpc": "2.0", 
+                "jsonrpc": "2.0",
                 "method": "alchemy_getNFTs",
-                "params": [wallet_address, {"withMetadata": True}]
+                "params": [wallet_address, {
+                    "withMetadata": True
+                }]
             }
-            
+
             print(f"🔍 [DEBUG NFT] Testing direct Alchemy call...")
-            test_response = await client.post(eth_fetcher.alchemy_url, json=test_payload)
-            print(f"🔍 [DEBUG NFT] Direct API status: {test_response.status_code}")
-            
+            test_response = await client.post(eth_fetcher.alchemy_url,
+                                              json=test_payload)
+            print(
+                f"🔍 [DEBUG NFT] Direct API status: {test_response.status_code}"
+            )
+
             if test_response.status_code == 200:
                 test_data = test_response.json()
-                print(f"🔍 [DEBUG NFT] Direct API response preview: {str(test_data)[:300]}...")
+                print(
+                    f"🔍 [DEBUG NFT] Direct API response preview: {str(test_data)[:300]}..."
+                )
             else:
                 print(f"🔍 [DEBUG NFT] Direct API error: {test_response.text}")
 
@@ -3130,23 +3162,32 @@ async def debug_nft_query(wallet_address: str):
 
         print(f"🔍 [DEBUG NFT] Checking for Mutant Ape contracts...")
         for contract in mutant_ape_contracts:
-            found_mutant = any(asset.token_address.lower() == contract.lower() for asset in nft_assets)
-            print(f"🔍 [DEBUG NFT] {contract}: {'FOUND' if found_mutant else 'NOT FOUND'}")
+            found_mutant = any(asset.token_address.lower() == contract.lower()
+                               for asset in nft_assets)
+            print(
+                f"🔍 [DEBUG NFT] {contract}: {'FOUND' if found_mutant else 'NOT FOUND'}"
+            )
 
         return {
-            "wallet_address": wallet_address,
-            "nft_count": len(nft_assets),
-            "mutant_ape_found": any("mutant" in asset.name.lower() or "mayc" in asset.symbol.lower() for asset in nft_assets),
-            "nfts": [{
-                "contract_address": asset.token_address,
-                "symbol": asset.symbol,
-                "name": asset.name,
-                "count": asset.balance,
-                "is_nft": asset.is_nft,
-                "token_ids": asset.token_ids[:10],  # Show more token IDs
-                "floor_price": asset.floor_price,
-                "image_url": asset.image_url
-            } for asset in nft_assets]
+            "wallet_address":
+            wallet_address,
+            "nft_count":
+            len(nft_assets),
+            "mutant_ape_found":
+            any("mutant" in asset.name.lower()
+                or "mayc" in asset.symbol.lower() for asset in nft_assets),
+            "nfts": [
+                {
+                    "contract_address": asset.token_address,
+                    "symbol": asset.symbol,
+                    "name": asset.name,
+                    "count": asset.balance,
+                    "is_nft": asset.is_nft,
+                    "token_ids": asset.token_ids[:10],  # Show more token IDs
+                    "floor_price": asset.floor_price,
+                    "image_url": asset.image_url
+                } for asset in nft_assets
+            ]
         }
     except Exception as e:
         print(f"❌ [DEBUG NFT] Error: {e}")

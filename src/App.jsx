@@ -3,12 +3,26 @@ import Chart from "chart.js/auto";
 import { jsPDF } from "jspdf";
 
 // Modular Card Components
-const MetricCard = ({ title, value, change, changeType = "positive", icon, children }) => (
+const MetricCard = ({
+  title,
+  value,
+  change,
+  changeType = "positive",
+  icon,
+  children,
+}) => (
   <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 hover:border-gray-600 transition-colors">
     <div className="flex items-center justify-between mb-2">
       <div className="flex items-center space-x-2">
-        <h3 className="text-xs sm:text-sm font-medium text-gray-400 uppercase tracking-wide">{title}</h3>
-        {icon && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: icon }}></div>}
+        <h3 className="text-xs sm:text-sm font-medium text-gray-400 uppercase tracking-wide">
+          {title}
+        </h3>
+        {icon && (
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{ backgroundColor: icon }}
+          ></div>
+        )}
       </div>
     </div>
     <div className="space-y-1">
@@ -16,13 +30,18 @@ const MetricCard = ({ title, value, change, changeType = "positive", icon, child
         {value}
       </p>
       {change && (
-        <div className={`text-xs sm:text-sm ${
-          changeType === "positive" ? "text-green-400" : 
-          changeType === "negative" ? "text-red-400" : 
-          changeType === "white" ? "text-white" : 
-          "text-gray-400"
-        } mt-1`}>
-          {typeof change === 'string' ? change : change}
+        <div
+          className={`text-xs sm:text-sm ${
+            changeType === "positive"
+              ? "text-green-400"
+              : changeType === "negative"
+                ? "text-red-400"
+                : changeType === "white"
+                  ? "text-white"
+                  : "text-gray-400"
+          } mt-1`}
+        >
+          {typeof change === "string" ? change : change}
         </div>
       )}
       {children}
@@ -30,9 +49,19 @@ const MetricCard = ({ title, value, change, changeType = "positive", icon, child
   </div>
 );
 
-const ActionCard = ({ title, description, buttonText, onAction, variant = "primary", disabled = false, children }) => (
+const ActionCard = ({
+  title,
+  description,
+  buttonText,
+  onAction,
+  variant = "primary",
+  disabled = false,
+  children,
+}) => (
   <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
-    <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">{title}</h3>
+    <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">
+      {title}
+    </h3>
     {description && <p className="text-sm text-gray-400 mb-4">{description}</p>}
     <button
       onClick={onAction}
@@ -41,8 +70,8 @@ const ActionCard = ({ title, description, buttonText, onAction, variant = "prima
         variant === "primary"
           ? "bg-purple-600 text-white hover:bg-purple-700 disabled:bg-purple-800"
           : variant === "secondary"
-          ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-800"
-          : "bg-gray-700 text-white hover:bg-gray-600 disabled:bg-gray-800"
+            ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-800"
+            : "bg-gray-700 text-white hover:bg-gray-600 disabled:bg-gray-800"
       } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
     >
       {buttonText}
@@ -54,70 +83,91 @@ const ActionCard = ({ title, description, buttonText, onAction, variant = "prima
 const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
   // Defensive programming to handle undefined values
   const safeAsset = {
-    id: asset?.id || '',
-    name: asset?.name || 'Unknown Asset',
-    symbol: asset?.symbol || 'N/A',
-    balance: asset?.balance || '0',
+    id: asset?.id || "",
+    name: asset?.name || "Unknown Asset",
+    symbol: asset?.symbol || "N/A",
+    balance: asset?.balance || "0",
     priceUSD: asset?.priceUSD || 0,
     valueUSD: asset?.valueUSD || 0,
     purchase_price: asset?.purchase_price || 0,
     total_invested: asset?.total_invested || 0,
     unrealized_pnl: asset?.unrealized_pnl || 0,
     total_return_pct: asset?.total_return_pct || 0,
-    notes: asset?.notes || '',
-    isNFT: asset?.isNFT === true || asset?.symbol?.includes('NFT') || asset?.name?.includes('Collection') || (asset?.balance && typeof asset.balance === 'string' && asset.balance.includes('NFTs')),
+    notes: asset?.notes || "",
+    isNFT:
+      asset?.isNFT === true ||
+      asset?.symbol?.includes("NFT") ||
+      asset?.name?.includes("Collection") ||
+      (asset?.balance &&
+        typeof asset.balance === "string" &&
+        asset.balance.includes("NFTs")),
     floorPrice: asset?.floorPrice || 0,
     imageUrl: asset?.imageUrl || null,
-    tokenIds: asset?.tokenIds || []
+    tokenIds: asset?.tokenIds || [],
   };
 
   // Debug NFT detection
   if (safeAsset.isNFT) {
-    console.log(`🖼️ [CARD DEBUG] Rendering NFT card: ${safeAsset.symbol} - ${safeAsset.name}`, {
-      isNFT: safeAsset.isNFT,
-      balance: safeAsset.balance,
-      floorPrice: safeAsset.floorPrice,
-      imageUrl: safeAsset.imageUrl,
-      valueUSD: safeAsset.valueUSD
-    });
+    console.log(
+      `🖼️ [CARD DEBUG] Rendering NFT card: ${safeAsset.symbol} - ${safeAsset.name}`,
+      {
+        isNFT: safeAsset.isNFT,
+        balance: safeAsset.balance,
+        floorPrice: safeAsset.floorPrice,
+        imageUrl: safeAsset.imageUrl,
+        valueUSD: safeAsset.valueUSD,
+      },
+    );
   }
 
   const safeTotalValue = totalValue || 1; // Avoid division by zero
   const weight = ((safeAsset.valueUSD / safeTotalValue) * 100).toFixed(1);
   const isNFTCollection = safeAsset.isNFT;
 
-  const returnColor = safeAsset.total_return_pct >= 0 ? 'text-green-400' : 'text-red-400';
-  const returnIcon = safeAsset.total_return_pct >= 0 ? '📈' : '📉';
+  const returnColor =
+    safeAsset.total_return_pct >= 0 ? "text-green-400" : "text-red-400";
+  const returnIcon = safeAsset.total_return_pct >= 0 ? "📈" : "📉";
 
   return (
-    <div 
+    <div
       className={`border rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg ${
-        isNFTCollection 
-          ? 'bg-gradient-to-br from-purple-900/20 via-pink-900/20 to-gray-900 border-purple-500/30 hover:border-purple-400 hover:shadow-purple-500/20' 
-          : 'bg-gradient-to-b from-gray-900 to-gray-950 border-gray-700 hover:border-gray-500 hover:shadow-purple-500/10'
+        isNFTCollection
+          ? "bg-gradient-to-br from-purple-900/20 via-pink-900/20 to-gray-900 border-purple-500/30 hover:border-purple-400 hover:shadow-purple-500/20"
+          : "bg-gradient-to-b from-gray-900 to-gray-950 border-gray-700 hover:border-gray-500 hover:shadow-purple-500/10"
       }`}
       onClick={onClick}
     >
       <div className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center space-x-3 min-w-0 flex-1">
-            <div className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden ${
-              isNFTCollection 
-                ? 'rounded-lg bg-gradient-to-r from-pink-500 to-purple-500' 
-                : 'rounded-full bg-gradient-to-r ' + (safeAsset.total_return_pct >= 0 ? 'from-green-500 to-emerald-500' : 'from-red-500 to-red-600')
-            }`}>
+            <div
+              className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden ${
+                isNFTCollection
+                  ? "rounded-lg bg-gradient-to-r from-pink-500 to-purple-500"
+                  : "rounded-full bg-gradient-to-r " +
+                    (safeAsset.total_return_pct >= 0
+                      ? "from-green-500 to-emerald-500"
+                      : "from-red-500 to-red-600")
+              }`}
+            >
               {isNFTCollection && safeAsset.imageUrl ? (
-                <img src={safeAsset.imageUrl} alt={safeAsset.name} className="w-full h-full object-cover" />
+                <img
+                  src={safeAsset.imageUrl}
+                  alt={safeAsset.name}
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <span className="text-white font-bold text-sm">
-                  {isNFTCollection ? '🖼️' : safeAsset.symbol.slice(0, 2)}
+                  {isNFTCollection ? "🖼️" : safeAsset.symbol.slice(0, 2)}
                 </span>
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className={`font-medium text-sm sm:text-base truncate ${
-                isNFTCollection ? 'text-purple-100' : 'text-white'
-              }`}>
+              <h3
+                className={`font-medium text-sm sm:text-base truncate ${
+                  isNFTCollection ? "text-purple-100" : "text-white"
+                }`}
+              >
                 {safeAsset.name}
               </h3>
               <p className="text-xs sm:text-sm text-gray-400 truncate flex items-center">
@@ -129,14 +179,20 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
                 )}
                 {!isNFTCollection && safeAsset.total_return_pct !== 0 && (
                   <span className={`ml-2 font-bold ${returnColor}`}>
-                    {returnIcon} {safeAsset.total_return_pct >= 0 ? '+' : ''}{safeAsset.total_return_pct.toFixed(0)}%
+                    {returnIcon} {safeAsset.total_return_pct >= 0 ? "+" : ""}
+                    {safeAsset.total_return_pct.toFixed(0)}%
                   </span>
                 )}
-                {isEditor && !isNFTCollection && safeAsset.purchase_price > 0 && (
-                  <span className="ml-2 px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full text-xs border border-blue-500/30" title="Purchase price set manually">
-                    📝
-                  </span>
-                )}
+                {isEditor &&
+                  !isNFTCollection &&
+                  safeAsset.purchase_price > 0 && (
+                    <span
+                      className="ml-2 px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full text-xs border border-blue-500/30"
+                      title="Purchase price set manually"
+                    >
+                      📝
+                    </span>
+                  )}
               </p>
             </div>
           </div>
@@ -155,50 +211,65 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
 
         <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm mb-3">
           <div>
-            <span className={`block ${isNFTCollection ? 'text-purple-300' : 'text-gray-400'}`}>
-              {isNFTCollection ? 'Items' : 'Balance'}
+            <span
+              className={`block ${isNFTCollection ? "text-purple-300" : "text-gray-400"}`}
+            >
+              {isNFTCollection ? "Items" : "Balance"}
             </span>
-            <span className={`font-mono ${isNFTCollection ? 'text-purple-100' : 'text-white'}`}>
-              {isNFTCollection ? `${Math.floor(safeAsset.balance)} NFTs` : safeAsset.balance}
-            </span>
-          </div>
-          <div>
-            <span className={`block ${isNFTCollection ? 'text-purple-300' : 'text-gray-400'}`}>
-              {isNFTCollection ? 'Floor Price' : 'Current Price'}
-            </span>
-            <span className={`font-mono ${isNFTCollection ? 'text-purple-100' : 'text-white'}`}>
-              {isNFTCollection 
-                ? (safeAsset.floorPrice > 0 ? `◎ ${safeAsset.floorPrice}` : 'Coming Soon')
-                : `$${safeAsset.priceUSD.toLocaleString()}`
-              }
+            <span
+              className={`font-mono ${isNFTCollection ? "text-purple-100" : "text-white"}`}
+            >
+              {isNFTCollection
+                ? `${Math.floor(safeAsset.balance)} NFTs`
+                : safeAsset.balance}
             </span>
           </div>
           <div>
-            <span className={`block ${isNFTCollection ? 'text-purple-300' : 'text-gray-400'}`}>
-              {isNFTCollection ? 'Collection Value' : 'Current Value'}
+            <span
+              className={`block ${isNFTCollection ? "text-purple-300" : "text-gray-400"}`}
+            >
+              {isNFTCollection ? "Floor Price" : "Current Price"}
             </span>
-            <span className={`font-mono ${isNFTCollection ? 'text-purple-100' : 'text-white'}`}>
-              {isNFTCollection 
-                ? (safeAsset.valueUSD > 0 
-                    ? `$${safeAsset.valueUSD.toLocaleString()}` 
-                    : (safeAsset.floorPrice > 0 
-                        ? `$${(safeAsset.floorPrice * parseFloat(safeAsset.balance)).toLocaleString()}` 
-                        : 'Evaluating...'
-                      )
-                  )
-                : `$${safeAsset.valueUSD.toLocaleString()}`
-              }
+            <span
+              className={`font-mono ${isNFTCollection ? "text-purple-100" : "text-white"}`}
+            >
+              {isNFTCollection
+                ? safeAsset.floorPrice > 0
+                  ? `◎ ${safeAsset.floorPrice}`
+                  : "Coming Soon"
+                : `$${safeAsset.priceUSD.toLocaleString()}`}
             </span>
           </div>
           <div>
-            <span className={`block ${isNFTCollection ? 'text-purple-300' : 'text-gray-400'}`}>
-              {isNFTCollection ? 'Portfolio %' : 'Purchase Price'}
+            <span
+              className={`block ${isNFTCollection ? "text-purple-300" : "text-gray-400"}`}
+            >
+              {isNFTCollection ? "Collection Value" : "Current Value"}
             </span>
-            <span className={`font-mono ${isNFTCollection ? 'text-purple-100' : 'text-blue-400'}`}>
-              {isNFTCollection 
+            <span
+              className={`font-mono ${isNFTCollection ? "text-purple-100" : "text-white"}`}
+            >
+              {isNFTCollection
+                ? safeAsset.valueUSD > 0
+                  ? `$${safeAsset.valueUSD.toLocaleString()}`
+                  : safeAsset.floorPrice > 0
+                    ? `$${(safeAsset.floorPrice * parseFloat(safeAsset.balance)).toLocaleString()}`
+                    : "Evaluating..."
+                : `$${safeAsset.valueUSD.toLocaleString()}`}
+            </span>
+          </div>
+          <div>
+            <span
+              className={`block ${isNFTCollection ? "text-purple-300" : "text-gray-400"}`}
+            >
+              {isNFTCollection ? "Portfolio %" : "Purchase Price"}
+            </span>
+            <span
+              className={`font-mono ${isNFTCollection ? "text-purple-100" : "text-blue-400"}`}
+            >
+              {isNFTCollection
                 ? `${weight}%`
-                : `$${safeAsset.purchase_price.toFixed(4)}`
-              }
+                : `$${safeAsset.purchase_price.toFixed(4)}`}
             </span>
           </div>
         </div>
@@ -210,11 +281,13 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-2">
               <span className="w-2 h-2 rounded-full bg-purple-400"></span>
-              <span className="text-xs sm:text-sm font-medium text-purple-200">Collection Status</span>
+              <span className="text-xs sm:text-sm font-medium text-purple-200">
+                Collection Status
+              </span>
             </div>
             <div className="text-right">
               <div className="text-sm sm:text-base font-bold text-purple-300">
-                {safeAsset.floorPrice > 0 ? 'Active' : 'Tracking'}
+                {safeAsset.floorPrice > 0 ? "Active" : "Tracking"}
               </div>
               <div className="text-xs text-purple-400 opacity-80">
                 {Math.floor(safeAsset.balance)} items
@@ -224,24 +297,36 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
         </div>
       ) : (
         safeAsset.total_invested > 0 && (
-          <div className={`px-4 py-3 ${
-            safeAsset.unrealized_pnl >= 0 
-              ? 'bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-t border-green-700/50' 
-              : 'bg-gradient-to-r from-red-900/40 to-red-800/40 border-t border-red-700/50'
-          }`}>
+          <div
+            className={`px-4 py-3 ${
+              safeAsset.unrealized_pnl >= 0
+                ? "bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-t border-green-700/50"
+                : "bg-gradient-to-r from-red-900/40 to-red-800/40 border-t border-red-700/50"
+            }`}
+          >
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-2">
-                <span className={`w-2 h-2 rounded-full ${
-                  safeAsset.unrealized_pnl >= 0 ? 'bg-green-400' : 'bg-red-400'
-                }`}></span>
-                <span className="text-xs sm:text-sm font-medium text-gray-300">P&L</span>
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    safeAsset.unrealized_pnl >= 0
+                      ? "bg-green-400"
+                      : "bg-red-400"
+                  }`}
+                ></span>
+                <span className="text-xs sm:text-sm font-medium text-gray-300">
+                  P&L
+                </span>
               </div>
               <div className="text-right">
-                <div className={`text-sm sm:text-base font-bold ${returnColor}`}>
-                  {safeAsset.unrealized_pnl >= 0 ? '+' : ''}${safeAsset.unrealized_pnl.toLocaleString()}
+                <div
+                  className={`text-sm sm:text-base font-bold ${returnColor}`}
+                >
+                  {safeAsset.unrealized_pnl >= 0 ? "+" : ""}$
+                  {safeAsset.unrealized_pnl.toLocaleString()}
                 </div>
                 <div className={`text-xs ${returnColor} opacity-80`}>
-                  {safeAsset.total_return_pct >= 0 ? '+' : ''}{safeAsset.total_return_pct.toFixed(1)}%
+                  {safeAsset.total_return_pct >= 0 ? "+" : ""}
+                  {safeAsset.total_return_pct.toFixed(1)}%
                 </div>
               </div>
             </div>
@@ -333,108 +418,148 @@ const PortfolioChart = ({ data }) => {
   return <canvas ref={chartRef} className="w-full h-full" />;
 };
 
-const WalletCard = ({ wallet, walletData, assets, totalValue, performance }) => {
-    const assetCount = assets ? assets.length : 0;
-    const hasError = walletData?.status === 'error' || walletData?.status === 'timeout';
+const WalletCard = ({
+  wallet,
+  walletData,
+  assets,
+  totalValue,
+  performance,
+}) => {
+  const assetCount = assets ? assets.length : 0;
+  const hasError =
+    walletData?.status === "error" || walletData?.status === "timeout";
 
-    // Get wallet-specific assets
-    const walletAssets = assets ? assets.filter(asset => {
-      // Map assets to wallets based on token type
-      if (wallet.network === 'SOL') {
-        return asset.id === 'solana' || 
-               asset.symbol === 'SOL' ||
-               asset.symbol === 'Fartcoin ' ||
-               asset.id.includes('pump') ||
-               asset.name?.includes('pump') ||
-               (asset.id.length > 40 && !asset.id.startsWith('0x')); // Solana addresses are longer and don't start with 0x
-      } else if (wallet.network === 'ETH') {
-        return asset.id.startsWith('0x') || 
-               asset.id === '0x0000000000000000000000000000000000000000' ||
-               asset.symbol === 'ETH' ||
-               asset.symbol === 'WBTC' ||
-               asset.symbol === 'PENDLE' ||
-               (asset.symbol === 'PENGU' && asset.id.startsWith('0x')); // Only ETH-based PENGU
-      }
-      return false;
-    }) : [];
+  // Get wallet-specific assets
+  const walletAssets = assets
+    ? assets.filter((asset) => {
+        // Map assets to wallets based on token type
+        if (wallet.network === "SOL") {
+          return (
+            asset.id === "solana" ||
+            asset.symbol === "SOL" ||
+            asset.symbol === "Fartcoin " ||
+            asset.id.includes("pump") ||
+            asset.name?.includes("pump") ||
+            (asset.id.length > 40 && !asset.id.startsWith("0x"))
+          ); // Solana addresses are longer and don't start with 0x
+        } else if (wallet.network === "ETH") {
+          return (
+            asset.id.startsWith("0x") ||
+            asset.id === "0x0000000000000000000000000000000000000000" ||
+            asset.symbol === "ETH" ||
+            asset.symbol === "WBTC" ||
+            asset.symbol === "PENDLE" ||
+            (asset.symbol === "PENGU" && asset.id.startsWith("0x"))
+          ); // Only ETH-based PENGU
+        }
+        return false;
+      })
+    : [];
 
-    const walletValue = walletAssets.reduce((sum, asset) => sum + (asset.valueUSD || 0), 0);
-    const walletAssetCount = walletAssets.length;
+  const walletValue = walletAssets.reduce(
+    (sum, asset) => sum + (asset.valueUSD || 0),
+    0,
+  );
+  const walletAssetCount = walletAssets.length;
 
-    return (
-      <div className={`p-3 border rounded-lg ${wallet.network === 'SOL' ? 'border-purple-500/30 bg-purple-900/10' : 'border-blue-500/30 bg-blue-900/10'}`}>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-medium text-white flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${wallet.network === 'SOL' ? 'bg-purple-400' : 'bg-blue-400'}`}></span>
-            {wallet.label}
-          </h3>
-          <span className={`text-xs px-2 py-1 rounded ${wallet.network === 'SOL' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}`}>
-            {wallet.network}
-          </span>
-        </div>
-
-        <div className="text-xs text-gray-400 mb-2 font-mono break-all">
-          {wallet.address.slice(0, 8)}...{wallet.address.slice(-8)}
-        </div>
-
-        {hasError ? (
-          <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
-            <div className="text-red-400 text-xs font-medium mb-1">⚠️ {wallet.network} Fetch Error</div>
-            <div className="text-red-300 text-xs">
-              {walletData?.errorMessage || `Unable to fetch ${wallet.network} data. This could be due to API limits, network issues, or wallet address format problems.`}
-            </div>
-            <div className="text-red-400 text-xs mt-1">
-              💡 Try updating the portfolio again or check if the {wallet.network} address is valid.
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm mb-2">
-              <div>
-                <span className="text-gray-400 block">Total Value</span>
-                <span className="text-white font-mono">${walletValue.toLocaleString()}</span>
-              </div>
-              <div>
-                <span className="text-gray-400 block">Assets</span>
-                <span className="text-white font-mono">{walletAssetCount}</span>
-              </div>
-              <div>
-                <span className="text-gray-400 block">24h Change</span>
-                <span className={`font-mono ${performance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {performance >= 0 ? '+' : ''}{performance.toFixed(2)}%
-                </span>
-              </div>
-            </div>
-
-            {/* Show top assets for this wallet */}
-            {walletAssets.length > 0 && (
-              <div className="border-t border-gray-700/50 pt-2">
-                <div className="text-xs text-gray-400 mb-1">Top Assets:</div>
-                {walletAssets
-                  .filter(asset => asset.valueUSD > 0)
-                  .sort((a, b) => b.valueUSD - a.valueUSD)
-                  .slice(0, 3)
-                  .map(asset => (
-                    <div key={asset.id} className="flex justify-between text-xs py-1">
-                      <span className="text-gray-300 truncate max-w-[120px]">{asset.symbol}</span>
-                      <span className="text-white font-mono">${asset.valueUSD.toLocaleString()}</span>
-                    </div>
-                  ))
-                }
-              </div>
-            )}
-          </div>
-        )}
+  return (
+    <div
+      className={`p-3 border rounded-lg ${wallet.network === "SOL" ? "border-purple-500/30 bg-purple-900/10" : "border-blue-500/30 bg-blue-900/10"}`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-medium text-white flex items-center gap-2">
+          <span
+            className={`w-2 h-2 rounded-full ${wallet.network === "SOL" ? "bg-purple-400" : "bg-blue-400"}`}
+          ></span>
+          {wallet.label}
+        </h3>
+        <span
+          className={`text-xs px-2 py-1 rounded ${wallet.network === "SOL" ? "bg-purple-500/20 text-purple-300" : "bg-blue-500/20 text-blue-300"}`}
+        >
+          {wallet.network}
+        </span>
       </div>
-    );
-  };
+
+      <div className="text-xs text-gray-400 mb-2 font-mono break-all">
+        {wallet.address.slice(0, 8)}...{wallet.address.slice(-8)}
+      </div>
+
+      {hasError ? (
+        <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
+          <div className="text-red-400 text-xs font-medium mb-1">
+            ⚠️ {wallet.network} Fetch Error
+          </div>
+          <div className="text-red-300 text-xs">
+            {walletData?.errorMessage ||
+              `Unable to fetch ${wallet.network} data. This could be due to API limits, network issues, or wallet address format problems.`}
+          </div>
+          <div className="text-red-400 text-xs mt-1">
+            💡 Try updating the portfolio again or check if the {wallet.network}{" "}
+            address is valid.
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm mb-2">
+            <div>
+              <span className="text-gray-400 block">Total Value</span>
+              <span className="text-white font-mono">
+                ${walletValue.toLocaleString()}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400 block">Assets</span>
+              <span className="text-white font-mono">{walletAssetCount}</span>
+            </div>
+            <div>
+              <span className="text-gray-400 block">24h Change</span>
+              <span
+                className={`font-mono ${performance >= 0 ? "text-green-400" : "text-red-400"}`}
+              >
+                {performance >= 0 ? "+" : ""}
+                {performance.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Show top assets for this wallet */}
+          {walletAssets.length > 0 && (
+            <div className="border-t border-gray-700/50 pt-2">
+              <div className="text-xs text-gray-400 mb-1">Top Assets:</div>
+              {walletAssets
+                .filter((asset) => asset.valueUSD > 0)
+                .sort((a, b) => b.valueUSD - a.valueUSD)
+                .slice(0, 3)
+                .map((asset) => (
+                  <div
+                    key={asset.id}
+                    className="flex justify-between text-xs py-1"
+                  >
+                    <span className="text-gray-300 truncate max-w-[120px]">
+                      {asset.symbol}
+                    </span>
+                    <span className="text-white font-mono">
+                      ${asset.valueUSD.toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Wallet Details Modal
 const WalletModal = ({ wallet, onClose, walletData, portfolioData }) => {
   if (!wallet) return null;
 
   const walletAssets = walletData?.assets || [];
-  const totalValue = walletAssets.reduce((sum, asset) => sum + asset.valueUSD, 0);
+  const totalValue = walletAssets.reduce(
+    (sum, asset) => sum + asset.valueUSD,
+    0,
+  );
   const performance = walletData?.performance || 0;
   const performanceHistory = walletData?.performanceHistory || [];
 
@@ -448,16 +573,30 @@ const WalletModal = ({ wallet, onClose, walletData, portfolioData }) => {
                 <span className="text-white font-bold">{wallet.network}</span>
               </div>
               <div>
-                <h2 className="text-lg sm:text-xl font-bold text-white">{wallet.label}</h2>
-                <p className="text-sm text-gray-400 font-mono break-all">{wallet.address}</p>
+                <h2 className="text-lg sm:text-xl font-bold text-white">
+                  {wallet.label}
+                </h2>
+                <p className="text-sm text-gray-400 font-mono break-all">
+                  {wallet.address}
+                </p>
               </div>
             </div>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white p-1"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -466,28 +605,39 @@ const WalletModal = ({ wallet, onClose, walletData, portfolioData }) => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-xs text-gray-400 mb-1">Total Value</div>
-              <div className="text-xl font-bold text-white">${totalValue.toLocaleString()}</div>
+              <div className="text-xl font-bold text-white">
+                ${totalValue.toLocaleString()}
+              </div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-xs text-gray-400 mb-1">Assets</div>
-              <div className="text-xl font-bold text-white">{walletAssets.length}</div>
+              <div className="text-xl font-bold text-white">
+                {walletAssets.length}
+              </div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-xs text-gray-400 mb-1">24h Change</div>
-              <div className={`text-xl font-bold ${performance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {performance >= 0 ? '+' : ''}{performance.toFixed(2)}%
+              <div
+                className={`text-xl font-bold ${performance >= 0 ? "text-green-400" : "text-red-400"}`}
+              >
+                {performance >= 0 ? "+" : ""}
+                {performance.toFixed(2)}%
               </div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-xs text-gray-400 mb-1">Network</div>
-              <div className="text-xl font-bold text-white">{wallet.network}</div>
+              <div className="text-xl font-bold text-white">
+                {wallet.network}
+              </div>
             </div>
           </div>
 
           {/* Performance Chart */}
           {performanceHistory.length > 0 && (
             <div className="bg-gray-800 rounded-lg p-4 mb-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Wallet Performance</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Wallet Performance
+              </h3>
               <div className="h-48">
                 <PortfolioChart data={performanceHistory} />
               </div>
@@ -496,11 +646,17 @@ const WalletModal = ({ wallet, onClose, walletData, portfolioData }) => {
 
           {/* Assets in Wallet */}
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Assets in Wallet ({walletAssets.length})</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">
+              Assets in Wallet ({walletAssets.length})
+            </h3>
             {walletAssets.length === 0 ? (
               <div className="bg-gray-800 rounded-lg p-8 text-center">
-                <div className="text-gray-400 mb-2">No assets found in this wallet</div>
-                <div className="text-sm text-gray-500">This wallet may be empty or data hasn't been fetched yet</div>
+                <div className="text-gray-400 mb-2">
+                  No assets found in this wallet
+                </div>
+                <div className="text-sm text-gray-500">
+                  This wallet may be empty or data hasn't been fetched yet
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -508,25 +664,37 @@ const WalletModal = ({ wallet, onClose, walletData, portfolioData }) => {
                   <div key={index} className="bg-gray-800 rounded-lg p-4">
                     <div className="flex items-center space-x-3 mb-3">
                       <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-xs">{asset.symbol.slice(0, 2)}</span>
+                        <span className="text-white font-bold text-xs">
+                          {asset.symbol.slice(0, 2)}
+                        </span>
                       </div>
                       <div>
-                        <div className="font-medium text-white text-sm">{asset.name}</div>
-                        <div className="text-xs text-gray-400">{asset.symbol}</div>
+                        <div className="font-medium text-white text-sm">
+                          {asset.name}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {asset.symbol}
+                        </div>
                       </div>
                     </div>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-400">Balance:</span>
-                        <span className="text-white font-mono">{asset.balance}</span>
+                        <span className="text-white font-mono">
+                          {asset.balance}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Value:</span>
-                        <span className="text-green-400 font-mono">${asset.valueUSD.toLocaleString()}</span>
+                        <span className="text-green-400 font-mono">
+                          ${asset.valueUSD.toLocaleString()}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Price:</span>
-                        <span className="text-white font-mono">${asset.priceUSD.toFixed(4)}</span>
+                        <span className="text-white font-mono">
+                          ${asset.priceUSD.toFixed(4)}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Weight:</span>
@@ -575,7 +743,7 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
         setReturnsData(data);
       }
     } catch (error) {
-      console.error('Error fetching returns data:', error);
+      console.error("Error fetching returns data:", error);
     } finally {
       setLoading(false);
     }
@@ -588,10 +756,25 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
       <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg sm:text-xl font-bold text-white">📊 Portfolio Returns Analysis</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <h2 className="text-lg sm:text-xl font-bold text-white">
+              📊 Portfolio Returns Analysis
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white p-1"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -605,59 +788,112 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
               {/* Portfolio Summary */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-gray-800 rounded-lg p-4">
-                  <div className="text-xs text-gray-400 mb-1">Total Invested</div>
-                  <div className="text-xl font-bold text-white">${returnsData.portfolio_metrics.total_invested.toLocaleString()}</div>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-4">
-                  <div className="text-xs text-gray-400 mb-1">Current Value</div>
-                  <div className="text-xl font-bold text-white">${returnsData.portfolio_metrics.total_current_value.toLocaleString()}</div>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-4">
-                  <div className="text-xs text-gray-400 mb-1">Total Return</div>
-                  <div className={`text-xl font-bold ${returnsData.portfolio_metrics.overall_return_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {returnsData.portfolio_metrics.overall_return_pct >= 0 ? '+' : ''}{returnsData.portfolio_metrics.overall_return_pct.toFixed(1)}%
+                  <div className="text-xs text-gray-400 mb-1">
+                    Total Invested
+                  </div>
+                  <div className="text-xl font-bold text-white">
+                    $
+                    {returnsData.portfolio_metrics.total_invested.toLocaleString()}
                   </div>
                 </div>
                 <div className="bg-gray-800 rounded-lg p-4">
-                  <div className="text-xs text-gray-400 mb-1">Unrealized P&L</div>
-                  <div className={`text-xl font-bold ${returnsData.portfolio_metrics.total_unrealized_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    ${returnsData.portfolio_metrics.total_unrealized_pnl.toLocaleString()}
+                  <div className="text-xs text-gray-400 mb-1">
+                    Current Value
+                  </div>
+                  <div className="text-xl font-bold text-white">
+                    $
+                    {returnsData.portfolio_metrics.total_current_value.toLocaleString()}
+                  </div>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="text-xs text-gray-400 mb-1">Total Return</div>
+                  <div
+                    className={`text-xl font-bold ${returnsData.portfolio_metrics.overall_return_pct >= 0 ? "text-green-400" : "text-red-400"}`}
+                  >
+                    {returnsData.portfolio_metrics.overall_return_pct >= 0
+                      ? "+"
+                      : ""}
+                    {returnsData.portfolio_metrics.overall_return_pct.toFixed(
+                      1,
+                    )}
+                    %
+                  </div>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="text-xs text-gray-400 mb-1">
+                    Unrealized P&L
+                  </div>
+                  <div
+                    className={`text-xl font-bold ${returnsData.portfolio_metrics.total_unrealized_pnl >= 0 ? "text-green-400" : "text-red-400"}`}
+                  >
+                    $
+                    {returnsData.portfolio_metrics.total_unrealized_pnl.toLocaleString()}
                   </div>
                 </div>
               </div>
 
               {/* Top Performers */}
               <div>
-                <h3 className="text-lg font-semibold text-white mb-4">🚀 Top Performers</h3>
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  🚀 Top Performers
+                </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {returnsData.top_performers.slice(0, 6).map((performer, index) => (
-                    <div key={index} className="bg-green-900/20 border border-green-700/50 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-white">{performer.symbol}</span>
-                        <span className="text-xs text-green-400">#{index + 1}</span>
+                  {returnsData.top_performers
+                    .slice(0, 6)
+                    .map((performer, index) => (
+                      <div
+                        key={index}
+                        className="bg-green-900/20 border border-green-700/50 rounded-lg p-4"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-white">
+                            {performer.symbol}
+                          </span>
+                          <span className="text-xs text-green-400">
+                            #{index + 1}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400 mb-1">
+                          {performer.name}
+                        </div>
+                        <div className="text-lg font-bold text-green-400">
+                          +{performer.return_pct.toFixed(1)}%
+                        </div>
+                        <div className="text-sm text-gray-300">
+                          ${performer.unrealized_pnl.toLocaleString()} profit
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-400 mb-1">{performer.name}</div>
-                      <div className="text-lg font-bold text-green-400">+{performer.return_pct.toFixed(1)}%</div>
-                      <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()} profit</div>
-                                        </div>
-                  ))}
-                </div>                  
+                    ))}
+                </div>
               </div>
 
               {/* Worst Performers */}
               {returnsData.worst_performers.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-4">📉 Underperformers</h3>
+                  <h3 className="text-lg font-semibold text-white mb-4">
+                    📉 Underperformers
+                  </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {returnsData.worst_performers.map((performer, index) => (
-                      <div key={index} className="bg-red-900/20 border border-red-700/50 rounded-lg p-4">
+                      <div
+                        key={index}
+                        className="bg-red-900/20 border border-red-700/50 rounded-lg p-4"
+                      >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-white">{performer.symbol}</span>
+                          <span className="font-medium text-white">
+                            {performer.symbol}
+                          </span>
                           <span className="text-xs text-red-400">⚠️</span>
                         </div>
-                        <div className="text-xs text-gray-400 mb-1">{performer.name}</div>
-                        <div className="text-lg font-bold text-red-400">{performer.return_pct.toFixed(1)}%</div>
-                        <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()}</div>
+                        <div className="text-xs text-gray-400 mb-1">
+                          {performer.name}
+                        </div>
+                        <div className="text-lg font-bold text-red-400">
+                          {performer.return_pct.toFixed(1)}%
+                        </div>
+                        <div className="text-sm text-gray-300">
+                          ${performer.unrealized_pnl.toLocaleString()}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -665,11 +901,16 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
               )}
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-400">No returns data available</div>
+            <div className="text-center py-8 text-gray-400">
+              No returns data available
+            </div>
           )}
 
           <div className="flex justify-end mt-6">
-            <button onClick={onClose} className="bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium">
+            <button
+              onClick={onClose}
+              className="bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium"
+            >
               Close
             </button>
           </div>
@@ -680,9 +921,17 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
 };
 
 // Enhanced Asset Details Modal with returns data and purchase price override
-const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEditor }) => {
+const AssetModal = ({
+  asset,
+  onClose,
+  onUpdateNotes,
+  onUpdatePurchasePrice,
+  isEditor,
+}) => {
   const [notes, setNotes] = useState(asset?.notes || "");
-  const [purchasePrice, setPurchasePrice] = useState((asset?.purchase_price || 0).toString());
+  const [purchasePrice, setPurchasePrice] = useState(
+    (asset?.purchase_price || 0).toString(),
+  );
   const [isUpdatingPrice, setIsUpdatingPrice] = useState(false);
   const [priceError, setPriceError] = useState("");
 
@@ -712,7 +961,12 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEd
     }
 
     // Allow zero for airdrops or free tokens, but warn user
-    if (priceValue === 0 && !confirm("Setting purchase price to $0. This is typically used for airdrops or free tokens. Continue?")) {
+    if (
+      priceValue === 0 &&
+      !confirm(
+        "Setting purchase price to $0. This is typically used for airdrops or free tokens. Continue?",
+      )
+    ) {
       return;
     }
 
@@ -725,30 +979,51 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEd
         asset.purchase_price = priceValue;
         asset.total_invested = (asset.balance || 0) * priceValue;
         asset.unrealized_pnl = (asset.valueUSD || 0) - asset.total_invested;
-        asset.total_return_pct = asset.total_invested > 0 ? 
-          ((asset.valueUSD || 0) - asset.total_invested) / asset.total_invested * 100 : 0;
+        asset.total_return_pct =
+          asset.total_invested > 0
+            ? (((asset.valueUSD || 0) - asset.total_invested) /
+                asset.total_invested) *
+              100
+            : 0;
       }
     } catch (error) {
-      console.error('Purchase price update error:', error);
+      console.error("Purchase price update error:", error);
       setPriceError(`Failed to update price: ${error.message}`);
     }
-    
+
     // Always reset loading state, even if there was an error
     setIsUpdatingPrice(false);
   };
 
-  const returnColor = (asset.total_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400';
-  const pnlColor = (asset.unrealized_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400';
+  const returnColor =
+    (asset.total_return_pct || 0) >= 0 ? "text-green-400" : "text-red-400";
+  const pnlColor =
+    (asset.unrealized_pnl || 0) >= 0 ? "text-green-400" : "text-red-400";
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg sm:text-xl font-bold text-white">{asset.name}</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <h2 className="text-lg sm:text-xl font-bold text-white">
+              {asset.name}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white p-1"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -758,7 +1033,8 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEd
             <div className="bg-gray-800 rounded-lg p-4">
               <div className="text-xs text-gray-400 mb-1">Total Return</div>
               <div className={`text-lg font-bold ${returnColor}`}>
-                {(asset.total_return_pct || 0) >= 0 ? '+' : ''}{(asset.total_return_pct || 0).toFixed(1)}%
+                {(asset.total_return_pct || 0) >= 0 ? "+" : ""}
+                {(asset.total_return_pct || 0).toFixed(1)}%
               </div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4">
@@ -772,11 +1048,15 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEd
           <div className="space-y-3 mb-4 text-sm sm:text-base">
             <div className="flex justify-between">
               <span className="text-gray-400">Balance:</span>
-              <span className="text-white font-mono">{asset?.balance || '0'} {asset?.symbol || 'N/A'}</span>
+              <span className="text-white font-mono">
+                {asset?.balance || "0"} {asset?.symbol || "N/A"}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Current Price:</span>
-              <span className="text-white font-mono">${(asset?.priceUSD || 0).toFixed(4)}</span>
+              <span className="text-white font-mono">
+                ${(asset?.priceUSD || 0).toFixed(4)}
+              </span>
             </div>
 
             {/* Purchase Price - Editable in editor mode */}
@@ -793,7 +1073,9 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEd
                       setPriceError("");
                     }}
                     onBlur={handlePurchasePriceUpdate}
-                    onKeyPress={(e) => e.key === "Enter" && handlePurchasePriceUpdate()}
+                    onKeyPress={(e) =>
+                      e.key === "Enter" && handlePurchasePriceUpdate()
+                    }
                     className="w-24 p-1 bg-gray-800 border border-gray-600 rounded text-blue-400 font-mono text-sm focus:border-blue-500 focus:outline-none"
                     step="0.0001"
                     min="0"
@@ -804,7 +1086,9 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEd
                   )}
                 </div>
               ) : (
-                <span className="text-blue-400 font-mono">${(asset?.purchase_price || 0).toFixed(4)}</span>
+                <span className="text-blue-400 font-mono">
+                  ${(asset?.purchase_price || 0).toFixed(4)}
+                </span>
               )}
             </div>
 
@@ -814,17 +1098,23 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEd
 
             <div className="flex justify-between">
               <span className="text-gray-400">Total Invested:</span>
-              <span className="text-blue-400 font-mono">${(asset?.total_invested || 0).toLocaleString()}</span>
+              <span className="text-blue-400 font-mono">
+                ${(asset?.total_invested || 0).toLocaleString()}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Current Value:</span>
-              <span className="text-green-400 font-mono">${(asset?.valueUSD || 0).toLocaleString()}</span>
+              <span className="text-green-400 font-mono">
+                ${(asset?.valueUSD || 0).toLocaleString()}
+              </span>
             </div>
           </div>
 
           {isEditor && (
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2 text-gray-300">Notes:</label>
+              <label className="block text-sm font-medium mb-2 text-gray-300">
+                Notes:
+              </label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -901,12 +1191,20 @@ const ReportGenerator = ({ portfolioData }) => {
 const LoadingSpinner = ({ status }) => (
   <div className="flex items-center justify-center space-x-2 text-purple-400">
     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400"></div>
-    <span className="text-sm">{status || 'Loading...'}</span>
+    <span className="text-sm">{status || "Loading..."}</span>
   </div>
 );
 
 // Settings Modal Component
-const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPasswordCheck, onEditorExit }) => {
+const SettingsModal = ({
+  isOpen,
+  onClose,
+  isEditor,
+  password,
+  setPassword,
+  onPasswordCheck,
+  onEditorExit,
+}) => {
   if (!isOpen) return null;
 
   return (
@@ -914,13 +1212,25 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
       <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-md w-full">
         <div className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg sm:text-xl font-bold text-white">Settings</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-white">
+              Settings
+            </h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white p-1"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -928,8 +1238,12 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
           {!isEditor ? (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-semibold text-white mb-2">🔐 Editor Access</h3>
-                <p className="text-sm text-gray-400 mb-4">Enter access key to unlock dashboard editing features</p>
+                <h3 className="text-base font-semibold text-white mb-2">
+                  🔐 Editor Access
+                </h3>
+                <p className="text-sm text-gray-400 mb-4">
+                  Enter access key to unlock dashboard editing features
+                </p>
                 <input
                   type="password"
                   value={password}
@@ -949,10 +1263,15 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
           ) : (
             <div className="space-y-4">
               <div className="p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
-                <h3 className="text-base font-semibold text-green-400 mb-2">✅ Editor Mode Active</h3>
-                <p className="text-sm text-gray-300 mb-4">You're currently in editor mode with full dashboard access.</p>
+                <h3 className="text-base font-semibold text-green-400 mb-2">
+                  ✅ Editor Mode Active
+                </h3>
+                <p className="text-sm text-gray-300 mb-4">
+                  You're currently in editor mode with full dashboard access.
+                </p>
                 <div className="text-sm text-green-400 mb-4">
-                  🔧 Editor features enabled: Hide assets, manage wallets, update notes
+                  🔧 Editor features enabled: Hide assets, manage wallets,
+                  update notes
                 </div>
                 <button
                   onClick={onEditorExit}
@@ -981,14 +1300,14 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
 // ================================================================================================
 // API BASE URL CONFIGURATION - CRITICAL FOR DEPLOYMENT SUCCESS
 // ================================================================================================
-// 
+//
 // This function determines the correct API base URL for different environments.
-// 
+//
 // PRODUCTION DEPLOYMENT (w3e.info, .replit.app):
 // - Backend runs on port 80 (same as frontend)
 // - Use same origin - NO PORT NUMBER needed
 // - Example: https://w3e.info (not https://w3e.info:8000)
-// 
+//
 // DEVELOPMENT (.replit.dev):
 // - Backend runs on port 8000, frontend on port 5000
 // - Must specify port 8000 for API calls
@@ -1003,33 +1322,33 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
 // - Backend MUST run on port 80 in production (see server/main.py)
 // - If frontend tries to connect to :8000 in production, it will fail
 // ================================================================================================
-  const getAPIBaseURL = () => {
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      const protocol = window.location.protocol;
+const getAPIBaseURL = () => {
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
 
-      // Production deployment URLs - use same origin (NO PORT!)
-      // CRITICAL: Do not add port numbers here - backend runs on port 80
-      if (hostname === 'w3e.info' || hostname.includes('.replit.app')) {
-        return `${protocol}//${hostname}`;
-      }
-
-      // Development URLs - localhost and 127.x.x.x
-      if (hostname === 'localhost' || hostname.startsWith('127.')) {
-        // Backend runs on port 8000 in development
-        return 'http://localhost:8000';
-      }
-
-      // Replit development URLs - .replit.dev domains
-      if (hostname.includes('.replit.dev')) {
-        // Backend runs on port 8000, frontend on port 5000
-        return `${protocol}//${hostname}:8000`;
-      }
+    // Production deployment URLs - use same origin (NO PORT!)
+    // CRITICAL: Do not add port numbers here - backend runs on port 80
+    if (hostname === "w3e.info" || hostname.includes(".replit.app")) {
+      return `${protocol}//${hostname}`;
     }
 
-    // Fallback for any other case
-    return 'http://localhost:8000';
-  };
+    // Development URLs - localhost and 127.x.x.x
+    if (hostname === "localhost" || hostname.startsWith("127.")) {
+      // Backend runs on port 8000 in development
+      return "http://localhost:80";
+    }
+
+    // Replit development URLs - .replit.dev domains
+    if (hostname.includes(".replit.dev")) {
+      // Backend runs on port 8000, frontend on port 5000
+      return `${protocol}//${hostname}`;
+    }
+  }
+
+  // Fallback for any other case
+  return "http://localhost:80";
+};
 
 // API Configuration for Replit environment
 const API_BASE_URL = getAPIBaseURL();
@@ -1070,7 +1389,7 @@ const App = () => {
       return {
         text: "No data",
         color: "text-gray-400",
-        dot: "bg-gray-400"
+        dot: "bg-gray-400",
       };
     }
 
@@ -1078,7 +1397,7 @@ const App = () => {
       return {
         text: "Data loaded",
         color: "text-blue-400",
-        dot: "bg-blue-400"
+        dot: "bg-blue-400",
       };
     }
 
@@ -1091,38 +1410,38 @@ const App = () => {
       return {
         text: "Live now",
         color: "text-green-400",
-        dot: "bg-green-400 animate-pulse"
+        dot: "bg-green-400 animate-pulse",
       };
     } else if (diffMinutes < 5) {
       return {
         text: `${diffMinutes}m ago`,
         color: "text-green-400",
-        dot: "bg-green-400"
+        dot: "bg-green-400",
       };
     } else if (diffMinutes < 30) {
       return {
         text: `${diffMinutes}m ago`,
         color: "text-yellow-400",
-        dot: "bg-yellow-400"
+        dot: "bg-yellow-400",
       };
     } else if (diffHours < 1) {
       return {
         text: `${diffMinutes}m ago`,
         color: "text-orange-400",
-        dot: "bg-orange-400"
+        dot: "bg-orange-400",
       };
     } else if (diffHours < 24) {
       return {
         text: `${diffHours}h ago`,
         color: "text-red-400",
-        dot: "bg-red-400"
+        dot: "bg-red-400",
       };
     } else {
       const diffDays = Math.floor(diffHours / 24);
       return {
         text: `${diffDays}d ago`,
         color: "text-red-500",
-        dot: "bg-red-500"
+        dot: "bg-red-500",
       };
     }
   };
@@ -1153,7 +1472,7 @@ const App = () => {
     setShowSettings(false);
     // Show a temporary success message
     setUpdateStatus("✅ Changes saved! Returned to viewer mode.");
-    setTimeout(() => setUpdateStatus(''), 3000);
+    setTimeout(() => setUpdateStatus(""), 3000);
   };
 
   const toggleHiddenAsset = async (asset) => {
@@ -1162,14 +1481,20 @@ const App = () => {
 
       if (isCurrentlyHidden) {
         // Unhide the asset
-        const response = await fetch(`${API_BASE_URL}/api/assets/hide/${asset.id}`, {
-          method: 'DELETE',
-        });
+        const response = await fetch(
+          `${API_BASE_URL}/api/assets/hide/${asset.id}`,
+          {
+            method: "DELETE",
+          },
+        );
 
         if (response.ok) {
           setHiddenAssets((prev) => {
             const newHiddenAssets = prev.filter((id) => id !== asset.id);
-            localStorage.setItem("hiddenAssets", JSON.stringify(newHiddenAssets));
+            localStorage.setItem(
+              "hiddenAssets",
+              JSON.stringify(newHiddenAssets),
+            );
             return newHiddenAssets;
           });
           console.log(`✅ Unhid asset: ${asset.symbol}`);
@@ -1181,30 +1506,38 @@ const App = () => {
         const params = new URLSearchParams({
           token_address: asset.id,
           symbol: asset.symbol,
-          name: asset.name
+          name: asset.name,
         });
 
-        const response = await fetch(`${API_BASE_URL}/api/assets/hide?${params}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        const response = await fetch(
+          `${API_BASE_URL}/api/assets/hide?${params}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
           },
-        });
+        );
 
         if (response.ok) {
           setHiddenAssets((prev) => {
             const newHiddenAssets = [...prev, asset.id];
-            localStorage.setItem("hiddenAssets", JSON.stringify(newHiddenAssets));
+            localStorage.setItem(
+              "hiddenAssets",
+              JSON.stringify(newHiddenAssets),
+            );
             return newHiddenAssets;
           });
           console.log(`✅ Hid asset: ${asset.symbol}`);
         } else {
           const errorText = await response.text();
-          throw new Error(`Failed to hide asset: ${response.status} - ${errorText}`);
+          throw new Error(
+            `Failed to hide asset: ${response.status} - ${errorText}`,
+          );
         }
       }
     } catch (error) {
-      console.error('Error toggling hidden asset:', error);
+      console.error("Error toggling hidden asset:", error);
       alert(`Failed to update asset visibility: ${error.message}`);
     }
   };
@@ -1216,18 +1549,21 @@ const App = () => {
     }
 
     try {
-      const asset = portfolioData.assets.find(a => a.id === assetId);
+      const asset = portfolioData.assets.find((a) => a.id === assetId);
       if (!asset) return;
 
-      const response = await fetch(`${API_BASE_URL}/api/assets/${asset.symbol}/notes?notes=${encodeURIComponent(notes)}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${API_BASE_URL}/api/assets/${asset.symbol}/notes?notes=${encodeURIComponent(notes)}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
-        throw new Error('Failed to update notes');
+        throw new Error("Failed to update notes");
       }
 
       setPortfolioData((prev) => ({
@@ -1236,46 +1572,48 @@ const App = () => {
           a.id === assetId ? { ...a, notes } : a,
         ),
       }));
-
     } catch (error) {
-      console.error('Error updating notes:', error);
+      console.error("Error updating notes:", error);
       alert(`Failed to update notes: ${error.message}`);
     }
   };
 
   const updatePurchasePrice = async (symbol, purchasePrice) => {
     if (!symbol) {
-      throw new Error('Symbol is required');
+      throw new Error("Symbol is required");
     }
 
     // Validate purchase price
-    if (typeof purchasePrice !== 'number' || isNaN(purchasePrice)) {
-      throw new Error('Invalid purchase price');
+    if (typeof purchasePrice !== "number" || isNaN(purchasePrice)) {
+      throw new Error("Invalid purchase price");
     }
 
     if (purchasePrice < 0) {
-      throw new Error('Purchase price cannot be negative');
+      throw new Error("Purchase price cannot be negative");
     }
 
     try {
       addDebugInfo(`Updating purchase price for ${symbol}: $${purchasePrice}`);
 
-      const response = await fetch(`${API_BASE_URL}/api/assets/${symbol}/purchase_price`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${API_BASE_URL}/api/assets/${symbol}/purchase_price`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            purchase_price: purchasePrice,
+          }),
         },
-        body: JSON.stringify({
-          purchase_price: purchasePrice
-        }),
-      });
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
         let errorMessage;
         try {
           const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.detail || 'Failed to update purchase price';
+          errorMessage = errorJson.detail || "Failed to update purchase price";
         } catch {
           errorMessage = `HTTP ${response.status}: ${errorText}`;
         }
@@ -1291,14 +1629,15 @@ const App = () => {
             const currentValue = asset.valueUSD || 0;
             const totalInvested = balance * purchasePrice;
             const unrealizedPnl = currentValue - totalInvested;
-            const returnPct = totalInvested > 0 ? (unrealizedPnl / totalInvested) * 100 : 0;
+            const returnPct =
+              totalInvested > 0 ? (unrealizedPnl / totalInvested) * 100 : 0;
 
             return {
               ...asset,
               purchase_price: purchasePrice,
               total_invested: totalInvested,
               unrealized_pnl: unrealizedPnl,
-              total_return_pct: returnPct
+              total_return_pct: returnPct,
             };
           }
           return asset;
@@ -1308,14 +1647,17 @@ const App = () => {
       addDebugInfo(`✅ Purchase price updated for ${symbol}`);
 
       // Show success message briefly
-      setUpdateStatus(`✅ Updated ${symbol} purchase price to $${purchasePrice.toFixed(4)}`);
-      setTimeout(() => setUpdateStatus(''), 3000);
+      setUpdateStatus(
+        `✅ Updated ${symbol} purchase price to $${purchasePrice.toFixed(4)}`,
+      );
+      setTimeout(() => setUpdateStatus(""), 3000);
 
       return true;
-
     } catch (error) {
-      console.error('Error updating purchase price:', error);
-      addDebugInfo(`❌ Error updating purchase price for ${symbol}: ${error.message}`);
+      console.error("Error updating purchase price:", error);
+      addDebugInfo(
+        `❌ Error updating purchase price for ${symbol}: ${error.message}`,
+      );
       throw error; // Re-throw so the modal can handle it
     }
   };
@@ -1323,10 +1665,22 @@ const App = () => {
   // Wallet addresses for the fund - stored in state forThis commit addresses a syntax error in the `addWallet` function, specifically ensuring that the API_BASE_URL is correctly used within the template literal for the fetch request. dynamic management
   const [walletAddresses, setWalletAddresses] = useState(() => {
     const saved = localStorage.getItem("fundWallets");
-    return saved ? JSON.parse(saved) : [
-      { id: 1, address: "0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98", label: "Ethereum Safe Multisig", network: "ETH" },
-      { id: 2, address: "4ZE7D7ecU7tSvA5iJVCVp6MprguDqy7tvXguE64T9Twb", label: "Solana EOA", network: "SOL" }
-    ];
+    return saved
+      ? JSON.parse(saved)
+      : [
+          {
+            id: 1,
+            address: "0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98",
+            label: "Ethereum Safe Multisig",
+            network: "ETH",
+          },
+          {
+            id: 2,
+            address: "4ZE7D7ecU7tSvA5iJVCVp6MprguDqy7tvXguE64T9Twb",
+            label: "Solana EOA",
+            network: "SOL",
+          },
+        ];
   });
   const [newWalletAddress, setNewWalletAddress] = useState("");
   const [newWalletLabel, setNewWalletLabel] = useState("");
@@ -1342,14 +1696,14 @@ const App = () => {
       addDebugInfo(`Adding wallet: ${newWalletLabel} (${newWalletNetwork})`);
 
       const response = await fetch(`${API_BASE_URL}/api/wallets`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           address: newWalletAddress.trim(),
           label: newWalletLabel.trim(),
-          network: newWalletNetwork
+          network: newWalletNetwork,
         }),
       });
 
@@ -1358,7 +1712,7 @@ const App = () => {
         let errorMessage;
         try {
           const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.detail || 'Failed to add wallet';
+          errorMessage = errorJson.detail || "Failed to add wallet";
         } catch {
           errorMessage = `HTTP ${response.status}: ${errorText}`;
         }
@@ -1366,7 +1720,9 @@ const App = () => {
       }
 
       const newWallet = await response.json();
-      addDebugInfo(`✅ Wallet added to backend: ${newWallet.id} - ${newWallet.label}`);
+      addDebugInfo(
+        `✅ Wallet added to backend: ${newWallet.id} - ${newWallet.label}`,
+      );
 
       // Update local state
       const updatedWallets = [...walletAddresses, newWallet];
@@ -1382,10 +1738,9 @@ const App = () => {
 
       // Show success message
       setUpdateStatus(`✅ Added wallet: ${newWallet.label}`);
-      setTimeout(() => setUpdateStatus(''), 3000);
-
+      setTimeout(() => setUpdateStatus(""), 3000);
     } catch (error) {
-      console.error('Error adding wallet:', error);
+      console.error("Error adding wallet:", error);
       addDebugInfo(`❌ Error adding wallet: ${error.message}`);
       alert(`Failed to add wallet: ${error.message}`);
     }
@@ -1394,14 +1749,16 @@ const App = () => {
   const removeWallet = async (walletId) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/wallets/${walletId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       if (!response.ok) {
-        throw new Error('Failed to remove wallet');
+        throw new Error("Failed to remove wallet");
       }
 
-      const updatedWallets = walletAddresses.filter(wallet => wallet.id !== walletId);
+      const updatedWallets = walletAddresses.filter(
+        (wallet) => wallet.id !== walletId,
+      );
       setWalletAddresses(updatedWallets);
       localStorage.setItem("fundWallets", JSON.stringify(updatedWallets));
 
@@ -1410,16 +1767,15 @@ const App = () => {
       delete newWalletData[walletId];
       setWalletData(newWalletData);
       localStorage.setItem("walletData", JSON.stringify(newWalletData));
-
     } catch (error) {
-      console.error('Error removing wallet:', error);
+      console.error("Error removing wallet:", error);
       alert(`Failed to remove wallet: ${error.message}`);
     }
   };
 
   // Status tracking state
-  const [updateStatus, setUpdateStatus] = useState('');
-  const [updateError, setUpdateError] = useState('');
+  const [updateStatus, setUpdateStatus] = useState("");
+  const [updateError, setUpdateError] = useState("");
   const [debugInfo, setDebugInfo] = useState([]);
   const [walletStatus, setWalletStatus] = useState([]);
 
@@ -1427,8 +1783,8 @@ const App = () => {
   const addDebugInfo = (message, data = null) => {
     const timestamp = new Date().toLocaleTimeString();
     const debugEntry = { timestamp, message, data };
-    console.log(`🐛 [${timestamp}] ${message}`, data || '');
-    setDebugInfo(prev => [...prev.slice(-9), debugEntry]); // Keep last 10 entries
+    console.log(`🐛 [${timestamp}] ${message}`, data || "");
+    setDebugInfo((prev) => [...prev.slice(-9), debugEntry]); // Keep last 10 entries
   };
 
   // Load saved portfolio data on startup and sync wallets
@@ -1437,7 +1793,10 @@ const App = () => {
       const maxRetries = 3;
 
       try {
-        addDebugInfo("Starting portfolio data load", { retryCount, API_BASE_URL });
+        addDebugInfo("Starting portfolio data load", {
+          retryCount,
+          API_BASE_URL,
+        });
 
         // Test backend connection first with longer timeout
         addDebugInfo("Testing backend connection...");
@@ -1445,11 +1804,11 @@ const App = () => {
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
         const healthResponse = await fetch(`${API_BASE_URL}/health`, {
-          method: 'GET',
+          method: "GET",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
-          signal: controller.signal
+          signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
@@ -1462,13 +1821,18 @@ const App = () => {
         // Load hidden assets from backend
         try {
           addDebugInfo("Loading hidden assets...");
-          const hiddenResponse = await fetch(`${API_BASE_URL}/api/assets/hidden`);
+          const hiddenResponse = await fetch(
+            `${API_BASE_URL}/api/assets/hidden`,
+          );
           if (hiddenResponse.ok) {
             const hiddenData = await hiddenResponse.json();
-            const hiddenIds = hiddenData.map(asset => asset.token_address);
+            const hiddenIds = hiddenData.map((asset) => asset.token_address);
             setHiddenAssets(hiddenIds);
             localStorage.setItem("hiddenAssets", JSON.stringify(hiddenIds));
-            addDebugInfo(`✅ Loaded ${hiddenIds.length} hidden assets`, hiddenIds);
+            addDebugInfo(
+              `✅ Loaded ${hiddenIds.length} hidden assets`,
+              hiddenIds,
+            );
           } else {
             addDebugInfo(`⚠️ Hidden assets response: ${hiddenResponse.status}`);
           }
@@ -1481,7 +1845,9 @@ const App = () => {
         const portfolioResponse = await fetch(`${API_BASE_URL}/api/portfolio`);
 
         if (!portfolioResponse.ok) {
-          throw new Error(`Portfolio fetch failed: ${portfolioResponse.status} ${portfolioResponse.statusText}`);
+          throw new Error(
+            `Portfolio fetch failed: ${portfolioResponse.status} ${portfolioResponse.statusText}`,
+          );
         }
 
         const savedData = await portfolioResponse.json();
@@ -1489,110 +1855,135 @@ const App = () => {
 
         console.log("🔍 [FRONTEND DEBUG] Full backend response:", savedData);
         console.log("🔍 [FRONTEND DEBUG] Assets array:", savedData.assets);
-        console.log("🔍 [FRONTEND DEBUG] Assets length:", savedData.assets?.length);
+        console.log(
+          "🔍 [FRONTEND DEBUG] Assets length:",
+          savedData.assets?.length,
+        );
 
         if (savedData.assets && savedData.assets.length > 0) {
           console.log("🔄 [FRONTEND DEBUG] Starting asset transformation...");
-          console.log("🔍 [NFT SEARCH] Looking for NFTs in backend data...");
+          console.log(" ��� [NFT SEARCH] Looking for NFTs in backend data...");
 
           // First pass - identify NFTs
-          const nftsFound = savedData.assets.filter(asset => 
-            asset.is_nft === true || 
-            asset.is_nft === 1 ||
-            asset.symbol?.includes('NFT') || 
-            asset.name?.includes('Collection') ||
-            (asset.nft_metadata && asset.nft_metadata !== null)
+          const nftsFound = savedData.assets.filter(
+            (asset) =>
+              asset.is_nft === true ||
+              asset.is_nft === 1 ||
+              asset.symbol?.includes("NFT") ||
+              asset.name?.includes("Collection") ||
+              (asset.nft_metadata && asset.nft_metadata !== null),
           );
 
-          console.log(`🖼️ [NFT SEARCH] Found ${nftsFound.length} potential NFTs:`, nftsFound.map(nft => ({
-            symbol: nft.symbol,
-            name: nft.name,
-            is_nft: nft.is_nft,
-            has_metadata: !!nft.has_metadata
-          })));
+          console.log(
+            `🖼️ [NFT SEARCH] Found ${nftsFound.length} potential NFTs:`,
+            nftsFound.map((nft) => ({
+              symbol: nft.symbol,
+              name: nft.name,
+              is_nft: nft.is_nft,
+              has_metadata: !!nft.has_metadata,
+            })),
+          );
 
           const transformedAssets = savedData.assets.map((asset, index) => {
-        console.log(`🔄 [FRONTEND DEBUG] Transforming asset ${index + 1}:`, asset);
+            console.log(
+              `🔄 [FRONTEND DEBUG] Transforming asset ${index + 1}:`,
+              asset,
+            );
 
-        // Parse NFT metadata if present
-        let nftMetadata = null;
-        if (asset.nft_metadata) {
-          try {
-            nftMetadata = JSON.parse(asset.nft_metadata);
-            console.log(`🖼️ [NFT DEBUG] Parsed metadata for ${asset.symbol}:`, nftMetadata);
-          } catch (e) {
-            console.warn("Failed to parse NFT metadata:", e);
-          }
-        }
+            // Parse NFT metadata if present
+            let nftMetadata = null;
+            if (asset.nft_metadata) {
+              try {
+                nftMetadata = JSON.parse(asset.nft_metadata);
+                console.log(
+                  `🖼️ [NFT DEBUG] Parsed metadata for ${asset.symbol}:`,
+                  nftMetadata,
+                );
+              } catch (e) {
+                console.warn("Failed to parse NFT metadata:", e);
+              }
+            }
 
-        // Enhanced NFT detection - check backend flag first
-        const isNFT = asset.is_nft === true || 
-                     asset.is_nft === 1 || 
-                     asset.symbol?.includes('NFT') || 
-                     asset.name?.includes('Collection') ||
-                     (asset.balance_formatted && asset.balance_formatted.includes('NFTs')) ||
-                     (nftMetadata && nftMetadata.token_ids) ||
-                     false;
+            // Enhanced NFT detection - check backend flag first
+            const isNFT =
+              asset.is_nft === true ||
+              asset.is_nft === 1 ||
+              asset.symbol?.includes("NFT") ||
+              asset.name?.includes("Collection") ||
+              (asset.balance_formatted &&
+                asset.balance_formatted.includes("NFTs")) ||
+              (nftMetadata && nftMetadata.token_ids) ||
+              false;
 
-        if (isNFT) {
-          console.log(`🖼️ [NFT DEBUG] Detected NFT: ${asset.symbol} - ${asset.name} - Backend isNFT: ${asset.is_nft}`);
-          console.log(`🖼️ [NFT DEBUG] NFT Floor Price: ${asset.floor_price}, Image: ${asset.image_url}`);
-          console.log(`🖼️ [NFT DEBUG] NFT Metadata: ${asset.nft_metadata}`);
-        }
+            if (isNFT) {
+              console.log(
+                `🖼️ [NFT DEBUG] Detected NFT: ${asset.symbol} - ${asset.name} - Backend isNFT: ${asset.is_nft}`,
+              );
+              console.log(
+                `🖼️ [NFT DEBUG] NFT Floor Price: ${asset.floor_price}, Image: ${asset.image_url}`,
+              );
+              console.log(`🖼️ [NFT DEBUG] NFT Metadata: ${asset.nft_metadata}`);
+            }
 
-        const transformed = {
-          id: asset.id,
-          name: asset.name,
-          symbol: asset.symbol,
-          balance: asset.balance_formatted || asset.balance,
-          priceUSD: asset.price_usd || 0,
-          valueUSD: asset.value_usd || 0,
-          purchase_price: asset.purchase_price || 0,
-          total_invested: asset.total_invested || 0,
-          realized_pnl: asset.realized_pnl || 0,
-          unrealized_pnl: asset.unrealized_pnl || 0,
-          total_return_pct: asset.total_return_pct || 0,
-          notes: asset.notes || "",
-          isNFT: isNFT,
-          floorPrice: asset.floor_price || (nftMetadata?.floor_price) || 0,
-          imageUrl: asset.image_url || (nftMetadata?.image_url) || null,
-          performance24h: asset.price_change_24h || 0,
-          tokenIds: nftMetadata?.token_ids || [],
-          nftMetadata: asset.nft_metadata || null
-        };
+            const transformed = {
+              id: asset.id,
+              name: asset.name,
+              symbol: asset.symbol,
+              balance: asset.balance_formatted || asset.balance,
+              priceUSD: asset.price_usd || 0,
+              valueUSD: asset.value_usd || 0,
+              purchase_price: asset.purchase_price || 0,
+              total_invested: asset.total_invested || 0,
+              realized_pnl: asset.realized_pnl || 0,
+              unrealized_pnl: asset.unrealized_pnl || 0,
+              total_return_pct: asset.total_return_pct || 0,
+              notes: asset.notes || "",
+              isNFT: isNFT,
+              floorPrice: asset.floor_price || nftMetadata?.floor_price || 0,
+              imageUrl: asset.image_url || nftMetadata?.image_url || null,
+              performance24h: asset.price_change_24h || 0,
+              tokenIds: nftMetadata?.token_ids || [],
+              nftMetadata: asset.nft_metadata || null,
+            };
 
-        if (isNFT) {
-          console.log(`🖼️ [NFT DEBUG] Final NFT asset:`, transformed);
-        } else {
-          console.log(`✅ [FRONTEND DEBUG] Transformed to:`, transformed);
-        }
-        return transformed;
-      });
-          console.log("🎯 [FRONTEND DEBUG] Final transformed assets:", transformedAssets);
+            if (isNFT) {
+              console.log(`🖼️ [NFT DEBUG] Final NFT asset:`, transformed);
+            } else {
+              console.log(`✅ [FRONTEND DEBUG] Transformed to:`, transformed);
+            }
+            return transformed;
+          });
+          console.log(
+            "🎯 [FRONTEND DEBUG] Final transformed assets:",
+            transformedAssets,
+          );
 
           const savedTotalValue = savedData.total_value || 0;
 
           // Generate balance history based on saved data
-          const balanceHistory = savedTotalValue > 0 ? [
-            { value: savedTotalValue * 0.92 },
-            { value: savedTotalValue * 0.95 },
-            { value: savedTotalValue * 0.88 },
-            { value: savedTotalValue * 0.96 },
-            { value: savedTotalValue }
-          ] : [{ value: 0 }];
+          const balanceHistory =
+            savedTotalValue > 0
+              ? [
+                  { value: savedTotalValue * 0.92 },
+                  { value: savedTotalValue * 0.95 },
+                  { value: savedTotalValue * 0.88 },
+                  { value: savedTotalValue * 0.96 },
+                  { value: savedTotalValue },
+                ]
+              : [{ value: 0 }];
 
           const portfolioUpdate = {
             assets: transformedAssets,
             balanceHistory: balanceHistory,
             totalValue: savedTotalValue,
-            performance24h: savedData.performance_24h || 0
+            performance24h: savedData.performance_24h || 0,
           };
 
           setPortfolioData(portfolioUpdate);
           addDebugInfo(`✅ Portfolio data set successfully`, {
             assetCount: transformedAssets.length,
             totalValue: savedTotalValue,
-            sampleAsset: transformedAssets[0]
+            sampleAsset: transformedAssets[0],
           });
         } else {
           addDebugInfo("⚠️ No assets found in portfolio data", savedData);
@@ -1603,7 +1994,10 @@ const App = () => {
         const walletsResponse = await fetch(`${API_BASE_URL}/api/wallets`);
         if (walletsResponse.ok) {
           const backendWallets = await walletsResponse.json();
-          addDebugInfo(`📋 Backend has ${backendWallets.length} wallets`, backendWallets);
+          addDebugInfo(
+            `📋 Backend has ${backendWallets.length} wallets`,
+            backendWallets,
+          );
 
           // Update local wallet state to match backend, but preserve default wallets
           if (backendWallets.length > 0) {
@@ -1618,12 +2012,12 @@ const App = () => {
             const syncPromises = currentWallets.map(async (wallet) => {
               try {
                 const response = await fetch(`${API_BASE_URL}/api/wallets`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     address: wallet.address,
                     label: wallet.label,
-                    network: wallet.network
+                    network: wallet.network,
                   }),
                 });
 
@@ -1636,29 +2030,40 @@ const App = () => {
                   return null;
                 }
               } catch (error) {
-                addDebugInfo(`❌ Error syncing wallet ${wallet.label}: ${error.message}`);
+                addDebugInfo(
+                  `❌ Error syncing wallet ${wallet.label}: ${error.message}`,
+                );
                 return null;
               }
             });
 
             // Wait for all syncs to complete
             const syncedWallets = await Promise.all(syncPromises);
-            const successfulWallets = syncedWallets.filter(w => w !== null);
+            const successfulWallets = syncedWallets.filter((w) => w !== null);
 
             if (successfulWallets.length > 0) {
               setWalletAddresses(successfulWallets);
-              localStorage.setItem("fundWallets", JSON.stringify(successfulWallets));
-              addDebugInfo(`✅ Synced ${successfulWallets.length} wallets to backend`);
+              localStorage.setItem(
+                "fundWallets",
+                JSON.stringify(successfulWallets),
+              );
+              addDebugInfo(
+                `✅ Synced ${successfulWallets.length} wallets to backend`,
+              );
             }
           }
 
           // Load wallet status information
           try {
-            const statusResponse = await fetch(`${API_BASE_URL}/api/wallets/status`);
+            const statusResponse = await fetch(
+              `${API_BASE_URL}/api/wallets/status`,
+            );
             if (statusResponse.ok) {
               const statusData = await statusResponse.json();
               setWalletStatus(statusData);
-              addDebugInfo(`📊 Loaded wallet status for ${statusData.length} wallets`);
+              addDebugInfo(
+                `📊 Loaded wallet status for ${statusData.length} wallets`,
+              );
             }
           } catch (error) {
             addDebugInfo("⚠️ Could not load wallet status", error.message);
@@ -1669,40 +2074,56 @@ const App = () => {
             addDebugInfo("Syncing local wallets to backend...");
             for (const wallet of walletAddresses) {
               try {
-                const syncResponse = await fetch(`${API_BASE_URL}/api/wallets`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
+                const syncResponse = await fetch(
+                  `${API_BASE_URL}/api/wallets`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      address: wallet.address,
+                      label: wallet.label,
+                      network: wallet.network,
+                    }),
                   },
-                  body: JSON.stringify({
-                    address: wallet.address,
-                    label: wallet.label,
-                    network: wallet.network
-                  }),
-                });
+                );
 
                 if (syncResponse.ok) {
                   addDebugInfo(`✅ Synced wallet: ${wallet.label}`);
                 } else {
                   const errorData = await syncResponse.json();
-                  addDebugInfo(`❌ Failed to sync wallet ${wallet.label}: ${errorData.detail || 'Unknown error'}`);
+                  addDebugInfo(
+                    `❌ Failed to sync wallet ${wallet.label}: ${errorData.detail || "Unknown error"}`,
+                  );
                 }
               } catch (error) {
-                addDebugInfo(`❌ Error syncing wallet ${wallet.label}: ${error.message}`);
+                addDebugInfo(
+                  `❌ Error syncing wallet ${wallet.label}: ${error.message}`,
+                );
               }
             }
 
             // Reload backend wallets after sync
             try {
-              const refreshResponse = await fetch(`${API_BASE_URL}/api/wallets`);
+              const refreshResponse = await fetch(
+                `${API_BASE_URL}/api/wallets`,
+              );
               if (refreshResponse.ok) {
                 const refreshedWallets = await refreshResponse.json();
                 setWalletAddresses(refreshedWallets);
-                localStorage.setItem("fundWallets", JSON.stringify(refreshedWallets));
-                addDebugInfo(`✅ Refreshed wallet list: ${refreshedWallets.length} wallets`);
+                localStorage.setItem(
+                  "fundWallets",
+                  JSON.stringify(refreshedWallets),
+                );
+                addDebugInfo(
+                  `✅ Refreshed wallet list: ${refreshedWallets.length} wallets`,
+                );
               }
             } catch (error) {
-              addDebugInfo(`⚠️ Could not refresh wallet list: ${error.message}`);
+              addDebugInfo(
+                `⚠️ Could not refresh wallet list: ${error.message}`,
+              );
             }
           } else if (backendWallets.length > 0) {
             // Backend has wallets, use them as the source of truth
@@ -1715,34 +2136,40 @@ const App = () => {
         }
 
         addDebugInfo("🎉 Portfolio load completed successfully");
-
       } catch (error) {
         let errorMessage = error.message;
 
         // Handle specific error types
-        if (error.name === 'AbortError') {
-          errorMessage = 'Connection timeout - backend taking too long to respond';
-        } else if (error.message === 'Failed to fetch') {
-          errorMessage = 'Network error - cannot reach backend server';
+        if (error.name === "AbortError") {
+          errorMessage =
+            "Connection timeout - backend taking too long to respond";
+        } else if (error.message === "Failed to fetch") {
+          errorMessage = "Network error - cannot reach backend server";
         }
 
-        addDebugInfo(`❌ Portfolio load error (attempt ${retryCount + 1}/${maxRetries + 1})`, errorMessage);
+        addDebugInfo(
+          `❌ Portfolio load error (attempt ${retryCount + 1}/${maxRetries + 1})`,
+          errorMessage,
+        );
 
         // Retry with exponential backoff for network errors
-        if (retryCount < maxRetries && (
-          error.message.includes('Failed to fetch') || 
-          error.message.includes('Backend not ready') ||
-          error.name === 'AbortError' ||
-          error.message.includes('Network error') ||
-          error.message.includes('TypeError')
-        )) {
+        if (
+          retryCount < maxRetries &&
+          (error.message.includes("Failed to fetch") ||
+            error.message.includes("Backend not ready") ||
+            error.name === "AbortError" ||
+            error.message.includes("Network error") ||
+            error.message.includes("TypeError"))
+        ) {
           const delay = Math.min(Math.pow(2, retryCount) * 1000, 3000); // Cap at 3s for faster recovery
           addDebugInfo(`🔄 Retrying portfolio load in ${delay / 1000}s...`);
           setTimeout(() => loadPortfolioAndSyncWallets(retryCount + 1), delay);
         } else {
           // Only show error if all retries failed
           if (retryCount >= maxRetries) {
-            setUpdateError(`Failed to load portfolio after ${maxRetries + 1} attempts: ${errorMessage}`);
+            setUpdateError(
+              `Failed to load portfolio after ${maxRetries + 1} attempts: ${errorMessage}`,
+            );
           } else {
             setUpdateError(`Failed to load portfolio: ${errorMessage}`);
           }
@@ -1757,37 +2184,39 @@ const App = () => {
 
   const updatePortfolio = async () => {
     setIsLoading(true);
-    setUpdateError('');
-    setUpdateStatus('🔗 Connecting to backend...');
+    setUpdateError("");
+    setUpdateStatus("🔗 Connecting to backend...");
 
     addDebugInfo(`🔍 [UPDATE] Using API_BASE_URL: ${API_BASE_URL}`);
 
     try {
       // Step 1: Test backend connection
-      setUpdateStatus('🔗 Testing backend connection...');
+      setUpdateStatus("🔗 Testing backend connection...");
 
       // Try the health endpoint first
       const healthResponse = await fetch(`${API_BASE_URL}/health`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+        signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
       if (!healthResponse.ok) {
-        throw new Error(`Backend health check failed (${healthResponse.status})`);
+        throw new Error(
+          `Backend health check failed (${healthResponse.status})`,
+        );
       }
 
       const healthData = await healthResponse.json();
       addDebugInfo(`✅ [UPDATE] Backend health check passed`, healthData);
 
       // Step 2: Trigger portfolio update
-      setUpdateStatus('🚀 Starting portfolio update...');
+      setUpdateStatus("🚀 Starting portfolio update...");
       const response = await fetch(`${API_BASE_URL}/api/portfolio/update`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       });
 
@@ -1797,29 +2226,31 @@ const App = () => {
       }
 
       // Step 3: Wait for processing
-      setUpdateStatus('⏳ Processing wallet data...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      setUpdateStatus("⏳ Processing wallet data...");
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       // Step 4: Wait a bit more for backend processing
-      setUpdateStatus('⏳ Waiting for backend processing...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      setUpdateStatus("⏳ Waiting for backend processing...");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Step 5: Fetch updated portfolio data
-      setUpdateStatus('📊 Fetching portfolio data...');
+      setUpdateStatus("📊 Fetching portfolio data...");
       const portfolioResponse = await fetch(`${API_BASE_URL}/api/portfolio`);
       if (!portfolioResponse.ok) {
         const errorText = await portfolioResponse.text();
-        throw new Error(`Failed to fetch portfolio (${portfolioResponse.status}): ${errorText}`);
+        throw new Error(
+          `Failed to fetch portfolio (${portfolioResponse.status}): ${errorText}`,
+        );
       }
 
       const portfolioData = await portfolioResponse.json();
 
       // Log the fetched data for debugging
-      console.log('Fetched portfolio data:', portfolioData);
+      console.log("Fetched portfolio data:", portfolioData);
 
       // Step 6: Transform data
-      setUpdateStatus('🔄 Processing asset data...');
-      const updatedAssets = portfolioData.assets.map(asset => {
+      setUpdateStatus("🔄 Processing asset data...");
+      const updatedAssets = portfolioData.assets.map((asset) => {
         // Parse NFT metadata if present
         let nftMetadata = null;
         if (asset.nft_metadata) {
@@ -1831,13 +2262,15 @@ const App = () => {
         }
 
         // Enhanced NFT detection - check backend flag first
-        const isNFT = asset.is_nft === true || 
-                     asset.is_nft === 1 || 
-                     asset.symbol?.includes('NFT') || 
-                     asset.name?.includes('Collection') ||
-                     (asset.balance_formatted && asset.balance_formatted.includes('NFTs')) ||
-                     (nftMetadata && nftMetadata.token_ids) ||
-                     false;
+        const isNFT =
+          asset.is_nft === true ||
+          asset.is_nft === 1 ||
+          asset.symbol?.includes("NFT") ||
+          asset.name?.includes("Collection") ||
+          (asset.balance_formatted &&
+            asset.balance_formatted.includes("NFTs")) ||
+          (nftMetadata && nftMetadata.token_ids) ||
+          false;
 
         return {
           id: asset.id,
@@ -1853,44 +2286,55 @@ const App = () => {
           total_return_pct: asset.total_return_pct || 0,
           notes: asset.notes || "",
           isNFT: isNFT,
-          floorPrice: asset.floor_price || (nftMetadata?.floor_price) || 0,
-          imageUrl: asset.image_url || (nftMetadata?.image_url) || null,
+          floorPrice: asset.floor_price || nftMetadata?.floor_price || 0,
+          imageUrl: asset.image_url || nftMetadata?.image_url || null,
           performance24h: asset.price_change_24h || 0,
           tokenIds: nftMetadata?.token_ids || [],
-          nftMetadata: asset.nft_metadata || null
+          nftMetadata: asset.nft_metadata || null,
         };
       });
 
       const newTotalValue = portfolioData.total_value || 0;
 
       // Generate balance history (simplified - in production you'd fetch from backend)
-      const newBalanceHistory = newTotalValue > 0 ? [
-        { value: newTotalValue * 0.92 },
-        { value: newTotalValue * 0.95 },
-        { value: newTotalValue * 0.88 },
-        { value: newTotalValue * 0.96 },
-        { value: newTotalValue }
-      ] : [{ value: 0 }];
+      const newBalanceHistory =
+        newTotalValue > 0
+          ? [
+              { value: newTotalValue * 0.92 },
+              { value: newTotalValue * 0.95 },
+              { value: newTotalValue * 0.88 },
+              { value: newTotalValue * 0.96 },
+              { value: newTotalValue },
+            ]
+          : [{ value: 0 }];
 
-      console.log(`Found ${updatedAssets.length} assets with total value $${newTotalValue}`);
+      console.log(
+        `Found ${updatedAssets.length} assets with total value $${newTotalValue}`,
+      );
 
       // Step 7: Fetch individual wallet data
-      setUpdateStatus('💼 Updating wallet details...');
+      setUpdateStatus("💼 Updating wallet details...");
       const newWalletData = {};
       let walletCount = 0;
 
       // First, get updated wallet list from backend
       const walletsListResponse = await fetch(`${API_BASE_URL}/api/wallets`);
-      const currentWallets = walletsListResponse.ok ? await walletsListResponse.json() : walletAddresses;
+      const currentWallets = walletsListResponse.ok
+        ? await walletsListResponse.json()
+        : walletAddresses;
 
       for (const wallet of currentWallets) {
         try {
-          setUpdateStatus(`💼 Processing ${wallet.label} (${++walletCount}/${currentWallets.length})...`);
-          const walletResponse = await fetch(`${API_BASE_URL}/api/wallets/${wallet.id}/details`);
+          setUpdateStatus(
+            `💼 Processing ${wallet.label} (${++walletCount}/${currentWallets.length})...`,
+          );
+          const walletResponse = await fetch(
+            `${API_BASE_URL}/api/wallets/${wallet.id}/details`,
+          );
 
           if (walletResponse.ok) {
             const walletDetails = await walletResponse.json();
-            const walletAssets = walletDetails.assets.map(asset => {
+            const walletAssets = walletDetails.assets.map((asset) => {
               // Parse NFT metadata if present
               let nftMetadata = null;
               if (asset.nft_metadata) {
@@ -1902,13 +2346,15 @@ const App = () => {
               }
 
               // Enhanced NFT detection
-              const isNFT = asset.is_nft === true || 
-                           asset.is_nft === 1 || 
-                           asset.symbol?.includes('NFT') || 
-                           asset.name?.includes('Collection') ||
-                           (asset.balance_formatted && asset.balance_formatted.includes('NFTs')) ||
-                           (nftMetadata && nftMetadata.token_ids) ||
-                           false;
+              const isNFT =
+                asset.is_nft === true ||
+                asset.is_nft === 1 ||
+                asset.symbol?.includes("NFT") ||
+                asset.name?.includes("Collection") ||
+                (asset.balance_formatted &&
+                  asset.balance_formatted.includes("NFTs")) ||
+                (nftMetadata && nftMetadata.token_ids) ||
+                false;
 
               return {
                 id: asset.id,
@@ -1924,11 +2370,11 @@ const App = () => {
                 total_return_pct: asset.total_return_pct || 0,
                 notes: asset.notes || "",
                 isNFT: isNFT,
-                floorPrice: asset.floor_price || (nftMetadata?.floor_price) || 0,
-                imageUrl: asset.image_url || (nftMetadata?.image_url) || null,
+                floorPrice: asset.floor_price || nftMetadata?.floor_price || 0,
+                imageUrl: asset.image_url || nftMetadata?.image_url || null,
                 performance24h: asset.price_change_24h || 0,
                 tokenIds: nftMetadata?.token_ids || [],
-                nftMetadata: asset.nft_metadata || null
+                nftMetadata: asset.nft_metadata || null,
               };
             });
 
@@ -1942,26 +2388,39 @@ const App = () => {
                 { value: walletTotalValue * 0.95 },
                 { value: walletTotalValue * 0.88 },
                 { value: walletTotalValue * 0.96 },
-                { value: walletTotalValue }
-              ]
+                { value: walletTotalValue },
+              ],
             };
-            console.log(`✅ Loaded wallet ${wallet.label} with ${walletAssets.length} assets worth $${walletTotalValue.toLocaleString()}`);
+            console.log(
+              `✅ Loaded wallet ${wallet.label} with ${walletAssets.length} assets worth $${walletTotalValue.toLocaleString()}`,
+            );
           } else if (walletResponse.status === 404) {
-            console.warn(`⚠️ Wallet ${wallet.label} (ID: ${wallet.id}) not found in backend`);
-            setUpdateStatus(`⚠️ Wallet ${wallet.label} not found - it may need to be re-added`);
+            console.warn(
+              `⚠️ Wallet ${wallet.label} (ID: ${wallet.id}) not found in backend`,
+            );
+            setUpdateStatus(
+              `⚠️ Wallet ${wallet.label} not found - it may need to be re-added`,
+            );
           } else {
-            console.error(`❌ Error fetching wallet ${wallet.label}: ${walletResponse.status} ${walletResponse.statusText}`);
-            setUpdateStatus(`❌ Error fetching ${wallet.label}: ${walletResponse.status}`);
+            console.error(
+              `❌ Error fetching wallet ${wallet.label}: ${walletResponse.status} ${walletResponse.statusText}`,
+            );
+            setUpdateStatus(
+              `❌ Error fetching ${wallet.label}: ${walletResponse.status}`,
+            );
           }
         } catch (error) {
-          console.error(`❌ Network error fetching wallet ${wallet.label}:`, error);
+          console.error(
+            `❌ Network error fetching wallet ${wallet.label}:`,
+            error,
+          );
           setUpdateStatus(`⚠️ Network error fetching ${wallet.label}`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
 
       // Step 8: Save data and force refresh
-      setUpdateStatus('💾 Saving data...');
+      setUpdateStatus("💾 Saving data...");
       setWalletData(newWalletData);
       localStorage.setItem("walletData", JSON.stringify(newWalletData));
 
@@ -1970,25 +2429,25 @@ const App = () => {
         assets: updatedAssets,
         balanceHistory: newBalanceHistory,
         totalValue: newTotalValue,
-        performance24h: portfolioData.performance_24h || 0
+        performance24h: portfolioData.performance_24h || 0,
       };
       setPortfolioData(newPortfolioData);
 
       addDebugInfo("💾 Portfolio data updated after fetch", {
         assetCount: updatedAssets.length,
         totalValue: newTotalValue,
-        sampleAsset: updatedAssets[0]
+        sampleAsset: updatedAssets[0],
       });
 
       // Force a fresh load from the API to ensure sync
-      setUpdateStatus('🔄 Verifying update...');
+      setUpdateStatus("🔄 Verifying update...");
       try {
         const verifyResponse = await fetch(`${API_BASE_URL}/api/portfolio`);
         if (verifyResponse.ok) {
           const verifyData = await verifyResponse.json();
           addDebugInfo("✅ Verification successful", {
             backendAssets: verifyData.assets.length,
-            backendTotal: verifyData.total_value
+            backendTotal: verifyData.total_value,
           });
         }
       } catch (verifyError) {
@@ -1996,13 +2455,17 @@ const App = () => {
       }
 
       // Step 9: Load updated wallet status
-      setUpdateStatus('📊 Loading wallet status...');
+      setUpdateStatus("📊 Loading wallet status...");
       try {
-        const statusResponse = await fetch(`${API_BASE_URL}/api/wallets/status`);
+        const statusResponse = await fetch(
+          `${API_BASE_URL}/api/wallets/status`,
+        );
         if (statusResponse.ok) {
           const statusData = await statusResponse.json();
           setWalletStatus(statusData);
-          addDebugInfo(`📊 Updated wallet status for ${statusData.length} wallets`);
+          addDebugInfo(
+            `📊 Updated wallet status for ${statusData.length} wallets`,
+          );
         }
       } catch (error) {
         addDebugInfo("⚠️ Could not refresh wallet status", error.message);
@@ -2018,37 +2481,41 @@ const App = () => {
       localStorage.setItem("lastUpdated", now.toISOString());
 
       setUpdateStatus(`✅ Updated ${assetCount} assets • $${valueFormatted}`);
-      setTimeout(() => setUpdateStatus(''), 5000);
+      setTimeout(() => setUpdateStatus(""), 5000);
 
-      addDebugInfo('🎉 Portfolio update completed successfully', {
+      addDebugInfo("🎉 Portfolio update completed successfully", {
         totalAssets: assetCount,
-        totalValue: newTotalValue
+        totalValue: newTotalValue,
       });
-
     } catch (error) {
-      console.error('Error updating portfolio:', error);
+      console.error("Error updating portfolio:", error);
       console.log(`🔍 [UPDATE ERROR] API_BASE_URL was: ${API_BASE_URL}`);
       console.log(`🔍 [UPDATE ERROR] Error type: ${error.name}`);
       console.log(`🔍 [UPDATE ERROR] Error message: ${error.message}`);
 
-      let errorMessage = 'Unknown error occurred';
+      let errorMessage = "Unknown error occurred";
 
-      if (error.name === 'TimeoutError' || error.message.includes('timeout')) {
-        errorMessage = '⏰ Request timeout - backend is taking too long to respond.';
-      } else if (error.message.includes('Failed to fetch') || error.message.includes('fetch')) {
+      if (error.name === "TimeoutError" || error.message.includes("timeout")) {
+        errorMessage =
+          "⏰ Request timeout - backend is taking too long to respond.";
+      } else if (
+        error.message.includes("Failed to fetch") ||
+        error.message.includes("fetch")
+      ) {
         errorMessage = `🔌 Cannot connect to backend server at ${API_BASE_URL}. Backend may be down.`;
-      } else if (error.message.includes('CORS')) {
-        errorMessage = '🚫 CORS error - backend not configured for frontend domain.';
-      } else if (error.message.includes('Network')) {
-        errorMessage = '🌐 Network error - check your internet connection.';
-      } else if (error.message.includes('health check failed')) {
+      } else if (error.message.includes("CORS")) {
+        errorMessage =
+          "🚫 CORS error - backend not configured for frontend domain.";
+      } else if (error.message.includes("Network")) {
+        errorMessage = "🌐 Network error - check your internet connection.";
+      } else if (error.message.includes("health check failed")) {
         errorMessage = `❌ Backend health check failed. Backend is not responding properly.`;
       } else {
         errorMessage = `❌ ${error.message}`;
       }
 
       setUpdateError(errorMessage);
-      setUpdateStatus('');
+      setUpdateStatus("");
     } finally {
       setIsLoading(false);
     }
@@ -2064,19 +2531,24 @@ const App = () => {
     0,
   );
 
-  const topAsset = visibleAssets.length > 0 ? visibleAssets.reduce((prev, current) => 
-    prev.valueUSD > current.valueUSD ? prev : current
-  ) : null;
+  const topAsset =
+    visibleAssets.length > 0
+      ? visibleAssets.reduce((prev, current) =>
+          prev.valueUSD > current.valueUSD ? prev : current,
+        )
+      : null;
 
-  const topAssetWeight = topAsset ? ((topAsset.valueUSD / totalValue) * 100).toFixed(1) : 0;
+  const topAssetWeight = topAsset
+    ? ((topAsset.valueUSD / totalValue) * 100).toFixed(1)
+    : 0;
 
   // Calculate performance vs raised capital
   const raisedCapital = 138000; // Hardcoded raised capital amount
-  const performanceVsRaised = totalValue > 0 ? ((totalValue - raisedCapital) / raisedCapital * 100) : 0;
+  const performanceVsRaised =
+    totalValue > 0 ? ((totalValue - raisedCapital) / raisedCapital) * 100 : 0;
   const performanceSign = performanceVsRaised >= 0 ? "+" : "";
-  const performanceChangeType = performanceVsRaised >= 0 ? "positive" : "negative";
-
-
+  const performanceChangeType =
+    performanceVsRaised >= 0 ? "positive" : "negative";
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -2087,18 +2559,24 @@ const App = () => {
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
               {/* Removing the icon */}
               <div className="min-w-0 flex-1">
-                <h1 className="text-lg sm:text-2xl font-bold truncate">📊 w3e.info</h1>
+                <h1 className="text-lg sm:text-2xl font-bold truncate">
+                  📊 w3e.info
+                </h1>
                 {/* Status Display */}
                 {updateStatus && (
                   <div className="flex items-center space-x-2 mt-1">
                     <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                    <p className="text-xs sm:text-sm text-blue-300 truncate">{updateStatus}</p>
+                    <p className="text-xs sm:text-sm text-blue-300 truncate">
+                      {updateStatus}
+                    </p>
                   </div>
                 )}
                 {updateError && (
                   <div className="flex items-center space-x-2 mt-1">
                     <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                    <p className="text-xs sm:text-sm text-red-300 truncate">Update failed</p>
+                    <p className="text-xs sm:text-sm text-red-300 truncate">
+                      Update failed
+                    </p>
                   </div>
                 )}
               </div>
@@ -2106,19 +2584,25 @@ const App = () => {
             <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
               {/* Refresh Button with Rebuilt Status System */}
               <div className="relative group">
-                <button 
+                <button
                   onClick={updatePortfolio}
                   disabled={isLoading}
                   className={`relative p-2 sm:p-3 rounded-xl transition-all duration-300 overflow-hidden ${
-                    isLoading 
-                      ? 'bg-blue-600/30 text-blue-300 cursor-not-allowed ring-2 ring-blue-400/50' 
-                      : updateError 
-                      ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30 ring-1 ring-red-500/50'
-                      : updateStatus && !isLoading
-                      ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30 ring-1 ring-green-500/50'
-                      : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg hover:shadow-blue-500/25'
+                    isLoading
+                      ? "bg-blue-600/30 text-blue-300 cursor-not-allowed ring-2 ring-blue-400/50"
+                      : updateError
+                        ? "bg-red-600/20 text-red-400 hover:bg-red-600/30 ring-1 ring-red-500/50"
+                        : updateStatus && !isLoading
+                          ? "bg-green-600/20 text-green-400 hover:bg-green-600/30 ring-1 ring-green-500/50"
+                          : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg hover:shadow-blue-500/25"
                   }`}
-                  title={isLoading ? "Updating..." : updateError ? "Update failed" : "Update Portfolio"}
+                  title={
+                    isLoading
+                      ? "Updating..."
+                      : updateError
+                        ? "Update failed"
+                        : "Update Portfolio"
+                  }
                 >
                   {/* Background Animation for Loading */}
                   {isLoading && (
@@ -2126,23 +2610,41 @@ const App = () => {
                   )}
 
                   {/* Icon */}
-                  <svg 
+                  <svg
                     className={`relative z-10 w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-500 ${
-                      isLoading ? 'animate-spin' : 
-                      updateError ? 'text-red-400' :
-                      updateStatus && !isLoading ? 'text-green-400' :
-                      'group-hover:rotate-180'
-                    }`} 
-                    fill="none" 
-                    stroke="currentColor" 
+                      isLoading
+                        ? "animate-spin"
+                        : updateError
+                          ? "text-red-400"
+                          : updateStatus && !isLoading
+                            ? "text-green-400"
+                            : "group-hover:rotate-180"
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
                     {updateError ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     ) : updateStatus && !isLoading ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
                     )}
                   </svg>
 
@@ -2155,17 +2657,27 @@ const App = () => {
                 </button>
 
                 {/* Enhanced Status Tooltip */}
-                <div className={`absolute right-0 top-full mt-2 w-96 bg-gray-900 border-2 rounded-xl shadow-2xl z-50 transition-all duration-300 ${
-                  (updateStatus || updateError || isLoading) ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
-                }`}>
+                <div
+                  className={`absolute right-0 top-full mt-2 w-96 bg-gray-900 border-2 rounded-xl shadow-2xl z-50 transition-all duration-300 ${
+                    updateStatus || updateError || isLoading
+                      ? "opacity-100 scale-100 translate-y-0"
+                      : "opacity-0 scale-95 -translate-y-2 pointer-events-none"
+                  }`}
+                >
                   <div className="p-4">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-base font-bold text-white flex items-center space-x-2">
                         <span>Portfolio Update</span>
-                        {isLoading && <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>}
-                        {updateError && <div className="w-2 h-2 bg-red-400 rounded-full"></div>}
-                        {updateStatus && !isLoading && !updateError && <div className="w-2 h-2 bg-green-400 rounded-full"></div>}
+                        {isLoading && (
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                        )}
+                        {updateError && (
+                          <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                        )}
+                        {updateStatus && !isLoading && !updateError && (
+                          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                        )}
                       </h4>
                     </div>
 
@@ -2174,11 +2686,15 @@ const App = () => {
                       <div className="mb-4">
                         <div className="flex items-center space-x-3 mb-3">
                           <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-                          <p className="text-sm text-blue-300 flex-1">{updateStatus}</p>
+                          <p className="text-sm text-blue-300 flex-1">
+                            {updateStatus}
+                          </p>
                         </div>
                         <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse transition-all duration-1000" 
-                               style={{width: '75%'}}></div>
+                          <div
+                            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse transition-all duration-1000"
+                            style={{ width: "75%" }}
+                          ></div>
                         </div>
                       </div>
                     )}
@@ -2187,10 +2703,22 @@ const App = () => {
                     {updateStatus && !isLoading && !updateError && (
                       <div className="mb-4 p-3 bg-green-900/20 border border-green-700/50 rounded-lg">
                         <div className="flex items-center space-x-2 mb-2">
-                          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          <svg
+                            className="w-4 h-4 text-green-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
                           </svg>
-                          <p className="text-sm text-green-300 font-medium">Update Complete!</p>
+                          <p className="text-sm text-green-300 font-medium">
+                            Update Complete!
+                          </p>
                         </div>
                         <p className="text-xs text-green-400">{updateStatus}</p>
                       </div>
@@ -2200,15 +2728,31 @@ const App = () => {
                     {updateError && (
                       <div className="mb-4 p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
                         <div className="flex items-center space-x-2 mb-2">
-                          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <svg
+                            className="w-4 h-4 text-red-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
                           </svg>
-                          <p className="text-sm text-red-300 font-medium">Update Failed</p>
+                          <p className="text-sm text-red-300 font-medium">
+                            Update Failed
+                          </p>
                         </div>
-                        <p className="text-xs text-red-400 mb-3">{updateError}</p>
+                        <p className="text-xs text-red-400 mb-3">
+                          {updateError}
+                        </p>
 
                         <div className="bg-red-900/30 rounded p-2">
-                          <p className="text-xs font-medium text-red-300 mb-1">🔧 Troubleshooting:</p>
+                          <p className="text-xs font-medium text-red-300 mb-1">
+                            🔧 Troubleshooting:
+                          </p>
                           <ul className="text-xs text-red-400 space-y-1">
                             <li>• Check if backend is running on port 8000</li>
                             <li>• Verify environment variables are set</li>
@@ -2220,20 +2764,37 @@ const App = () => {
 
                     {/* Footer */}
                     <div className="text-xs text-gray-500 text-center">
-                      {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString()}` : 'Never updated'}
+                      {lastUpdated
+                        ? `Last updated: ${lastUpdated.toLocaleTimeString()}`
+                        : "Never updated"}
                     </div>
                   </div>
                 </div>
               </div>
 
-              <button 
+              <button
                 onClick={() => setShowSettings(true)}
                 className="text-gray-400 hover:text-white transition-colors p-1 sm:p-2"
                 title="Settings"
               >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <svg
+                  className="w-4 h-4 sm:w-5 sm:h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
                 </svg>
               </button>
             </div>
@@ -2242,8 +2803,6 @@ const App = () => {
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
-
-
         {/* Key Metrics - Mobile responsive grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           <MetricCard
@@ -2251,7 +2810,9 @@ const App = () => {
             value={`$${totalValue.toLocaleString()}`}
             change={
               <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${getLiveStatus().dot}`}></div>
+                <div
+                  className={`w-2 h-2 rounded-full ${getLiveStatus().dot}`}
+                ></div>
                 <span className={getLiveStatus().color}>
                   {getLiveStatus().text}
                 </span>
@@ -2263,8 +2824,13 @@ const App = () => {
           <MetricCard
             title="Performance"
             value={
-              <span className={performanceVsRaised >= 0 ? 'text-green-400' : 'text-red-400'}>
-                {performanceSign}{performanceVsRaised.toFixed(1)}%
+              <span
+                className={
+                  performanceVsRaised >= 0 ? "text-green-400" : "text-red-400"
+                }
+              >
+                {performanceSign}
+                {performanceVsRaised.toFixed(1)}%
               </span>
             }
             change="Since inception"
@@ -2290,12 +2856,22 @@ const App = () => {
         {false && (
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-3 sm:space-y-0">
-              <h3 className="text-base sm:text-lg font-semibold text-white">Portfolio Performance</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-white">
+                Portfolio Performance
+              </h3>
               <div className="flex space-x-2 overflow-x-auto">
-                <button className="px-3 py-1 text-xs bg-purple-600 text-white rounded-md whitespace-nowrap">7D</button>
-                <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">30D</button>
-                <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">90D</button>
-                <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">1Y</button>
+                <button className="px-3 py-1 text-xs bg-purple-600 text-white rounded-md whitespace-nowrap">
+                  7D
+                </button>
+                <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">
+                  30D
+                </button>
+                <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">
+                  90D
+                </button>
+                <button className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 whitespace-nowrap">
+                  1Y
+                </button>
               </div>
             </div>
             <div className="h-48 sm:h-64 lg:h-80">
@@ -2307,8 +2883,6 @@ const App = () => {
         {/* Action Cards for Editor */}
         {isEditor && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 sm:mb-8">
-
-
             <ActionCard
               title="📊 Returns Analysis"
               description="View detailed performance metrics and top performers"
@@ -2318,9 +2892,15 @@ const App = () => {
             />
 
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
-              <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">Generate Reports</h3>
-              <p className="text-sm text-gray-400 mb-4">Export performance reports</p>
-              <ReportGenerator portfolioData={{ ...portfolioData, totalValue }} />
+              <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">
+                Generate Reports
+              </h3>
+              <p className="text-sm text-gray-400 mb-4">
+                Export performance reports
+              </p>
+              <ReportGenerator
+                portfolioData={{ ...portfolioData, totalValue }}
+              />
             </div>
           </div>
         )}
@@ -2328,33 +2908,58 @@ const App = () => {
         {/* Wallet Management Section */}
         {isEditor && (
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
-            <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">Fund Wallets</h3>
+            <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">
+              Fund Wallets
+            </h3>
 
             {/* Current Wallets with Status */}
             <div className="space-y-3 mb-6">
               {walletAddresses.map((wallet) => {
-                const status = walletStatus.find(s => s.wallet_id === wallet.id);
-                const statusColor = status?.status === 'success' ? 'bg-green-500' : 
-                                   status?.status === 'error' ? 'bg-red-500' :
-                                   status?.status === 'timeout' ? 'bg-yellow-500' : 'bg-gray-500';
-                const statusText = status?.status === 'success' ? '✅' :
-                                  status?.status === 'error' ? '❌' :
-                                  status?.status === 'timeout' ? '⏰' : '❓';
+                const status = walletStatus.find(
+                  (s) => s.wallet_id === wallet.id,
+                );
+                const statusColor =
+                  status?.status === "success"
+                    ? "bg-green-500"
+                    : status?.status === "error"
+                      ? "bg-red-500"
+                      : status?.status === "timeout"
+                        ? "bg-yellow-500"
+                        : "bg-gray-500";
+                const statusText =
+                  status?.status === "success"
+                    ? "✅"
+                    : status?.status === "error"
+                      ? "❌"
+                      : status?.status === "timeout"
+                        ? "⏰"
+                        : "❓";
 
                 return (
-                  <div key={wallet.id} className="p-3 bg-gray-800 rounded-lg border border-gray-700">
+                  <div
+                    key={wallet.id}
+                    className="p-3 bg-gray-800 rounded-lg border border-gray-700"
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-3 min-w-0 flex-1">
                         <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-white font-bold text-xs">{wallet.network}</span>
+                          <span className="text-white font-bold text-xs">
+                            {wallet.network}
+                          </span>
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center space-x-2">
-                            <p className="text-white font-medium text-sm">{wallet.label}</p>
+                            <p className="text-white font-medium text-sm">
+                              {wallet.label}
+                            </p>
                             <span className="text-xs">{statusText}</span>
-                            <div className={`w-2 h-2 rounded-full ${statusColor} flex-shrink-0`}></div>
+                            <div
+                              className={`w-2 h-2 rounded-full ${statusColor} flex-shrink-0`}
+                            ></div>
                           </div>
-                          <p className="text-gray-400 text-xs font-mono break-all">{wallet.address}</p>
+                          <p className="text-gray-400 text-xs font-mono break-all">
+                            {wallet.address}
+                          </p>
                         </div>
                       </div>
                       <button
@@ -2362,8 +2967,18 @@ const App = () => {
                         className="text-red-400 hover:text-red-300 p-1 ml-2 flex-shrink-0"
                         title="Remove wallet"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
                         </svg>
                       </button>
                     </div>
@@ -2373,19 +2988,29 @@ const App = () => {
                       <div className="grid grid-cols-3 gap-2 text-xs text-gray-400 mt-2 pt-2 border-t border-gray-700">
                         <div>
                           <span className="block">Assets</span>
-                          <span className="text-white">{status.assets_found || 0}</span>
+                          <span className="text-white">
+                            {status.assets_found || 0}
+                          </span>
                         </div>
                         <div>
                           <span className="block">Value</span>
-                          <span className="text-white">${(status.total_value || 0).toLocaleString()}</span>
+                          <span className="text-white">
+                            ${(status.total_value || 0).toLocaleString()}
+                          </span>
                         </div>
                         <div>
                           <span className="block">Status</span>
-                          <span className={`${
-                            status.status === 'success' ? 'text-green-400' :
-                            status.status === 'error' ? 'text-red-400' :
-                            status.status === 'timeout' ? 'text-yellow-400' : 'text-gray-400'
-                          }`}>
+                          <span
+                            className={`${
+                              status.status === "success"
+                                ? "text-green-400"
+                                : status.status === "error"
+                                  ? "text-red-400"
+                                  : status.status === "timeout"
+                                    ? "text-yellow-400"
+                                    : "text-gray-400"
+                            }`}
+                          >
                             {status.status}
                           </span>
                         </div>
@@ -2405,7 +3030,9 @@ const App = () => {
 
             {/* Add New Wallet Form */}
             <div className="border-t border-gray-700 pt-4">
-              <h4 className="text-sm font-medium text-gray-300 mb-3">Add New Wallet</h4>
+              <h4 className="text-sm font-medium text-gray-300 mb-3">
+                Add New Wallet
+              </h4>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <input
                   type="text"
@@ -2438,24 +3065,23 @@ const App = () => {
                 >
                   Add Wallet
                 </button>
-
               </div>
             </div>
           </div>
         )}
 
-
-
-
-
-
         {/* Current Positions Grid - Mobile responsive */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <div>
-              <h3 className="text-base sm:text-lg font-semibold text-white">Current Positions</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-white">
+                Current Positions
+              </h3>
               <p className="text-xs sm:text-sm text-gray-400">
-                {visibleAssets.length} positions • ${visibleAssets.reduce((sum, asset) => sum + asset.valueUSD, 0).toLocaleString()}
+                {visibleAssets.length} positions • $
+                {visibleAssets
+                  .reduce((sum, asset) => sum + asset.valueUSD, 0)
+                  .toLocaleString()}
               </p>
             </div>
           </div>
@@ -2464,8 +3090,18 @@ const App = () => {
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 sm:p-8 text-center">
               <div className="mb-4">
                 <div className="w-16 h-16 mx-auto mb-4 bg-gray-800 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-4 4m0 0l-4-4m4 4V3" />
+                  <svg
+                    className="w-8 h-8 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-4 4m0 0l-4-4m4 4V3"
+                    />
                   </svg>
                 </div>
               </div>
@@ -2473,7 +3109,9 @@ const App = () => {
                 No Token Data Found
               </h4>
               <p className="text-sm text-gray-400 mb-6 max-w-md mx-auto">
-                Your portfolio appears to be empty. Click the "Update Database" button to fetch the latest wallet balances and asset data from your configured wallets.
+                Your portfolio appears to be empty. Click the "Update Database"
+                button to fetch the latest wallet balances and asset data from
+                your configured wallets.
               </p>
               <button className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium">
                 {isLoading ? <LoadingSpinner /> : "🔄 Update Database"}
@@ -2495,14 +3133,16 @@ const App = () => {
           )}
         </div>
 
-
         {/* Wallets Section */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <div>
-              <h3 className="text-base sm:text-lg font-semibold text-white">Fund Wallets</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-white">
+                Fund Wallets
+              </h3>
               <p className="text-xs sm:text-sm text-gray-400">
-                {walletAddresses.length} wallets • {Object.keys(walletData).length} with data
+                {walletAddresses.length} wallets •{" "}
+                {Object.keys(walletData).length} with data
               </p>
             </div>
           </div>
@@ -2511,8 +3151,18 @@ const App = () => {
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 sm:p-8 text-center">
               <div className="mb-4">
                 <div className="w-16 h-16 mx-auto mb-4 bg-gray-800 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  <svg
+                    className="w-8 h-8 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                    />
                   </svg>
                 </div>
               </div>
@@ -2520,7 +3170,8 @@ const App = () => {
                 No Wallets Configured
               </h4>
               <p className="text-sm text-gray-400 mb-6 max-w-md mx-auto">
-                Add wallet addresses to start tracking individual wallet performance and asset breakdowns.
+                Add wallet addresses to start tracking individual wallet
+                performance and asset breakdowns.
               </p>
               {isEditor && (
                 <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium">
@@ -2532,16 +3183,26 @@ const App = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {walletAddresses.map((wallet) => {
                 // Check if wallet has status info to determine if there's an error
-                const status = walletStatus.find(s => s.wallet_id === wallet.id);
+                const status = walletStatus.find(
+                  (s) => s.wallet_id === wallet.id,
+                );
                 const hasData = walletData[wallet.id];
-                const hasError = status?.status === 'error' || (!hasData && wallet.network === 'SOL');
+                const hasError =
+                  status?.status === "error" ||
+                  (!hasData && wallet.network === "SOL");
 
                 return (
                   <WalletCard
                     key={wallet.id}
                     wallet={wallet}
                     onClick={() => setSelectedWallet(wallet)}
-                    walletData={walletData[wallet.id] || { assets: [], performance: 0, hasError }}
+                    walletData={
+                      walletData[wallet.id] || {
+                        assets: [],
+                        performance: 0,
+                        hasError,
+                      }
+                    }
                     assets={portfolioData.assets}
                     totalValue={portfolioData.totalValue}
                     performance={portfolioData.performance24h || 0}
@@ -2551,7 +3212,6 @@ const App = () => {
             </div>
           )}
         </div>
-
 
         {/* Hidden Assets */}
         {hiddenAssets.length > 0 && isEditor && (
@@ -2563,7 +3223,10 @@ const App = () => {
               {portfolioData.assets
                 .filter((asset) => hiddenAssets.includes(asset.id))
                 .map((asset) => (
-                  <div key={asset.id} className="bg-gray-800 border border-gray-600 rounded-lg p-4 opacity-60">
+                  <div
+                    key={asset.id}
+                    className="bg-gray-800 border border-gray-600 rounded-lg p-4 opacity-60"
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
@@ -2586,46 +3249,44 @@ const App = () => {
           </div>
         )}
 
+        {/* Asset Modal */}
+        {selectedAsset && (
+          <AssetModal
+            asset={selectedAsset}
+            onClose={() => setSelectedAsset(null)}
+            onUpdateNotes={updateNotes}
+            onUpdatePurchasePrice={updatePurchasePrice}
+            isEditor={isEditor}
+          />
+        )}
 
-      {/* Asset Modal */}
-      {selectedAsset && (
-        <AssetModal
-          asset={selectedAsset}
-          onClose={() => setSelectedAsset(null)}
-          onUpdateNotes={updateNotes}
-          onUpdatePurchasePrice={updatePurchasePrice}
+        {/* Wallet Modal */}
+        {selectedWallet && (
+          <WalletModal
+            wallet={selectedWallet}
+            onClose={() => setSelectedWallet(null)}
+            walletData={walletData[selectedWallet.id]}
+            portfolioData={portfolioData}
+          />
+        )}
+
+        {/* Settings Modal */}
+        <SettingsModal
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
           isEditor={isEditor}
+          password={password}
+          setPassword={setPassword}
+          onPasswordCheck={checkPassword}
+          onEditorExit={handleEditorExit}
         />
-      )}
 
-      {/* Wallet Modal */}
-      {selectedWallet && (
-        <WalletModal
-          wallet={selectedWallet}
-          onClose={() => setSelectedWallet(null)}
-          walletData={walletData[selectedWallet.id]}
+        {/* Returns Analysis Modal */}
+        <ReturnsModal
+          isOpen={showReturnsModal}
+          onClose={() => setShowReturnsModal(false)}
           portfolioData={portfolioData}
         />
-      )}
-
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        isEditor={isEditor}
-        password={password}
-        setPassword={setPassword}
-        onPasswordCheck={checkPassword}
-        onEditorExit={handleEditorExit}
-      />
-
-      {/* Returns Analysis Modal */}
-      <ReturnsModal
-        isOpen={showReturnsModal}
-        onClose={() => setShowReturnsModal(false)}
-        portfolioData={portfolioData}
-      />
-
       </div>
     </div>
   );
