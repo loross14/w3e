@@ -1883,7 +1883,7 @@ const App = () => {
   const performanceSign = performanceVsRaised >= 0 ? "+" : "";
   const performanceChangeType = performanceVsRaised >= 0 ? "positive" : "negative";
 
-  const [isOverviewCollapsed, setIsOverviewCollapsed] = useState(false);
+  
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -2251,120 +2251,7 @@ const App = () => {
           </div>
         )}
 
-        {/* Portfolio Overview Cards */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <div>
-              <h3 className="text-base sm:text-lg font-semibold text-white">📊 Portfolio Overview</h3>
-              <p className="text-xs sm:text-sm text-gray-400">
-                Performance breakdown across all positions
-              </p>
-            </div>
-			  {/* Adding closeable functionality */}
-              <button 
-				onClick={() => setIsOverviewCollapsed(!isOverviewCollapsed)}
-				className="text-gray-400 hover:text-white p-1"
-				title="Collapse Overview"
-			  >
-				  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-				  </svg>
-			  </button>
-          </div>
-		  {/* Adding conditional rendering for portfolio overview section */}
-		  {!isOverviewCollapsed && (
-          <div className="grid grid-cols-2 gap-4 sm:gap-6 mb-6">
-            {/* Top Performers Card */}
-            <div className="bg-gradient-to-br from-green-900/20 via-emerald-900/20 to-gray-900 border border-green-500/30 rounded-lg p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 rounded-full bg-green-400"></div>
-                  <h4 className="text-sm font-semibold text-green-100">🚀 Top Performers</h4>
-                </div>
-                <div className="text-xs text-green-400 font-mono">
-                  {visibleAssets.filter(asset => asset.total_return_pct > 0).length} profitable
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {visibleAssets
-                  .filter(asset => asset.total_return_pct > 0)
-                  .sort((a, b) => b.total_return_pct - a.total_return_pct)
-                  .slice(0, 3)
-                  .map((asset, index) => (
-                    <div key={asset.id} className="flex items-center justify-between py-2 px-3 bg-green-900/20 rounded-lg border border-green-700/30">
-                      <div className="flex items-center space-x-2 min-w-0 flex-1">
-                        <span className="text-xs text-green-400 font-bold w-6">#{index + 1}</span>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-green-100 truncate">{asset.symbol}</div>
-                          <div className="text-xs text-green-300">${asset.valueUSD.toLocaleString()}</div>
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-sm font-bold text-green-400">
-                          +{asset.total_return_pct.toFixed(0)}%
-                        </div>
-                        <div className="text-xs text-green-300">
-                          +${asset.unrealized_pnl.toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                }
-
-                {visibleAssets.filter(asset => asset.total_return_pct > 0).length === 0 && (
-                  <div className="text-center py-4">
-                    <div className="text-green-300 text-sm">No profitable positions yet</div>
-                    <div className="text-green-400 text-xs mt-1">Keep hodling! 💎🙌</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Largest Holdings Card */}
-            <div className="bg-gradient-to-br from-blue-900/20 via-indigo-900/20 to-gray-900 border border-blue-500/30 rounded-lg p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                  <h4 className="text-sm font-semibold text-blue-100">💰 Largest Holdings</h4>
-                </div>
-                <div className="text-xs text-blue-400 font-mono">
-                  ${totalValue.toLocaleString()} total
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {visibleAssets
-                  .sort((a, b) => b.valueUSD - a.valueUSD)
-                  .slice(0, 3)
-                  .map((asset, index) => {
-                    const weight = ((asset.valueUSD / totalValue) * 100).toFixed(1);
-                    return (
-                      <div key={asset.id} className="flex items-center justify-between py-2 px-3 bg-blue-900/20 rounded-lg border border-blue-700/30">
-                        <div className="flex items-center space-x-2 min-w-0 flex-1">
-                          <span className="text-xs text-blue-400 font-bold w-6">#{index + 1}</span>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm font-medium text-blue-100 truncate">{asset.symbol}</div>
-                            <div className="text-xs text-blue-300">{asset.balance} tokens</div>
-                          </div>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <div className="text-sm font-bold text-blue-300">
-                            {weight}%
-                          </div>
-                          <div className="text-xs text-blue-400">
-                            ${asset.valueUSD.toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                }
-              </div>
-            </div>
-          </div>
-		  )}
-        </div>
+        
 
 
 
