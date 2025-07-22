@@ -526,7 +526,7 @@ class EthereumAssetFetcher(AssetFetcher):
                         print(f"🖼️ [ETH NFT QUERY] Response status: {nft_response.status_code}")
                         print(f"🖼️ [ETH NFT QUERY] Response headers: {dict(nft_response.headers)}")
 
-                if nft_response.status_code == 200:
+                        if nft_response.status_code == 200:
                             try:
                                 nft_data = nft_response.json()
                                 print(f"🖼️ [ETH NFT QUERY] Raw response keys: {list(nft_data.keys())}")
@@ -556,7 +556,7 @@ class EthereumAssetFetcher(AssetFetcher):
                                     print(f"🖼️ [ETH NFT QUERY] Unexpected result format: {result}")
                                     continue
 
-                    print(f"🖼️ [ETH NFT QUERY] ============ NFT QUERY RESULTS ({method_config['method']}) ============")
+                                print(f"🖼️ [ETH NFT QUERY] ============ NFT QUERY RESULTS ({method_config['method']}) ============")
                                 print(f"🖼️ [ETH NFT QUERY] Total NFTs found: {total_count}")
                                 print(f"🖼️ [ETH NFT QUERY] NFTs in result array: {len(owned_nfts)}")
                                 print(f"🖼️ [ETH NFT QUERY] Wallet: {wallet_address}")
@@ -668,7 +668,13 @@ class EthereumAssetFetcher(AssetFetcher):
                                         print(f"❌ [ETH NFT] Error processing NFT #{i+1}: {nft_error}")
                                         print(f"❌ [ETH NFT] Problematic NFT data: {nft}")
                                         continue
-
+                                
+                            except Exception as e:
+                                print(f"An error occurred: {e}")
+                            finally:
+                                print("Cleanup code here if needed")
+                        
+                                    
                     print(
                         f"🖼️ [ETH NFT QUERY] ========== NFT COLLECTIONS SUMMARY =========="
                     )
@@ -729,12 +735,12 @@ class EthereumAssetFetcher(AssetFetcher):
                         f"❌ [ETH NFT QUERY] Response text: {nft_response.text}"
                     )
 
-                    # If the NFT API fails, continue without NFTs rather than failing completely
-                    if nft_response.status_code == 400:
-                        print(
-                            f"⚠️ [ETH NFT QUERY] NFT API not supported, skipping NFT collection..."
-                        )
-                        return assets
+                # If the NFT API fails, continue without NFTs rather than failing completely
+                if nft_response.status_code == 400:
+                    print(
+                        f"⚠️ [ETH NFT QUERY] NFT API not supported, skipping NFT collection..."
+                    )
+                    return assets
 
         except Exception as e:
             print(f"❌ [ETH NFT QUERY] Exception: {e}")
