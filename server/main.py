@@ -3666,7 +3666,7 @@ async def update_portfolio_data_new():
                             "0x0000000000000000000000000000000000000000".lower(
                             ), 0) or price_map.get("eth", 0))
                     if price_usd > 0:
-                        print(f"✅ ETH price lookup successful: ${price_usd}")
+                        print(f"✅ ETH current market price: ${price_usd}")
                     else:
                         print(
                             f"❌ ETH price lookup failed - checking price_map keys: {list(price_map.keys())}"
@@ -3677,12 +3677,13 @@ async def update_portfolio_data_new():
                     if price_usd == 0:
                         price_usd = price_map.get(token_address, 0)
 
-                    value_usd = asset['balance'] * price_usd
-                    nft_metadata = None
+                # Calculate current market value using CURRENT price, not override
+                value_usd = asset['balance'] * price_usd
+                nft_metadata = None
 
-                    print(
-                        f"💰 {asset['network']} Asset: {asset['symbol']} - Balance: {asset['balance']:.6f}, Price: ${price_usd:.6f}, Value: ${value_usd:.2f}"
-                    )
+                print(
+                    f"💰 {asset['network']} Asset: {asset['symbol']} = ${value_usd:.2f} (Balance: {asset['balance']:.6f} × Price: ${price_usd:.2f})"
+                )
 
                     # Identify spam/scam tokens and low-value tokens for auto-hiding
                     is_spam_token = (
@@ -3742,16 +3743,17 @@ async def update_portfolio_data_new():
                 override_data = cursor.fetchone()
 
                 if override_data:
-                    # Use the permanent override price
+                    # CRITICAL: Override affects ONLY purchase price, NOT current market value
                     purchase_price = override_data['override_price']
                     total_invested = asset['balance'] * purchase_price
                     realized_pnl = 0
+                    # Use actual current market value, not override price
                     unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
                     total_return_pct = ((value_usd - total_invested) /
                                         total_invested *
                                         100) if total_invested > 0 else 0
                     print(
-                        f"✅ [OVERRIDE] Using override price for {asset['symbol']}: ${purchase_price}"
+                        f"✅ [OVERRIDE] Using override price for {asset['symbol']}: ${purchase_price} (Current market value: ${value_usd:.2f})"
                     )
                 else:
                     # Check for cost basis data
@@ -3782,6 +3784,7 @@ async def update_portfolio_data_new():
                                             100) if total_invested > 0 else 0
 
                 # Insert asset into database
+                # CRITICAL: price_usd and value_usd are CURRENT MARKET DATA, not purchase data
                 cursor.execute(
                     """
                     INSERT INTO assets 
@@ -3795,6 +3798,16 @@ async def update_portfolio_data_new():
                       asset.get('floor_price', 0), asset.get('image_url'),
                       purchase_price, total_invested, realized_pnl,
                       unrealized_pnl, total_return_pct))
+
+                # Debug log to verify correct values
+                if asset['symbol'] == 'ETH':
+                    print(f"🔍 [ETH DEBUG] Inserted ETH with:")
+                    print(f"   - Current Price: ${price_usd}")
+                    print(f"   - Current Value: ${value_usd}")
+                    print(f"   - Purchase Price: ${purchase_price}")
+                    print(f"   - Total Invested: ${total_invested}")
+                    print(f"   - P&L: ${unrealized_pnl}")
+                    print(f"   - Return: {total_return_pct:.1f}%")
 
                 # Debug NFT insertion
                 if is_nft:
