@@ -1710,6 +1710,7 @@ const App = () => {
       if (!response.ok) {
         const errorText = await response.text();
         let errorMessage;
+        ```text
         try {
           const errorJson = JSON.parse(errorText);
           errorMessage = errorJson.detail || "Failed to add wallet";
@@ -1862,7 +1863,7 @@ const App = () => {
 
         if (savedData.assets && savedData.assets.length > 0) {
           console.log("🔄 [FRONTEND DEBUG] Starting asset transformation...");
-          console.log(" ��� [NFT SEARCH] Looking for NFTs in backend data...");
+          console.log("  [NFT SEARCH] Looking for NFTs in backend data...");
 
           // First pass - identify NFTs
           const nftsFound = savedData.assets.filter(
@@ -3100,7 +3101,7 @@ const App = () => {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-4 4m0 0l-4-4m4 4V3"
+                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2-2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-4 4m0 0l-4-4m4 4V3"
                     />
                   </svg>
                 </div>
