@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Protocol
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import httpx
 from web3 import Web3
@@ -14,6 +16,16 @@ import requests
 from abc import ABC, abstractmethod
 
 app = FastAPI(title="Crypto Fund API", version="1.0.0")
+
+# Serve static files in production
+if os.path.exists("../dist"):
+    print("🌐 [DEPLOYMENT] Serving static files from ../dist")
+    app.mount("/static", StaticFiles(directory="../dist/assets"), name="static")
+    app.mount("/assets", StaticFiles(directory="../dist/assets"), name="assets")
+elif os.path.exists("./dist"):
+    print("🌐 [DEPLOYMENT] Serving static files from ./dist")
+    app.mount("/static", StaticFiles(directory="./dist/assets"), name="static")
+    app.mount("/assets", StaticFiles(directory="./dist/assets"), name="assets")
 
 # CORS middleware for frontend
 app.add_middleware(
@@ -1492,7 +1504,15 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    return {"message": "Crypto Fund API", "status": "running"}
+    # In deployment, serve the React app
+    if os.path.exists("../dist/index.html"):
+        print("🌐 [DEPLOYMENT] Serving React app from ../dist/index.html")
+        return FileResponse("../dist/index.html")
+    elif os.path.exists("./dist/index.html"):
+        print("🌐 [DEPLOYMENT] Serving React app from ./dist/index.html")
+        return FileResponse("./dist/index.html")
+    else:
+        return {"message": "Crypto Fund API", "status": "running", "mode": "api-only"}
 
 @app.get("/health")
 async def health_check():
@@ -2576,7 +2596,39 @@ async def update_portfolio_data_new():
     finally:
         conn.close()
 
+# Catch-all route for SPA routing (must be last)
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    # Don't catch API routes
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+    
+    # Serve static assets
+    if full_path.startswith("assets/") or full_path.endswith(".js") or full_path.endswith(".css"):
+        if os.path.exists(f"../dist/{full_path}"):
+            return FileResponse(f"../dist/{full_path}")
+        elif os.path.exists(f"./dist/{full_path}"):
+            return FileResponse(f"./dist/{full_path}")
+    
+    # For all other routes, serve the React app
+    if os.path.exists("../dist/index.html"):
+        print(f"🌐 [SPA] Serving React app for route: /{full_path}")
+        return FileResponse("../dist/index.html")
+    elif os.path.exists("./dist/index.html"):
+        print(f"🌐 [SPA] Serving React app for route: /{full_path}")
+        return FileResponse("./dist/index.html")
+    else:
+        raise HTTPException(status_code=404, detail="File not found")
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 80))
+    print(f"🚀 [SERVER] Starting server on port {port}")
+    print(f"🔍 [SERVER] Checking for static files...")
+    if os.path.exists("../dist"):
+        print("✅ [SERVER] Found ../dist directory")
+    elif os.path.exists("./dist"):
+        print("✅ [SERVER] Found ./dist directory")  
+    else:
+        print("⚠️ [SERVER] No dist directory found - running API-only mode")
     uvicorn.run(app, host="0.0.0.0", port=port)

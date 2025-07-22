@@ -1920,14 +1920,7 @@ const App = () => {
         {/* Action Cards for Editor */}
         {isEditor && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 sm:mb-8">
-            <ActionCard
-              title="Update Portfolio"
-              description="Refresh asset prices and balances"
-              buttonText={isLoading ? <LoadingSpinner status={updateStatus} /> : "Update Portfolio"}
-              onAction={updatePortfolio}
-              variant="secondary"
-              disabled={isLoading}
-            />
+            
 
             <ActionCard
               title="📊 Returns Analysis"
@@ -2052,19 +2045,16 @@ const App = () => {
                   placeholder="Wallet address"
                   className="col-span-1 sm:col-span-1 p-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none text-sm font-mono"
                 />
-                <button
-                  onClick={addWallet}
-                  className="col-span-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                >
+                
                   Add Wallet
-                </button>
+                
               </div>
             </div>
           </div>
         )}
 
         {/* Top Performing Assets Card */}
-        <div className="mb-6 sm:mb-8 hidden sm:block">
+        
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6">
             <h3 className="text-base sm:text-lg font-semibold text-white mb-4">🚀 Top 3 Performing Assets (24h)</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -2073,117 +2063,134 @@ const App = () => {
                 .sort((a, b) => (b.performance24h || 0) - (a.performance24h || 0))
                 .slice(0, 3)
                 .map((asset, index) => (
-                  <div key={asset.id} className="bg-gray-800 rounded-lg p-4">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-xs">#{index + 1}</span>
-                      </div>
-                      <div>
-                        <div className="font-medium text-white text-sm">{asset.symbol}</div>
-                        <div className="text-xs text-gray-400">{asset.name}</div>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="text-xs text-gray-400">24h Change</div>
-                        <div className={`text-sm font-bold ${(asset.performance24h || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  
+                    
+                      
+                        
+                          {asset.symbol}
+                        
+                        
+                          {asset.name}
+                        
+                      
+                    
+                    
+                      
+                        24h Change
+                        
                           {(asset.performance24h || 0) >= 0 ? '+' : ''}{(asset.performance24h || 0).toFixed(2)}%
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-gray-400">Value</div>
-                        <div className="text-sm font-mono text-white">${asset.valueUSD.toLocaleString()}</div>
-                      </div>
-                    </div>
-                  </div>
+                        
+                      
+                      
+                        Value
+                        
+                          ${asset.valueUSD.toLocaleString()}
+                        
+                      
+                    
+                  
                 ))}
 
               {/* Show placeholder if no performance data */}
               {visibleAssets.filter(asset => asset.performance24h !== undefined).length === 0 && (
-                <div className="col-span-3 text-center py-8">
-                  <div className="text-gray-400 mb-2">📊 Performance data loading...</div>
-                  <div className="text-sm text-gray-500">24h performance data will appear here once available</div>
-                </div>
+                
+                  
+                    📊 Performance data loading...
+                  
+                  
+                    24h performance data will appear here once available
+                  
+                
               )}
-            </div>
-          </div>
-        </div>
+            
+          
+        
 
         {/* Current Positions Grid - Mobile responsive */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex justify-between items-center mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-semibold text-white">💰 Current Positions</h3>
-            <span className="text-xs sm:text-sm text-gray-400">
-              {visibleAssets.length} positions • ${visibleAssets.reduce((sum, asset) => sum + asset.valueUSD, 0).toLocaleString()}
-            </span>
-          </div>
+        
+          
+            
+              Current Positions
+              
+                {visibleAssets.length} positions • ${visibleAssets.reduce((sum, asset) => sum + asset.valueUSD, 0).toLocaleString()}
+              
+            
+          
 
           {visibleAssets.length === 0 ? (
-            <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
-              </div>
-              <h4 className="text-lg font-semibold text-white mb-2">No Token Data Found</h4>
-              <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                Your portfolio appears to be empty. Click the "Update Database" button to fetch the latest wallet balances and asset data from your configured wallets.
-              </p>
-              <button
-                onClick={updatePortfolio}
-                disabled={isLoading}
-                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:bg-purple-800 disabled:cursor-not-allowed"
-              >
-                {isLoading ? <LoadingSpinner status={updateStatus} /> : "🔄 Update Database"}
-              </button>
-            </div>
+            
+              
+                
+                  
+                    
+                      
+                        
+                        
+                  
+                
+                
+                  No Token Data Found
+                
+                
+                  Your portfolio appears to be empty. Click the "Update Database" button to fetch the latest wallet balances and asset data from your configured wallets.
+                
+                
+                  {isLoading ?  : "🔄 Update Database"}
+                
+              
+            
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+            
               {visibleAssets.map((asset) => (
-                <AssetCard
-                  key={asset.id}
+                
                   asset={asset}
                   onClick={() => setSelectedAsset(asset)}
                   onHide={() => toggleHiddenAsset(asset)}
                   isEditor={isEditor}
                   totalValue={totalValue}
-                />
+                
               ))}
-            </div>
+            
           )}
-        </div>
+        
 
         {/* Wallets Section */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex justify-between items-center mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-semibold text-white">Fund Wallets</h3>
-            <span className="text-xs sm:text-sm text-gray-400">
-              {walletAddresses.length} wallets • {Object.keys(walletData).length} with data
-            </span>
-          </div>
+        
+          
+            
+              Fund Wallets
+              
+                {walletAddresses.length} wallets • {Object.keys(walletData).length} with data
+              
+            
+          
 
           {walletAddresses.length === 0 ? (
-            <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <h4 className="text-lg font-semibold text-white mb-2">No Wallets Configured</h4>
-              <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                Add wallet addresses to start tracking individual wallet performance and asset breakdowns.
-              </p>
-              {isEditor && (
-                <button
-                  onClick={() => document.querySelector('input[placeholder="Wallet label"]')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                >
-                  🏦 Add First Wallet
-                </button>
-              )}
-            </div>
+            
+              
+                
+                  
+                    
+                      
+                        
+                        
+                  
+                
+                
+                  No Wallets Configured
+                
+                
+                  Add wallet addresses to start tracking individual wallet performance and asset breakdowns.
+                
+                {isEditor && (
+                  
+                    🏦 Add First Wallet
+                  
+                )}
+              
+            
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            
               {walletAddresses.map((wallet) => {
                 // Check if wallet has status info to determine if there's an error
                 const status = walletStatus.find(s => s.wallet_id === wallet.id);
@@ -2191,90 +2198,89 @@ const App = () => {
                 const hasError = status?.status === 'error' || (!hasData && wallet.network === 'SOL');
 
                 return (
-                  <WalletCard
-                    key={wallet.id}
+                  
                     wallet={wallet}
                     onClick={() => setSelectedWallet(wallet)}
                     walletData={walletData[wallet.id] || { assets: [], performance: 0, hasError }}
                     assets={portfolioData.assets}
                     totalValue={portfolioData.totalValue}
                     performance={portfolioData.performance24h || 0}
-                  />
+                  
                 );
               })}
-            </div>
+            
           )}
-        </div>
+        
 
         {/* Hidden Assets */}
         {hiddenAssets.length > 0 && isEditor && (
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
-            <h3 className="text-base sm:text-lg font-semibold mb-4 text-white">HiddenAssets</h3>
-            <div className="space-y-3">
+          
+            
+              HiddenAssets
+            
+            
               {portfolioData.assets
                 .filter((asset) => hiddenAssets.includes(asset.id))
                 .map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="flex justify-between items-center p-3 bg-gray-800 rounded-lg border border-gray-700"
-                  >
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-xs">{asset.symbol.slice(0, 2)}</span>
-                      </div>
-                      <span className="text-white font-medium truncate">{asset.name}</span>
-                    </div>
-                    <button
-                      onClick={() => toggleHiddenAsset(asset)}
-                      className="text-xs bg-green-600/20 text-green-400 px-3 py-1 rounded-md hover:bg-green-600/30 transition-colors border border-green-600/30 whitespace-nowrap"
-                    >
+                  
+                    
+                      
+                        
+                          {asset.symbol.slice(0, 2)}
+                        
+                        {asset.name}
+                      
+                    
+                    
                       Show
-                    </button>
-                  </div>
+                    
+                  
                 ))}
-            </div>
-          </div>
+            
+          
         )}
-      </div>
+      
 
       {/* Asset Modal */}
       {selectedAsset && (
-        <AssetModal
+        
           asset={selectedAsset}
           onClose={() => setSelectedAsset(null)}
           onUpdateNotes={updateNotes}
           isEditor={isEditor}
-        />
+        
       )}
 
       {/* Wallet Modal */}
       {selectedWallet && (
-        <WalletModal
+        
           wallet={selectedWallet}
           onClose={() => setSelectedWallet(null)}
           walletData={walletData[selectedWallet.id]}
           portfolioData={portfolioData}
-        />
+        
       )}
 
       {/* Settings Modal */}
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        isEditor={isEditor}
-        password={password}
-        setPassword={setPassword}
-        onPasswordCheck={checkPassword}
-        onEditorExit={handleEditorExit}
-      />
+      
+        
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+          isEditor={isEditor}
+          password={password}
+          setPassword={setPassword}
+          onPasswordCheck={checkPassword}
+          onEditorExit={handleEditorExit}
+        
+      
 
       {/* Returns Analysis Modal */}
-      <ReturnsModal
+      
         isOpen={showReturnsModal}
         onClose={() => setShowReturnsModal(false)}
         portfolioData={portfolioData}
-      />
-    </div>
+      
+    
   );
 };
 
