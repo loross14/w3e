@@ -1,0 +1,191 @@
+2025-07-22T04:13:31Z info: Deployment: feb1305d-d3d8-4fc0-b892-f95c6772240f
+2025-07-22T04:13:31Z info: Build: 4f338bd0-d270-48f7-a646-662a92cca59f
+2025-07-22T04:13:31Z info: Connecting to builder
+2025-07-22T04:13:33Z info: Builder connected
+2025-07-22T04:13:33Z info: Installing packages
+--> uv lock
+
+--> uv lock
+
+Resolved 1 package in 1ms
+
+Resolved 1 package in 1ms
+
+--> uv sync
+
+--> uv sync
+
+Resolved 1 package in 1ms
+
+Resolved 1 package in 1ms
+
+Audited in 0.01ms
+
+Audited in 0.01ms
+
+2025-07-22T04:13:34Z info: Starting Build
+
+> react-javascript@1.0.0 build
+> vite build
+
+
+vite v5.0.0 building for production...
+
+transforming...
+
+✓ 396 modules transformed.
+
+rendering chunks...
+
+computing gzip size...
+
+dist/index.html                            0.68 kB │ gzip:   0.42 kB
+
+dist/assets/index-EYoiAfMD.css            44.38 kB │ gzip:   7.69 kB
+
+dist/assets/purify.es-zeYmSgJQ.js         21.93 kB │ gzip:   8.59 kB
+dist/assets/index.es-lEot17Wh.js         150.60 kB │ gzip:  51.31 kB
+
+dist/assets/html2canvas.esm-3GUt5PBi.js  201.43 kB │ gzip:  47.70 kB
+
+dist/assets/index-cUjLrLxQ.js            771.11 kB │ gzip: 247.81 kB
+
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+✓ built in 9.89s
+
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.4.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.4.2
+npm notice To update run: npm install -g npm@11.4.2
+npm notice
+
+2025-07-22T04:13:47Z info: Pushing pid1 binary layer...
+2025-07-22T04:13:49Z info: Pushing Repl layer...
+2025-07-22T04:13:49Z info: Pushing hosting layer...
+2025-07-22T04:13:49Z info: Created hosting layer
+2025-07-22T04:13:50Z info: Created pid1 binary layer
+2025-07-22T04:14:16Z info: Created Repl layer
+2025-07-22T04:14:16Z info: Pushing Repl (cache) layer...
+2025-07-22T04:14:17Z info: Created Repl (cache) layer
+2025-07-22T04:14:17Z info: Pushed image manifest
+2025-07-22T04:14:18Z info: Pushed soci index manifest
+2025-07-22T04:14:21Z info: Creating Autoscale service
+forwarding local port 80 to external port 80 (mapped as 1104)
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: uvicorn==0.24.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 3)) (0.24.0)
+Requirement already satisfied: psycopg2-binary==2.9.7 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 8)) (2.9.7)
+Requirement already satisfied: httpx==0.25.2 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 4)) (0.25.2)
+Requirement already satisfied: eth-keyfile>=0.6.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (0.9.1)
+Requirement already satisfied: eth-hash>=0.5.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-hash[pycryptodome]>=0.5.1->web3==6.11.3->-r requirements.txt (line 5)) (0.7.1)
+Requirement already satisfied: pyunormalize>=15.0.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (16.0.0)
+Requirement already satisfied: eth-keys>=0.4.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (0.7.0)
+Requirement already satisfied: rpds-py>=0.7.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from jsonschema>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (0.26.0)
+Requirement already satisfied: parsimonious<0.11.0,>=0.10.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-abi>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (0.10.0)
+Requirement already satisfied: python-multipart==0.0.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 7)) (0.0.6)
+Requirement already satisfied: fastapi==0.104.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 2)) (0.104.1)
+  File "/home/runner/workspace/server/main.py", line 367
+Requirement already satisfied: eth-account>=0.8.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (0.11.3)
+Requirement already satisfied: click>=7.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from uvicorn==0.24.0->-r requirements.txt (line 3)) (8.2.1)
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: typing-extensions>=4.8.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from fastapi==0.104.1->-r requirements.txt (line 2)) (4.14.1)
+Requirement already satisfied: greenlet!=0.4.17 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from sqlalchemy==2.0.23->-r requirements.txt (line 9)) (3.2.3)
+Requirement already satisfied: idna in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from httpx==0.25.2->-r requirements.txt (line 4)) (3.10)
+Requirement already satisfied: httpx==0.25.2 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 4)) (0.25.2)
+Requirement already satisfied: frozenlist>=1.1.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (1.7.0)
+Requirement already satisfied: fastapi==0.104.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 2)) (0.104.1)
+Requirement already satisfied: attrs>=17.3.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (25.3.0)
+Requirement already satisfied: protobuf>=4.21.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (6.31.1)
+Requirement already satisfied: parsimonious<0.11.0,>=0.10.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-abi>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (0.10.0)
+    async def _get_nft_floor_price(self, self, client: httpx.AsyncClient, contract_address: str, opensea_slug: str = None) -> float:
+Requirement already satisfied: propcache>=0.2.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (0.3.2)
+                                         ^^^^
+Requirement already satisfied: anyio<4.0.0,>=3.7.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from fastapi==0.104.1->-r requirements.txt (line 2)) (3.7.1)
+Requirement already satisfied: certifi in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from httpx==0.25.2->-r requirements.txt (line 4)) (2025.7.14)
+Requirement already satisfied: multidict<7.0,>=4.5 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (6.6.3)
+Requirement already satisfied: bitarray>=2.4.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (3.5.1)
+command finished with error [sh -c cd server && python3 -m pip install --break-system-packages -r requirements.txt && python3 main.py]: exit status 1
+Requirement already satisfied: eth-typing>=3.0.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (5.2.1)
+Requirement already satisfied: lru-dict<1.3.0,>=1.1.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (1.2.0)
+Requirement already satisfied: eth-keyfile>=0.6.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (0.9.1)
+Requirement already satisfied: fastapi==0.104.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 2)) (0.104.1)
+Requirement already satisfied: charset-normalizer<4,>=2 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from requests>=2.16.0->web3==6.11.3->-r requirements.txt (line 5)) (3.4.2)
+Requirement already satisfied: rlp>=1.0.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (4.1.0)
+Requirement already satisfied: parsimonious<0.11.0,>=0.10.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-abi>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (0.10.0)
+Requirement already satisfied: starlette<0.28.0,>=0.27.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from fastapi==0.104.1->-r requirements.txt (line 2)) (0.27.0)
+Requirement already satisfied: eth-abi>=4.0.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (5.2.0)
+Requirement already satisfied: protobuf>=4.21.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (6.31.1)
+Requirement already satisfied: referencing>=0.28.4 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from jsonschema>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (0.36.2)
+Requirement already satisfied: eth-keys>=0.4.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (0.7.0)
+Requirement already satisfied: pydantic==2.5.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 6)) (2.5.0)
+Requirement already satisfied: lru-dict<1.3.0,>=1.1.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (1.2.0)
+Requirement already satisfied: python-multipart==0.0.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 7)) (0.0.6)
+Requirement already satisfied: pyunormalize>=15.0.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (16.0.0)
+Requirement already satisfied: typing-extensions>=4.8.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from fastapi==0.104.1->-r requirements.txt (line 2)) (4.14.1)
+Requirement already satisfied: eth-abi>=4.0.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (5.2.0)
+Requirement already satisfied: multidict<7.0,>=4.5 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (6.6.3)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from requests>=2.16.0->web3==6.11.3->-r requirements.txt (line 5)) (2.5.0)
+Requirement already satisfied: eth-hash>=0.5.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-hash[pycryptodome]>=0.5.1->web3==6.11.3->-r requirements.txt (line 5)) (0.7.1)
+Requirement already satisfied: rlp>=1.0.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (4.1.0)
+Requirement already satisfied: yarl<2.0,>=1.17.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (1.20.1)
+Requirement already satisfied: toolz>=0.8.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from cytoolz>=0.10.1->eth-utils>=2.1.0->web3==6.11.3->-r requirements.txt (line 5)) (1.0.0)
+Requirement already satisfied: py_ecc>=5.2.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-keyfile>=0.6.0->eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (8.0.0)
+Requirement already satisfied: typing-extensions>=4.8.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from fastapi==0.104.1->-r requirements.txt (line 2)) (4.14.1)
+Requirement already satisfied: requests>=2.16.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (2.31.0)
+Requirement already satisfied: click>=7.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from uvicorn==0.24.0->-r requirements.txt (line 3)) (8.2.1)
+Requirement already satisfied: greenlet!=0.4.17 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from sqlalchemy==2.0.23->-r requirements.txt (line 9)) (3.2.3)
+Requirement already satisfied: eth-typing>=3.0.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (5.2.1)
+Requirement already satisfied: aiohttp>=3.7.4.post0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (3.12.14)
+  File "/home/runner/workspace/server/main.py", line 367
+Requirement already satisfied: multidict<7.0,>=4.5 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (6.6.3)
+                                         ^^^^
+Requirement already satisfied: pycryptodome<4,>=3.6.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-hash[pycryptodome]>=0.5.1->web3==6.11.3->-r requirements.txt (line 5)) (3.23.0)
+SyntaxError: duplicate argument 'self' in function definition
+  File "/home/runner/workspace/server/main.py", line 367
+Requirement already satisfied: charset-normalizer<4,>=2 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from requests>=2.16.0->web3==6.11.3->-r requirements.txt (line 5)) (3.4.2)
+Requirement already satisfied: jsonschema-specifications>=2023.03.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from jsonschema>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (2025.4.1)
+Requirement already satisfied: yarl<2.0,>=1.17.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (1.20.1)
+Requirement already satisfied: toolz>=0.8.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from cytoolz>=0.10.1->eth-utils>=2.1.0->web3==6.11.3->-r requirements.txt (line 5)) (1.0.0)
+Requirement already satisfied: parsimonious<0.11.0,>=0.10.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-abi>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (0.10.0)
+Requirement already satisfied: python-multipart==0.0.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 7)) (0.0.6)
+Requirement already satisfied: sniffio in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from httpx==0.25.2->-r requirements.txt (line 4)) (1.3.1)
+Requirement already satisfied: python-multipart==0.0.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 7)) (0.0.6)
+Requirement already satisfied: pydantic==2.5.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 6)) (2.5.0)
+Requirement already satisfied: jsonschema>=4.0.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (4.25.0)
+Requirement already satisfied: eth-keyfile>=0.6.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (0.9.1)
+Requirement already satisfied: jsonschema-specifications>=2023.03.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from jsonschema>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (2025.4.1)
+Requirement already satisfied: frozenlist>=1.1.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (1.7.0)
+Requirement already satisfied: eth-keys>=0.4.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (0.7.0)
+    async def _get_nft_floor_price(self, self, client: httpx.AsyncClient, contract_address: str, opensea_slug: str = None) -> float:
+Requirement already satisfied: referencing>=0.28.4 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from jsonschema>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (0.36.2)
+Requirement already satisfied: anyio<4.0.0,>=3.7.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from fastapi==0.104.1->-r requirements.txt (line 2)) (3.7.1)
+Requirement already satisfied: charset-normalizer<4,>=2 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from requests>=2.16.0->web3==6.11.3->-r requirements.txt (line 5)) (3.4.2)
+Requirement already satisfied: httpcore==1.* in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from httpx==0.25.2->-r requirements.txt (line 4)) (1.0.9)
+Requirement already satisfied: psycopg2-binary==2.9.7 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 8)) (2.9.7)
+Requirement already satisfied: sniffio in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from httpx==0.25.2->-r requirements.txt (line 4)) (1.3.1)
+Requirement already satisfied: requests>=2.16.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (2.31.0)
+Requirement already satisfied: python-multipart==0.0.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 7)) (0.0.6)
+Requirement already satisfied: yarl<2.0,>=1.17.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (1.20.1)
+Requirement already satisfied: rpds-py>=0.7.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from jsonschema>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (0.26.0)
+Requirement already satisfied: parsimonious<0.11.0,>=0.10.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-abi>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (0.10.0)
+Requirement already satisfied: eth-keys>=0.4.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (0.7.0)
+Requirement already satisfied: cytoolz>=0.10.1 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-utils>=2.1.0->web3==6.11.3->-r requirements.txt (line 5)) (1.0.1)
+Requirement already satisfied: greenlet!=0.4.17 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from sqlalchemy==2.0.23->-r requirements.txt (line 9)) (3.2.3)
+Requirement already satisfied: protobuf>=4.21.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (6.31.1)
+Requirement already satisfied: referencing>=0.28.4 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from jsonschema>=4.0.0->web3==6.11.3->-r requirements.txt (line 5)) (0.36.2)
+Requirement already satisfied: uvicorn==0.24.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 3)) (0.24.0)
+Requirement already satisfied: hexbytes<0.4.0,>=0.1.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (0.3.1)
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: eth-keys>=0.4.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (0.7.0)
+Requirement already satisfied: lru-dict<1.3.0,>=1.1.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (1.2.0)
+Requirement already satisfied: annotated-types>=0.4.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from pydantic==2.5.0->-r requirements.txt (line 6)) (0.7.0)
+Requirement already satisfied: propcache>=0.2.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (0.3.2)
+command finished with error [sh -c cd server && python3 -m pip install --break-system-packages -r requirements.txt && python3 main.py]: exit status 1
+Requirement already satisfied: py_ecc>=5.2.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-keyfile>=0.6.0->eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (8.0.0)
+Requirement already satisfied: multidict<7.0,>=4.5 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from aiohttp>=3.7.4.post0->web3==6.11.3->-r requirements.txt (line 5)) (6.6.3)
+crash loop detected
+2025-07-22T04:17:04Z error: The deployment is crash looping. This can happen if the run command fails or exits immediately after starting. Check the logs for more information.
