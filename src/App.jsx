@@ -901,8 +901,17 @@ const API_BASE_URL = (() => {
   if (window.location.hostname === 'localhost') {
     return 'http://localhost:8000';
   }
-  // Always use port 8000 for backend API calls, regardless of frontend port
+  // Always use the backend port 8000, but handle Replit's URL structure
   const currentUrl = new URL(window.location.href);
+  
+  // For Replit URLs, extract the base domain and use port 8000
+  if (currentUrl.hostname.includes('replit.dev')) {
+    // Extract the repl ID from the hostname
+    const replId = currentUrl.hostname.split('.')[0];
+    return `https://${replId}-00-13ahw0dwiiebv.kirk.replit.dev:8000`;
+  }
+  
+  // Fallback for other environments
   return `${currentUrl.protocol}//${currentUrl.hostname}:8000`;
 })();
 
@@ -1223,14 +1232,20 @@ const App = () => {
       try {
         addDebugInfo("Starting portfolio data load", { retryCount, API_BASE_URL });
 
-        // Test backend connection first
+        // Test backend connection first with longer timeout
         addDebugInfo("Testing backend connection...");
-        const healthResponse = await fetch(`${API_BASE_URL}/`, {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+        const healthResponse = await fetch(`${API_BASE_URL}/health`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
+          signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (!healthResponse.ok) {
           throw new Error(`Backend not ready (${healthResponse.status})`);
@@ -1495,15 +1510,29 @@ const App = () => {
         addDebugInfo("🎉 Portfolio load completed successfully");
 
       } catch (error) {
-        addDebugInfo(`❌ Portfolio load error (attempt ${retryCount + 1}/${maxRetries + 1})`, error.message);
+        let errorMessage = error.message;
+        
+        // Handle specific error types
+        if (error.name === 'AbortError') {
+          errorMessage = 'Connection timeout - backend taking too long to respond';
+        } else if (error.message === 'Failed to fetch') {
+          errorMessage = 'Network error - cannot reach backend server';
+        }
+        
+        addDebugInfo(`❌ Portfolio load error (attempt ${retryCount + 1}/${maxRetries + 1})`, errorMessage);
 
-        // Retry with exponential backoff if backend isn't ready yet
-        if (retryCount < maxRetries && (error.message.includes('Failed to fetch') || error.message.includes('Backend not ready'))) {
+        // Retry with exponential backoff for network errors
+        if (retryCount < maxRetries && (
+          error.message.includes('Failed to fetch') || 
+          error.message.includes('Backend not ready') ||
+          error.name === 'AbortError' ||
+          error.message.includes('Network error')
+        )) {
           const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s delays
           addDebugInfo(`🔄 Retrying portfolio load in ${delay / 1000}s...`);
           setTimeout(() => loadPortfolioAndSyncWallets(retryCount + 1), delay);
         } else {
-          setUpdateError(`Failed to load portfolio: ${error.message}`);
+          setUpdateError(`Failed to load portfolio: ${errorMessage}`);
         }
       }
     };
