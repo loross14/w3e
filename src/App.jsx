@@ -976,28 +976,35 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
   );
 };
 
-// API Configuration for Replit environment
-const API_BASE_URL = (() => {
-  if (window.location.hostname === 'localhost') {
+// Determine API base URL with fallback logic
+  const getAPIBaseURL = () => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      const protocol = window.location.protocol;
+
+      // Production deployment URLs - use same origin
+      if (hostname === 'w3e.info' || hostname.includes('.replit.app')) {
+        return `${protocol}//${hostname}`;
+      }
+
+      // Development URLs
+      if (hostname === 'localhost' || hostname.startsWith('127.')) {
+        // Try backend on port 8000 first, then 5000
+        return 'http://localhost:8000';
+      }
+
+      // Replit development URLs
+      if (hostname.includes('.replit.dev')) {
+        return `${protocol}//${hostname}:8000`;
+      }
+    }
+
+    // Fallback
     return 'http://localhost:8000';
-  }
+  };
 
-  // For Replit, use the same base URL but with port 8000
-  const currentUrl = new URL(window.location.href);
-
-  // Extract the base Replit URL (remove port if present)
-  let hostname = currentUrl.hostname;
-
-  // If we're on a Replit domain, construct the backend URL properly
-  if (hostname.includes('.replit.dev')) {
-    // Replace port in the URL or add port 8000
-    const protocol = currentUrl.protocol;
-    return `${protocol}//${hostname.replace(':5000', '')}:8000`;
-  }
-
-  // Fallback for other environments
-  return `${currentUrl.protocol}//${hostname}:8000`;
-})();
+// API Configuration for Replit environment
+const API_BASE_URL = getAPIBaseURL();
 
 // Main App Component
 const App = () => {

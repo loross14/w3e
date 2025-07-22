@@ -3029,8 +3029,14 @@ async def serve_spa(full_path: str):
 if __name__ == "__main__":
     import uvicorn
     # Use PORT from environment, fallback to 8000 for development, 80 for deployment
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 80))
+    
+    # Override port based on environment
+    if os.environ.get("NODE_ENV") == "production":
+        port = 80
+    
     print(f"🚀 [SERVER] Starting server on port {port}")
+    print(f"🔍 [SERVER] Environment: {os.environ.get('NODE_ENV', 'development')}")
     print(f"🔍 [SERVER] Checking for static files...")
     
     # Check for dist directories
