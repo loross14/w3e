@@ -9,12 +9,11 @@ httpx==0.25.2
 requests==2.31.0
 responses==0.23.3
 
-# Mock and testing utilities (no unittest-mock - it's built-in)
+# Mock and testing utilities
 faker==20.1.0
 
 # JSON and async support
 orjson==3.9.10
 aiofiles==23.2.1
 
-# Database testing
-sqlite3
+# Note: sqlite3 is built into Python - no need to install it

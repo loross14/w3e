@@ -4,10 +4,16 @@ import asyncio
 import os
 import tempfile
 import json
-import sqlite3
 from pathlib import Path
 from unittest.mock import patch, MagicMock, Mock
 from typing import Dict, List, Any
+
+# Import sqlite3 - this is built into Python
+try:
+    import sqlite3
+except ImportError:
+    print("❌ sqlite3 not available - this shouldn't happen as it's built into Python")
+    sqlite3 = None
 
 # CRITICAL: Set test environment before any imports
 os.environ["NODE_ENV"] = "test"
