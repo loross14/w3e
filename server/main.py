@@ -2179,11 +2179,13 @@ async def update_asset_notes(symbol: str, notes: str):
 
 @app.put("/api/assets/{symbol}/purchase_price")
 async def update_asset_purchase_price(symbol: str, request: dict):
-    """Update purchase price for a specific asset and recalculate metrics with comprehensive validation"""
+    """Update purchase price for a specific asset with robust symbol matching and comprehensive validation"""
     if not symbol or not symbol.strip():
         raise HTTPException(status_code=400, detail="Symbol is required")
     
-    symbol = symbol.strip()
+    # Clean the input symbol but preserve original for logging
+    original_symbol = symbol
+    clean_symbol = symbol.strip()
     
     try:
         purchase_price = request.get('purchase_price')
@@ -2206,7 +2208,7 @@ async def update_asset_purchase_price(symbol: str, request: dict):
         if purchase_price > 1e15:  # 1 quadrillion - reasonable upper limit
             raise HTTPException(status_code=400, detail="Purchase price is too large")
         
-        print(f"🔄 Updating purchase price for {symbol}: ${purchase_price}")
+        print(f"🔄 [PURCHASE PRICE] Updating purchase price for '{original_symbol}' (cleaned: '{clean_symbol}'): ${purchase_price}")
         
     except HTTPException:
         raise  # Re-raise HTTP exceptions as-is
@@ -2218,23 +2220,92 @@ async def update_asset_purchase_price(symbol: str, request: dict):
     cursor = conn.cursor()
 
     try:
-        # First check if asset exists and get current data
+        # ROBUST SYMBOL MATCHING: Try multiple approaches to find the asset
+        asset_data = None
+        matched_symbol = None
+        
+        print(f"🔍 [PURCHASE PRICE] Searching for asset with symbol variations...")
+        
+        # Method 1: Exact match (cleaned)
         cursor.execute("""
-            SELECT symbol, balance, value_usd, purchase_price as old_purchase_price
+            SELECT symbol, balance, value_usd, purchase_price as old_purchase_price, token_address
             FROM assets 
             WHERE symbol = %s
             LIMIT 1
-        """, (symbol,))
-        
+        """, (clean_symbol,))
         asset_data = cursor.fetchone()
-        if not asset_data:
-            raise HTTPException(status_code=404, detail=f"Asset with symbol '{symbol}' not found")
+        if asset_data:
+            matched_symbol = asset_data['symbol']
+            print(f"✅ [PURCHASE PRICE] Found exact match: '{matched_symbol}'")
         
+        # Method 2: Case-insensitive match
+        if not asset_data:
+            cursor.execute("""
+                SELECT symbol, balance, value_usd, purchase_price as old_purchase_price, token_address
+                FROM assets 
+                WHERE LOWER(symbol) = LOWER(%s)
+                LIMIT 1
+            """, (clean_symbol,))
+            asset_data = cursor.fetchone()
+            if asset_data:
+                matched_symbol = asset_data['symbol']
+                print(f"✅ [PURCHASE PRICE] Found case-insensitive match: '{matched_symbol}'")
+        
+        # Method 3: Trimmed symbol match (handle database symbols with extra whitespace)
+        if not asset_data:
+            cursor.execute("""
+                SELECT symbol, balance, value_usd, purchase_price as old_purchase_price, token_address
+                FROM assets 
+                WHERE TRIM(symbol) = %s
+                LIMIT 1
+            """, (clean_symbol,))
+            asset_data = cursor.fetchone()
+            if asset_data:
+                matched_symbol = asset_data['symbol']
+                print(f"✅ [PURCHASE PRICE] Found trimmed match: '{matched_symbol}' (original with whitespace)")
+        
+        # Method 4: Partial match (contains)
+        if not asset_data:
+            cursor.execute("""
+                SELECT symbol, balance, value_usd, purchase_price as old_purchase_price, token_address
+                FROM assets 
+                WHERE symbol ILIKE %s OR %s ILIKE '%%' || symbol || '%%'
+                LIMIT 1
+            """, (f'%{clean_symbol}%', clean_symbol))
+            asset_data = cursor.fetchone()
+            if asset_data:
+                matched_symbol = asset_data['symbol']
+                print(f"✅ [PURCHASE PRICE] Found partial match: '{matched_symbol}'")
+        
+        # If still not found, provide helpful debugging information
+        if not asset_data:
+            # Get all available symbols for debugging
+            cursor.execute("""
+                SELECT symbol, name, balance, value_usd 
+                FROM assets 
+                WHERE balance > 0 
+                ORDER BY value_usd DESC 
+                LIMIT 10
+            """)
+            available_assets = cursor.fetchall()
+            
+            available_symbols = [f"'{asset['symbol']}' ({asset['name']}, ${asset['value_usd']:.2f})" for asset in available_assets]
+            
+            error_detail = f"Asset with symbol '{clean_symbol}' not found. Available assets: {', '.join(available_symbols)}"
+            print(f"❌ [PURCHASE PRICE] {error_detail}")
+            
+            raise HTTPException(
+                status_code=404, 
+                detail=error_detail
+            )
+        
+        # Extract data from the matched asset
         balance = float(asset_data['balance']) if asset_data['balance'] else 0
         current_value = float(asset_data['value_usd']) if asset_data['value_usd'] else 0
         old_purchase_price = float(asset_data['old_purchase_price']) if asset_data['old_purchase_price'] else 0
+        token_address = asset_data['token_address']
         
-        print(f"📊 Asset {symbol} current data: Balance={balance}, Value=${current_value}, Old Price=${old_purchase_price}")
+        print(f"📊 [PURCHASE PRICE] Asset '{matched_symbol}' current data: Balance={balance}, Value=${current_value}, Old Price=${old_purchase_price}")
         
         # Calculate new metrics with safe division
         total_invested = balance * purchase_price
@@ -2251,10 +2322,10 @@ async def update_asset_purchase_price(symbol: str, request: dict):
             elif total_return_pct == float('-inf'):
                 total_return_pct = -999999  # Very large negative number
 
-        print(f"📈 Calculated metrics: Invested=${total_invested}, P&L=${unrealized_pnl}, Return={total_return_pct}%")
+        print(f"📈 [PURCHASE PRICE] Calculated metrics: Invested=${total_invested:.2f}, P&L=${unrealized_pnl:.2f}, Return={total_return_pct:.2f}%")
 
-        # Update the asset with new purchase price and recalculated metrics
-        cursor.execute("""
+        # Update the asset using the exact matched symbol (important for symbols with whitespace)
+        update_count = cursor.execute("""
             UPDATE assets 
             SET purchase_price = %s,
                 total_invested = %s,
@@ -2262,33 +2333,34 @@ async def update_asset_purchase_price(symbol: str, request: dict):
                 total_return_pct = %s,
                 last_updated = CURRENT_TIMESTAMP
             WHERE symbol = %s
-        """, (purchase_price, total_invested, unrealized_pnl, total_return_pct, symbol))
+        """, (purchase_price, total_invested, unrealized_pnl, total_return_pct, matched_symbol))
 
         if cursor.rowcount == 0:
-            raise HTTPException(status_code=500, detail=f"Failed to update asset {symbol}")
+            raise HTTPException(status_code=500, detail=f"Failed to update asset '{matched_symbol}' - no rows affected")
 
-        # Also update the cost basis table for consistency
+        print(f"✅ [PURCHASE PRICE] Updated {cursor.rowcount} row(s) for symbol '{matched_symbol}'")
+
+        # Also update the cost basis table for consistency using token_address (more reliable)
         cursor.execute("""
             INSERT INTO asset_cost_basis 
             (token_address, symbol, average_purchase_price, total_quantity_purchased, total_invested, last_updated)
-            SELECT token_address, symbol, %s, balance, %s, CURRENT_TIMESTAMP
-            FROM assets 
-            WHERE symbol = %s
+            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             ON CONFLICT (token_address) DO UPDATE SET
+            symbol = EXCLUDED.symbol,
             average_purchase_price = EXCLUDED.average_purchase_price,
             total_quantity_purchased = EXCLUDED.total_quantity_purchased,
             total_invested = EXCLUDED.total_invested,
             last_updated = EXCLUDED.last_updated
-        """, (purchase_price, total_invested, symbol))
+        """, (token_address, matched_symbol, purchase_price, balance, total_invested))
 
         conn.commit()
         
-        print(f"✅ Successfully updated purchase price for {symbol}: ${purchase_price}")
+        print(f"✅ [PURCHASE PRICE] Successfully updated purchase price for '{matched_symbol}': ${purchase_price}")
         print(f"   New metrics: Invested=${total_invested:.2f}, P&L=${unrealized_pnl:.2f}, Return={total_return_pct:.2f}%")
         
         return {
-            "message": f"Purchase price updated for {symbol}",
-            "symbol": symbol,
+            "message": f"Purchase price updated for {matched_symbol}",
+            "symbol": matched_symbol,  # Return the actual matched symbol
             "purchase_price": purchase_price,
             "total_invested": total_invested,
             "unrealized_pnl": unrealized_pnl,
@@ -2301,11 +2373,13 @@ async def update_asset_purchase_price(symbol: str, request: dict):
         raise  # Re-raise HTTP exceptions as-is
     except psycopg2.Error as e:
         conn.rollback()
-        print(f"❌ Database error updating purchase price for {symbol}: {e}")
+        print(f"❌ [PURCHASE PRICE] Database error updating purchase price for '{clean_symbol}': {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         conn.rollback()
-        print(f"❌ Unexpected error updating purchase price for {symbol}: {e}")
+        print(f"❌ [PURCHASE PRICE] Unexpected error updating purchase price for '{clean_symbol}': {e}")
+        import traceback
+        print(f"📋 [PURCHASE PRICE] Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
     finally:
         if 'cursor' in locals() and cursor:
@@ -2999,6 +3073,36 @@ async def update_portfolio_data_new():
                     print(f"🙈 Auto-hidden {hide_asset['reason']}: {hide_asset['symbol'] or 'unnamed'} (${hide_asset.get('value_usd', 0):.6f})")
                 except psycopg2.Error as e:
                     print(f"❌ Error auto-hiding asset {hide_asset['symbol']}: {e}")
+
+        # CRITICAL: Clean up symbol inconsistencies (trim whitespace from symbols)
+        print("🧹 [DATA CLEANUP] Cleaning up symbol whitespace inconsistencies...")
+        cursor.execute("""
+            UPDATE assets 
+            SET symbol = TRIM(symbol)
+            WHERE symbol != TRIM(symbol)
+        """)
+        
+        cleaned_symbols = cursor.rowcount
+        if cleaned_symbols > 0:
+            print(f"✅ [DATA CLEANUP] Cleaned whitespace from {cleaned_symbols} asset symbols")
+            
+            # Also clean up cost basis table
+            cursor.execute("""
+                UPDATE asset_cost_basis 
+                SET symbol = TRIM(symbol)
+                WHERE symbol != TRIM(symbol)
+            """)
+            
+            # Clean up asset notes
+            cursor.execute("""
+                UPDATE asset_notes 
+                SET symbol = TRIM(symbol)
+                WHERE symbol != TRIM(symbol)
+            """)
+            
+            print(f"✅ [DATA CLEANUP] Symbol cleanup completed across all tables")
+        else:
+            print(f"✅ [DATA CLEANUP] No symbol whitespace issues found")
 
         # Record portfolio history
         cursor.execute(
