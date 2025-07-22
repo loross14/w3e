@@ -1472,7 +1472,7 @@ const App = () => {
             symbol: nft.symbol,
             name: nft.name,
             is_nft: nft.is_nft,
-            has_metadata: !!nft.nft_metadata
+            has_metadata: !!nft.has_metadata
           })));
 
           const transformedAssets = savedData.assets.map((asset, index) => {
@@ -1930,63 +1930,63 @@ const App = () => {
 
       // Force update portfolio data
       const newPortfolioData = {
-        assets: updatedAssets,
-        balanceHistory: newBalanceHistory,
-        totalValue: newTotalValue,
-        performance24h: portfolioData.performance_24h || 0
-      };
-      setPortfolioData(newPortfolioData);
+          assets: updatedAssets,
+          balanceHistory: newBalanceHistory,
+          totalValue: newTotalValue,
+          performance24h: portfolioData.performance_24h || 0
+        };
+        setPortfolioData(newPortfolioData);
 
-      addDebugInfo("💾 Portfolio data updated after fetch", {
-        assetCount: updatedAssets.length,
-        totalValue: newTotalValue,
-        sampleAsset: updatedAssets[0]
-      });
+        addDebugInfo("💾 Portfolio data updated after fetch", {
+          assetCount: updatedAssets.length,
+          totalValue: newTotalValue,
+          sampleAsset: updatedAssets[0]
+        });
 
-      // Force a fresh load from the API to ensure sync
-      setUpdateStatus('🔄 Verifying update...');
-      try {
-        const verifyResponse = await fetch(`${API_BASE_URL}/api/portfolio`);
-        if (verifyResponse.ok) {
-          const verifyData = await verifyResponse.json();
-          addDebugInfo("✅ Verification successful", {
-            backendAssets: verifyData.assets.length,
-            backendTotal: verifyData.total_value
-          });
+        // Force a fresh load from the API to ensure sync
+        setUpdateStatus('🔄 Verifying update...');
+        try {
+          const verifyResponse = await fetch(`${API_BASE_URL}/api/portfolio`);
+          if (verifyResponse.ok) {
+            const verifyData = await verifyResponse.json();
+            addDebugInfo("✅ Verification successful", {
+              backendAssets: verifyData.assets.length,
+              backendTotal: verifyData.total_value
+            });
+          }
+        } catch (verifyError) {
+          addDebugInfo("⚠️ Verification failed", verifyError.message);
         }
-      } catch (verifyError) {
-        addDebugInfo("⚠️ Verification failed", verifyError.message);
-      }
 
-      // Step 9: Load updated wallet status
-      setUpdateStatus('📊 Loading wallet status...');
-      try {
-        const statusResponse = await fetch(`${API_BASE_URL}/api/wallets/status`);
-        if (statusResponse.ok) {
-          const statusData = await statusResponse.json();
-          setWalletStatus(statusData);
-          addDebugInfo(`📊 Updated wallet status for ${statusData.length} wallets`);
+        // Step 9: Load updated wallet status
+        setUpdateStatus('📊 Loading wallet status...');
+        try {
+          const statusResponse = await fetch(`${API_BASE_URL}/api/wallets/status`);
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            setWalletStatus(statusData);
+            addDebugInfo(`📊 Updated wallet status for ${statusData.length} wallets`);
+          }
+        } catch (error) {
+          addDebugInfo("⚠️ Could not refresh wallet status", error.message);
         }
-      } catch (error) {
-        addDebugInfo("⚠️ Could not refresh wallet status", error.message);
-      }
 
-      // Step 10: Complete
-      const assetCount = updatedAssets.length;
-      const valueFormatted = newTotalValue.toLocaleString();
+        // Step 10: Complete
+        const assetCount = updatedAssets.length;
+        const valueFormatted = newTotalValue.toLocaleString();
 
-      // Update the last updated timestamp
-      const now = new Date();
-      setLastUpdated(now);
-      localStorage.setItem("lastUpdated", now.toISOString());
+        // Update the last updated timestamp
+        const now = new Date();
+        setLastUpdated(now);
+        localStorage.setItem("lastUpdated", now.toISOString());
 
-      setUpdateStatus(`✅ Updated ${assetCount} assets • $${valueFormatted}`);
-      setTimeout(() => setUpdateStatus(''), 5000);
+        setUpdateStatus(`✅ Updated ${assetCount} assets • $${valueFormatted}`);
+        setTimeout(() => setUpdateStatus(''), 5000);
 
-      addDebugInfo('🎉 Portfolio update completed successfully', {
-        totalAssets: assetCount,
-        totalValue: newTotalValue
-      });
+        addDebugInfo('🎉 Portfolio update completed successfully', {
+          totalAssets: assetCount,
+          totalValue: newTotalValue
+        });
     } catch (error) {
       console.error('Error updating portfolio:', error);
       console.log(`🔍 [UPDATE ERROR] API_BASE_URL was: ${API_BASE_URL}`);
