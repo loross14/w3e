@@ -2601,28 +2601,30 @@ async def update_portfolio_data_new():
     finally:
         conn.close()
 
-# Catch-all route for SPA routing (must be last)
+# Serve static assets
+@app.get("/assets/{file_path:path}")
+async def serve_static_assets(file_path: str):
+    dist_path = "../dist" if os.path.exists("../dist") else "./dist" if os.path.exists("./dist") else None
+    if dist_path:
+        full_file_path = f"{dist_path}/assets/{file_path}"
+        if os.path.exists(full_file_path):
+            return FileResponse(full_file_path)
+    raise HTTPException(status_code=404, detail="Asset not found")
+
+# Catch-all route for SPA routing (must be last, but exclude API routes completely)
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
-    # Don't catch API routes
-    if full_path.startswith("api/"):
+    # Completely exclude anything starting with 'api'
+    if full_path.startswith("api"):
         raise HTTPException(status_code=404, detail="API endpoint not found")
 
-    # Serve static assets
+    # Serve the React app for all non-API routes
     dist_path = "../dist" if os.path.exists("../dist") else "./dist" if os.path.exists("./dist") else None
-
-    if dist_path and (full_path.endswith(".js") or full_path.endswith(".css")):
-        file_path = f"{dist_path}/{full_path}"
-        if os.path.exists(file_path):
-            return FileResponse(file_path)
-
-    # For all other routes, serve the React app
+    
     if dist_path and os.path.exists(f"{dist_path}/index.html"):
-        print(f"🌐 [SPA] Serving React app for route: /{full_path}")
         return FileResponse(f"{dist_path}/index.html")
     else:
-        print(f"❌ [SPA] No dist/index.html found for route: /{full_path}")
-        return {"error": "Frontend not built", "route": full_path}
+        return {"error": "Frontend not built", "route": full_path, "message": "Run 'npm run build' to build the frontend"}
 
 if __name__ == "__main__":
     import uvicorn
