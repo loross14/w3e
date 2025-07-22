@@ -1528,7 +1528,7 @@ const App = () => {
           error.name === 'AbortError' ||
           error.message.includes('Network error')
         )) {
-          const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s delays
+          const delay = Math.min(Math.pow(2, retryCount) * 1000, 5000); // Cap at 5s
           addDebugInfo(`🔄 Retrying portfolio load in ${delay / 1000}s...`);
           setTimeout(() => loadPortfolioAndSyncWallets(retryCount + 1), delay);
         } else {
