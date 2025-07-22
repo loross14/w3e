@@ -2140,51 +2140,162 @@ const App = () => {
           </div>
         )}
 
-        {/* Top Performing Assets Card */}
-        <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
-          <h3 className="text-base sm:text-lg font-semibold text-white mb-4">🚀 Top 3 Performing Assets (24h)</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {visibleAssets
-              .filter(asset => asset.performance24h !== undefined)
-              .sort((a, b) => (b.performance24h || 0) - (a.performance24h || 0))
-              .slice(0, 3)
-              .map((asset, index) => (
-                <div key={asset.id} className="bg-gradient-to-r from-green-900/20 to-emerald-900/20 border border-green-700/50 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-white">{asset.symbol}</span>
-                      <span className="text-xs text-green-400">#{index + 1}</span>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400 mb-1">{asset.name}</div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="block text-gray-400">24h Change</span>
-                      <span className="text-green-400 font-bold">
-                        {(asset.performance24h || 0) >= 0 ? '+' : ''}{(asset.performance24h || 0).toFixed(2)}%
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-gray-400">Value</span>
-                      <span className="text-white font-mono">
-                        ${asset.valueUSD.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+        {/* Portfolio Overview Cards */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <div>
+              <h3 className="text-base sm:text-lg font-semibold text-white">📊 Portfolio Overview</h3>
+              <p className="text-xs sm:text-sm text-gray-400">
+                Performance breakdown across all positions
+              </p>
+            </div>
+          </div>
 
-            {/* Show placeholder if no performance data */}
-            {visibleAssets.filter(asset => asset.performance24h !== undefined).length === 0 && (
-              <div className="col-span-full bg-gray-800 rounded-lg p-8 text-center">
-                <div className="text-gray-400 mb-2">
-                  📊 Performance data loading...
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
+            {/* Top Performers Card */}
+            <div className="bg-gradient-to-br from-green-900/20 via-emerald-900/20 to-gray-900 border border-green-500/30 rounded-xl p-4 sm:p-6">
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                <h4 className="text-base font-semibold text-green-100">🚀 Top Performers</h4>
+              </div>
+              
+              <div className="space-y-3">
+                {visibleAssets
+                  .filter(asset => asset.total_return_pct > 0)
+                  .sort((a, b) => b.total_return_pct - a.total_return_pct)
+                  .slice(0, 3)
+                  .map((asset, index) => (
+                    <div key={asset.id} className="flex items-center justify-between py-2 px-3 bg-green-900/20 rounded-lg border border-green-700/30">
+                      <div className="flex items-center space-x-2 min-w-0 flex-1">
+                        <span className="text-xs text-green-400 font-bold">#{index + 1}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-green-100 truncate">{asset.symbol}</div>
+                          <div className="text-xs text-green-300 opacity-80 truncate">{asset.name}</div>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-sm font-bold text-green-400">
+                          +{asset.total_return_pct.toFixed(0)}%
+                        </div>
+                        <div className="text-xs text-green-300 opacity-80">
+                          ${asset.valueUSD.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                }
+                
+                {visibleAssets.filter(asset => asset.total_return_pct > 0).length === 0 && (
+                  <div className="text-center py-4">
+                    <div className="text-green-300 text-sm">No profitable positions yet</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Largest Holdings Card */}
+            <div className="bg-gradient-to-br from-blue-900/20 via-indigo-900/20 to-gray-900 border border-blue-500/30 rounded-xl p-4 sm:p-6">
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="w-3 h-3 rounded-full bg-blue-400"></div>
+                <h4 className="text-base font-semibold text-blue-100">💰 Largest Holdings</h4>
+              </div>
+              
+              <div className="space-y-3">
+                {visibleAssets
+                  .sort((a, b) => b.valueUSD - a.valueUSD)
+                  .slice(0, 3)
+                  .map((asset, index) => (
+                    <div key={asset.id} className="flex items-center justify-between py-2 px-3 bg-blue-900/20 rounded-lg border border-blue-700/30">
+                      <div className="flex items-center space-x-2 min-w-0 flex-1">
+                        <span className="text-xs text-blue-400 font-bold">#{index + 1}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-blue-100 truncate">{asset.symbol}</div>
+                          <div className="text-xs text-blue-300 opacity-80 truncate">{asset.name}</div>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-sm font-bold text-blue-300">
+                          ${asset.valueUSD.toLocaleString()}
+                        </div>
+                        <div className="text-xs text-blue-400 opacity-80">
+                          {((asset.valueUSD / totalValue) * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+
+            {/* Portfolio Health Card */}
+            <div className={`bg-gradient-to-br ${
+              performanceVsRaised >= 0 
+                ? 'from-purple-900/20 via-pink-900/20 to-gray-900 border-purple-500/30' 
+                : 'from-orange-900/20 via-red-900/20 to-gray-900 border-orange-500/30'
+            } border rounded-xl p-4 sm:p-6`}>
+              <div className="flex items-center space-x-2 mb-4">
+                <div className={`w-3 h-3 rounded-full ${
+                  performanceVsRaised >= 0 ? 'bg-purple-400' : 'bg-orange-400'
+                }`}></div>
+                <h4 className={`text-base font-semibold ${
+                  performanceVsRaised >= 0 ? 'text-purple-100' : 'text-orange-100'
+                }`}>
+                  📈 Portfolio Health
+                </h4>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Overall Performance */}
+                <div className={`p-3 rounded-lg border ${
+                  performanceVsRaised >= 0 
+                    ? 'bg-purple-900/20 border-purple-700/30' 
+                    : 'bg-orange-900/20 border-orange-700/30'
+                }`}>
+                  <div className={`text-xs ${
+                    performanceVsRaised >= 0 ? 'text-purple-300' : 'text-orange-300'
+                  } mb-1`}>
+                    Total Return vs Raised Capital
+                  </div>
+                  <div className={`text-lg font-bold ${
+                    performanceVsRaised >= 0 ? 'text-purple-300' : 'text-orange-300'
+                  }`}>
+                    {performanceVsRaised >= 0 ? '+' : ''}{performanceVsRaised.toFixed(1)}%
+                  </div>
+                  <div className={`text-xs ${
+                    performanceVsRaised >= 0 ? 'text-purple-400' : 'text-orange-400'
+                  } opacity-80`}>
+                    ${totalValue.toLocaleString()} / $138,000
+                  </div>
                 </div>
-                <div className="text-sm text-gray-500">
-                  24h performance data will appear here once available
+
+                {/* Asset Distribution */}
+                <div className="space-y-2">
+                  <div className={`text-xs ${
+                    performanceVsRaised >= 0 ? 'text-purple-300' : 'text-orange-300'
+                  }`}>
+                    Asset Distribution
+                  </div>
+                  <div className={`text-sm ${
+                    performanceVsRaised >= 0 ? 'text-purple-100' : 'text-orange-100'
+                  }`}>
+                    {visibleAssets.length} active positions
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className={`text-xs ${
+                      performanceVsRaised >= 0 ? 'text-purple-400' : 'text-orange-400'
+                    }`}>
+                      Profitable: {visibleAssets.filter(a => a.total_return_pct > 0).length}
+                    </div>
+                    <div className="w-1 h-1 rounded-full bg-gray-500"></div>
+                    <div className={`text-xs ${
+                      performanceVsRaised >= 0 ? 'text-purple-400' : 'text-orange-400'
+                    }`}>
+                      Underwater: {visibleAssets.filter(a => a.total_return_pct < 0).length}
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
 
