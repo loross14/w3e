@@ -16,14 +16,14 @@ const MetricCard = ({ title, value, change, changeType = "positive", icon, child
         {value}
       </p>
       {change && (
-        <p className={`text-xs sm:text-sm ${
+        <div className={`text-xs sm:text-sm ${
           changeType === "positive" ? "text-green-400" : 
           changeType === "negative" ? "text-red-400" : 
           changeType === "white" ? "text-white" : 
           "text-gray-400"
         } mt-1`}>
-          {change}
-        </p>
+          {typeof change === 'string' ? change : change}
+        </div>
       )}
       {children}
     </div>
@@ -926,8 +926,77 @@ const App = () => {
     const saved = localStorage.getItem("walletData");
     return saved ? JSON.parse(saved) : {};
   });
+  const [lastUpdated, setLastUpdated] = useState(() => {
+    const saved = localStorage.getItem("lastUpdated");
+    return saved ? new Date(saved) : null;
+  });
 
   const correctPassword = "bullrun";
+
+  // Function to get live status with real-time updates
+  const getLiveStatus = () => {
+    if (!lastUpdated) {
+      return {
+        text: "No data",
+        color: "text-gray-400",
+        dot: "bg-gray-400"
+      };
+    }
+
+    const now = new Date();
+    const diffMs = now - lastUpdated;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+    if (diffMinutes < 1) {
+      return {
+        text: "Live now",
+        color: "text-green-400",
+        dot: "bg-green-400 animate-pulse"
+      };
+    } else if (diffMinutes < 5) {
+      return {
+        text: `${diffMinutes}m ago`,
+        color: "text-green-400",
+        dot: "bg-green-400"
+      };
+    } else if (diffMinutes < 30) {
+      return {
+        text: `${diffMinutes}m ago`,
+        color: "text-yellow-400",
+        dot: "bg-yellow-400"
+      };
+    } else if (diffHours < 1) {
+      return {
+        text: `${diffMinutes}m ago`,
+        color: "text-orange-400",
+        dot: "bg-orange-400"
+      };
+    } else if (diffHours < 24) {
+      return {
+        text: `${diffHours}h ago`,
+        color: "text-red-400",
+        dot: "bg-red-400"
+      };
+    } else {
+      const diffDays = Math.floor(diffHours / 24);
+      return {
+        text: `${diffDays}d ago`,
+        color: "text-red-500",
+        dot: "bg-red-500"
+      };
+    }
+  };
+
+  // Update live status every minute
+  const [, forceUpdate] = useState({});
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceUpdate({});
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
 
   const checkPassword = () => {
     if (password === correctPassword) {
@@ -1689,6 +1758,12 @@ const App = () => {
       // Step 10: Complete
       const assetCount = updatedAssets.length;
       const valueFormatted = newTotalValue.toLocaleString();
+      
+      // Update the last updated timestamp
+      const now = new Date();
+      setLastUpdated(now);
+      localStorage.setItem("lastUpdated", now.toISOString());
+      
       setUpdateStatus(`✅ Updated ${assetCount} assets • $${valueFormatted}`);
       setTimeout(() => setUpdateStatus(''), 5000);
 
@@ -1863,8 +1938,15 @@ const App = () => {
           <MetricCard
             title="Total Value"
             value={`$${totalValue.toLocaleString()}`}
-            change={`${portfolioData.performance24h >= 0 ? '+' : ''}${(portfolioData.performance24h || 2.4).toFixed(1)}% (24h)`}
-            changeType={portfolioData.performance24h >= 0 ? "positive" : "negative"}
+            change={
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${getLiveStatus().dot}`}></div>
+                <span className={getLiveStatus().color}>
+                  {getLiveStatus().text}
+                </span>
+              </div>
+            }
+            changeType="white"
             icon="#10B981"
           />
 
