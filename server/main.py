@@ -14,8 +14,16 @@ from psycopg2.extras import RealDictCursor
 import json
 import requests
 from abc import ABC, abstractmethod
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Crypto Fund API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+    yield
+    # Shutdown (if needed)
+
+app = FastAPI(title="Crypto Fund API", version="1.0.0", lifespan=lifespan)
 
 # Serve static files in production
 if os.path.exists("../dist"):
@@ -1391,7 +1399,6 @@ def init_db():
                 wallet_id INTEGER PRIMARY KEY REFERENCES wallets(id),
                 status TEXT,
                 assets_found INTEGER,
-```python
                 total_value REAL,
                 error_message TEXT,
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -1499,9 +1506,6 @@ async def get_token_prices_new(token_addresses_by_network: Dict[str, List[str]])
     return all_prices
 
 # API endpoints
-@app.on_event("startup")
-async def startup_event():
-    init_db()
 
 @app.get("/")
 async def root():
@@ -2622,7 +2626,8 @@ async def serve_spa(full_path: str):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 80))
+    # Use PORT from environment, fallback to 80 for deployment, 8000 for development
+    port = int(os.environ.get("PORT", 8000))
     print(f"🚀 [SERVER] Starting server on port {port}")
     print(f"🔍 [SERVER] Checking for static files...")
     if os.path.exists("../dist"):
@@ -2631,4 +2636,11 @@ if __name__ == "__main__":
         print("✅ [SERVER] Found ./dist directory")  
     else:
         print("⚠️ [SERVER] No dist directory found - running API-only mode")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    
+    # Ensure server starts quickly and binds to all interfaces
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=port,
+        log_level="info"
+    )
