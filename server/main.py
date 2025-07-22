@@ -2535,8 +2535,7 @@ async def get_portfolio():
         ORDER BY timestamp DESC LIMIT 1
     """)
     saved_total_result = cursor.fetchone()
-    saved_total_value = saved_total_result[
-        'total_value_usd'] if saved_total_result else 0
+    saved_total_value = saved_total_result['total_value_usd'] if saved_total_result else 0
 
     # Use saved value if available, otherwise calculate from current assets
     calculated_total = sum(asset.value_usd or 0 for asset in assets)
