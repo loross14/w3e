@@ -902,9 +902,11 @@ const API_BASE_URL = (() => {
     return 'http://localhost:8000';
   }
   
-  // For Replit, use a simpler approach - just replace the port
+  // For Replit, construct the backend URL properly
   const currentUrl = new URL(window.location.href);
-  return `${currentUrl.protocol}//${currentUrl.hostname.replace(':5000', '')}:8000`;
+  // Remove any port from hostname and add 8000
+  const hostname = currentUrl.hostname.split(':')[0];
+  return `${currentUrl.protocol}//${hostname}:8000`;
 })();
 
 // Main App Component
