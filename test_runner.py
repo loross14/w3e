@@ -92,12 +92,10 @@ class TestRunner:
             "-v", 
             "--tb=short",
             "--disable-warnings",
-            "--no-cov",
             "-p", "no:web3",
             "-p", "no:ethereum", 
             "-p", "no:cacheprovider",
-            "--maxfail=5",
-            "--isolated-build"
+            "--maxfail=5"
         ], capture_output=True, text=True, env=env)
         
         self.test_results["backend_tests"] = {
@@ -192,7 +190,6 @@ class TestRunner:
             "-v",
             "--tb=short",
             "--disable-warnings",
-            "--no-cov",
             "-p", "no:web3",
             "-p", "no:ethereum",
             "-x"  # Stop on first failure
