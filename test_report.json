@@ -1,6 +1,10 @@
 {
-  "start_time": "2025-07-22 19:54:37.755590",
-  "backend_tests": {},
+  "start_time": "2025-07-22 19:58:08.577790",
+  "backend_tests": {
+    "exit_code": 4,
+    "stdout": "",
+    "stderr": "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/_pytest/config/__init__.py:331: PluggyTeardownRaisedWarning: A plugin raised an exception during an old-style hookwrapper teardown.\nPlugin: helpconfig, Hook: pytest_cmdline_parse\nUsageError: usage: __main__.py [options] [file_or_dir] [file_or_dir] [...]\n__main__.py: error: unrecognized arguments: --no-cov --isolated-build\n  inifile: /home/runner/workspace/pytest.ini\n  rootdir: /home/runner/workspace\nFor more information see https://pluggy.readthedocs.io/en/stable/api_reference.html#pluggy.PluggyTeardownRaisedWarning\n  config = pluginmanager.hook.pytest_cmdline_parse(\nERROR: usage: __main__.py [options] [file_or_dir] [file_or_dir] [...]\n__main__.py: error: unrecognized arguments: --no-cov --isolated-build\n  inifile: /home/runner/workspace/pytest.ini\n  rootdir: /home/runner/workspace\n\n"
+  },
   "frontend_tests": {
     "exit_code": 0,
     "stdout": "Frontend build successful",
@@ -17,6 +21,6 @@
   "total_passed": 0,
   "total_failed": 0,
   "total_skipped": 0,
-  "end_time": "2025-07-22 19:55:01.128241",
-  "duration": "0:00:23.372651"
+  "end_time": "2025-07-22 19:58:49.488458",
+  "duration": "0:00:40.910668"
 }
