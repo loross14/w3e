@@ -372,7 +372,7 @@ class EthereumAssetFetcher(AssetFetcher):
         print(f"🖼️ [ETH NFT QUERY] Final result: {len(assets)} NFT collections found")
         return assets
 
-    async def _get_nft_floor_price(self, client: httpx.AsyncClient, contract_address: str, opensea_slug: str = None) -> float:
+    async def _get_nft_floor_price(self, self, client: httpx.AsyncClient, contract_address: str, opensea_slug: str = None) -> float:
         """Get NFT collection floor price from OpenSea API"""
         try:
             if opensea_slug:
@@ -506,7 +506,7 @@ class EthereumPriceFetcher(PriceFetcher):
             "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": 100000,  # WBTC ~$100k
             "0x808507121b80c02388fad14726482e061b8da827": 5.0,     # PENDLE ~$5
         }
-        
+
         for addr, fallback_price in fallback_prices.items():
             if addr.lower() not in price_map and addr not in price_map:
                 print(f"🔄 Using fallback price for {addr}: ${fallback_price}")
@@ -1891,20 +1891,71 @@ async def get_wallet_status():
 
 @app.put("/api/assets/{symbol}/notes")
 async def update_asset_notes(symbol: str, notes: str):
+    """Update notes for a specific asset"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        INSERT INTO asset_notes (symbol, notes, updated_at)
-        VALUES (%s, %s, CURRENT_TIMESTAMP)
-        ON CONFLICT (symbol) DO UPDATE SET
-        notes = EXCLUDED.notes, updated_at = CURRENT_TIMESTAMP
-    """, (symbol, notes))
+    try:
+        cursor.execute("""
+            INSERT INTO asset_notes (symbol, notes, updated_at)
+            VALUES (%s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (symbol) DO UPDATE SET
+            notes = EXCLUDED.notes, updated_at = CURRENT_TIMESTAMP
+        """, (symbol, notes))
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        conn.close()
 
-    return {"message": "Notes updated successfully"}
+        return {"message": "Notes updated successfully"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
+
+@app.put("/api/assets/{symbol}/purchase_price")
+async def update_asset_purchase_price(symbol: str, request: dict):
+    """Update purchase price for a specific asset and recalculate metrics"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        purchase_price = request.get('purchase_price', 0)
+
+        # Update the purchase price in the assets table
+        cursor.execute("""
+            UPDATE assets 
+            SET purchase_price = %s,
+                total_invested = balance * %s,
+                unrealized_pnl = value_usd - (balance * %s),
+                total_return_pct = CASE 
+                    WHEN (balance * %s) > 0 
+                    THEN ((value_usd - (balance * %s)) / (balance * %s)) * 100 
+                    ELSE 0 
+                END
+            WHERE symbol = %s
+        """, (purchase_price, purchase_price, purchase_price, purchase_price, purchase_price, purchase_price, symbol))
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"Asset {symbol} not found")
+
+        conn.commit()
+        print(f"✅ Updated purchase price for {symbol}: ${purchase_price}")
+        conn.close()
+        return {"message": f"Purchase price updated for {symbol}"}
+
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ Error updating purchase price for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
 
 @app.post("/api/assets/hide")
 async def hide_asset(token_address: str, symbol: str, name: str):
@@ -1926,6 +1977,7 @@ async def hide_asset(token_address: str, symbol: str, name: str):
         print(f"❌ Error hiding asset: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
     finally:
+        cursor.close()
         conn.close()
 
 @app.delete("/api/assets/hide/{token_address}")
@@ -2646,7 +2698,7 @@ async def serve_spa(full_path: str):
 
     # Serve the React app for all other routes
     dist_path = "../dist" if os.path.exists("../dist") else "./dist" if os.path.exists("./dist") else None
-    
+
     if dist_path and os.path.exists(f"{dist_path}/index.html"):
         return FileResponse(f"{dist_path}/index.html")
     else:
@@ -2664,7 +2716,7 @@ if __name__ == "__main__":
         print("✅ [SERVER] Found ./dist directory")  
     else:
         print("⚠️ [SERVER] No dist directory found - running API-only mode")
-    
+
     # Ensure server starts quickly and binds to all interfaces
     uvicorn.run(
         app, 

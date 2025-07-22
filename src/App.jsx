@@ -634,7 +634,7 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
                       <div className="text-xs text-gray-400 mb-1">{performer.name}</div>
                       <div className="text-lg font-bold text-green-400">+{performer.return_pct.toFixed(1)}%</div>
                       <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()} profit</div>
-                    </div>
+                                        </div>
                   ))}
                 </div>                  
               </div>
@@ -901,7 +901,7 @@ const API_BASE_URL = (() => {
   if (window.location.hostname === 'localhost') {
     return 'http://localhost:8000';
   }
-  
+
   // For Replit, construct the backend URL properly
   const currentUrl = new URL(window.location.href);
   // Remove any port from hostname and add 8000
@@ -1280,7 +1280,7 @@ const App = () => {
 
         if (savedData.assets && savedData.assets.length > 0) {
           console.log("🔄 [FRONTEND DEBUG] Starting asset transformation...");
-          console.log("🖼️ [NFT SEARCH] Looking for NFTs in backend data...");
+          console.log("🔍 [NFT SEARCH] Looking for NFTs in backend data...");
 
           // First pass - identify NFTs
           const nftsFound = savedData.assets.filter(asset => 
@@ -1505,14 +1505,14 @@ const App = () => {
 
       } catch (error) {
         let errorMessage = error.message;
-        
+
         // Handle specific error types
         if (error.name === 'AbortError') {
           errorMessage = 'Connection timeout - backend taking too long to respond';
         } else if (error.message === 'Failed to fetch') {
           errorMessage = 'Network error - cannot reach backend server';
         }
-        
+
         addDebugInfo(`❌ Portfolio load error (attempt ${retryCount + 1}/${maxRetries + 1})`, errorMessage);
 
         // Retry with exponential backoff for network errors
@@ -1846,6 +1846,8 @@ const App = () => {
   const performanceSign = performanceVsRaised >= 0 ? "+" : "";
   const performanceChangeType = performanceVsRaised >= 0 ? "positive" : "negative";
 
+  const [isOverviewCollapsed, setIsOverviewCollapsed] = useState(false);
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Mobile-optimized Header */}
@@ -1853,11 +1855,9 @@ const App = () => {
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-xs sm:text-sm">3</span>
-              </div>
+              {/* Removing the icon */}
               <div className="min-w-0 flex-1">
-                <h1 className="text-lg sm:text-2xl font-bold truncate">Web3Equities Portfolio</h1>
+                <h1 className="text-lg sm:text-2xl font-bold truncate">w3e.info</h1>
                 {/* Status Display */}
                 {updateStatus && (
                   <div className="flex items-center space-x-2 mt-1">
@@ -1979,7 +1979,6 @@ const App = () => {
               </div>
             }
             changeType="white"
-            icon="#10B981"
           />
 
           <MetricCard
@@ -1991,7 +1990,6 @@ const App = () => {
             }
             change="Since inception"
             changeType="white"
-            icon="#F59E0B"
           />
 
           <MetricCard
@@ -1999,7 +1997,6 @@ const App = () => {
             value={visibleAssets.length}
             change="Active positions"
             changeType="white"
-            icon="#3B82F6"
           />
 
           <MetricCard
@@ -2007,7 +2004,6 @@ const App = () => {
             value={topAsset?.symbol || "N/A"}
             change={`${topAssetWeight}% of portfolio`}
             changeType="white"
-            icon="#8B5CF6"
           />
         </div>
 
@@ -2178,16 +2174,27 @@ const App = () => {
                 Performance breakdown across all positions
               </p>
             </div>
+			  {/* Adding closeable functionality */}
+              <button 
+				onClick={() => setIsOverviewCollapsed(!isOverviewCollapsed)}
+				className="text-gray-400 hover:text-white p-1"
+				title="Collapse Overview"
+			  >
+				  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+				  </svg>
+			  </button>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 mb-6">
+		  {/* Adding conditional rendering for portfolio overview section */}
+		  {!isOverviewCollapsed && (
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
             {/* Top Performers Card */}
             <div className="bg-gradient-to-br from-green-900/20 via-emerald-900/20 to-gray-900 border border-green-500/30 rounded-lg p-3 sm:p-4">
               <div className="flex items-center space-x-2 mb-3">
                 <div className="w-2 h-2 rounded-full bg-green-400"></div>
                 <h4 className="text-sm font-semibold text-green-100">🚀 Top Performers</h4>
               </div>
-              
+
               <div className="space-y-2">
                 {visibleAssets
                   .filter(asset => asset.total_return_pct > 0)
@@ -2209,7 +2216,7 @@ const App = () => {
                     </div>
                   ))
                 }
-                
+
                 {visibleAssets.filter(asset => asset.total_return_pct > 0).length === 0 && (
                   <div className="text-center py-2">
                     <div className="text-green-300 text-xs">No profitable positions yet</div>
@@ -2224,7 +2231,7 @@ const App = () => {
                 <div className="w-2 h-2 rounded-full bg-blue-400"></div>
                 <h4 className="text-sm font-semibold text-blue-100">💰 Largest Holdings</h4>
               </div>
-              
+
               <div className="space-y-2">
                 {visibleAssets
                   .sort((a, b) => b.valueUSD - a.valueUSD)
@@ -2264,7 +2271,7 @@ const App = () => {
                   📈 Portfolio Health
                 </h4>
               </div>
-              
+
               <div className="space-y-2">
                 {/* Overall Performance */}
                 <div className={`p-2 rounded border ${
@@ -2307,6 +2314,7 @@ const App = () => {
               </div>
             </div>
           </div>
+		  )}
         </div>
 
 
