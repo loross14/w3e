@@ -901,18 +901,10 @@ const API_BASE_URL = (() => {
   if (window.location.hostname === 'localhost') {
     return 'http://localhost:8000';
   }
-  // Always use the backend port 8000, but handle Replit's URL structure
+  
+  // For Replit, use a simpler approach - just replace the port
   const currentUrl = new URL(window.location.href);
-  
-  // For Replit URLs, extract the base domain and use port 8000
-  if (currentUrl.hostname.includes('replit.dev')) {
-    // Extract the repl ID from the hostname
-    const replId = currentUrl.hostname.split('.')[0];
-    return `https://${replId}-00-13ahw0dwiiebv.kirk.replit.dev:8000`;
-  }
-  
-  // Fallback for other environments
-  return `${currentUrl.protocol}//${currentUrl.hostname}:8000`;
+  return `${currentUrl.protocol}//${currentUrl.hostname.replace(':5000', '')}:8000`;
 })();
 
 // Main App Component
@@ -1526,13 +1518,19 @@ const App = () => {
           error.message.includes('Failed to fetch') || 
           error.message.includes('Backend not ready') ||
           error.name === 'AbortError' ||
-          error.message.includes('Network error')
+          error.message.includes('Network error') ||
+          error.message.includes('TypeError')
         )) {
-          const delay = Math.min(Math.pow(2, retryCount) * 1000, 5000); // Cap at 5s
+          const delay = Math.min(Math.pow(2, retryCount) * 1000, 3000); // Cap at 3s for faster recovery
           addDebugInfo(`🔄 Retrying portfolio load in ${delay / 1000}s...`);
           setTimeout(() => loadPortfolioAndSyncWallets(retryCount + 1), delay);
         } else {
-          setUpdateError(`Failed to load portfolio: ${errorMessage}`);
+          // Only show error if all retries failed
+          if (retryCount >= maxRetries) {
+            setUpdateError(`Failed to load portfolio after ${maxRetries + 1} attempts: ${errorMessage}`);
+          } else {
+            setUpdateError(`Failed to load portfolio: ${errorMessage}`);
+          }
         }
       }
     };
