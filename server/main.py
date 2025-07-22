@@ -2611,14 +2611,17 @@ async def serve_static_assets(file_path: str):
             return FileResponse(full_file_path)
     raise HTTPException(status_code=404, detail="Asset not found")
 
-# Catch-all route for SPA routing (must be last, but exclude API routes completely)
+# Catch-all route for SPA routing - only for non-API routes
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
-    # Completely exclude anything starting with 'api'
-    if full_path.startswith("api"):
-        raise HTTPException(status_code=404, detail="API endpoint not found")
+    # Only serve SPA for routes that don't conflict with API endpoints
+    # This should only catch routes like /dashboard, /settings, etc.
+    if (full_path.startswith("api/") or 
+        full_path.startswith("health") or 
+        full_path.startswith("assets/")):
+        raise HTTPException(status_code=404, detail="Not found")
 
-    # Serve the React app for all non-API routes
+    # Serve the React app for all other routes
     dist_path = "../dist" if os.path.exists("../dist") else "./dist" if os.path.exists("./dist") else None
     
     if dist_path and os.path.exists(f"{dist_path}/index.html"):
