@@ -1392,8 +1392,7 @@ def init_db():
                 status TEXT,
                 assets_found INTEGER,
                 total_value REAL,
-                error_```python
-message TEXT,
+                error_message TEXT,
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
