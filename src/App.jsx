@@ -901,7 +901,7 @@ const API_BASE_URL = (() => {
   if (window.location.hostname === 'localhost') {
     return 'http://localhost:8000';
   }
-  // For Replit deployment, always use port 8000 where the backend runs
+  // Always use port 8000 for backend API calls, regardless of frontend port
   const currentUrl = new URL(window.location.href);
   return `${currentUrl.protocol}//${currentUrl.hostname}:8000`;
 })();
