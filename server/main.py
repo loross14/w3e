@@ -476,151 +476,198 @@ class EthereumAssetFetcher(AssetFetcher):
         assets = []
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:  # Increased timeout
                 print(
                     f"🖼️ [ETH NFT QUERY] Starting NFT query for wallet: {wallet_address}"
                 )
                 print(f"🖼️ [ETH NFT QUERY] Alchemy URL: {self.alchemy_url}")
+                print(f"🖼️ [ETH NFT QUERY] Hidden addresses: {list(hidden_addresses)}")
 
-                # Use the correct Alchemy NFT method
-                nft_query_payload = {
-                    "id":
-                    1,
-                    "jsonrpc":
-                    "2.0",
-                    "method":
-                    "alchemy_getNFTs",
-                    "params": [
-                        wallet_address, {
-                            "withMetadata": True,
-                            "tokenUriTimeoutInMs": 5000
+                # Try multiple NFT API methods for better coverage
+                nft_methods = [
+                    {
+                        "method": "alchemy_getNFTs",
+                        "params": [
+                            wallet_address, {
+                                "withMetadata": True,
+                                "tokenUriTimeoutInMs": 10000,
+                                "omitMetadata": False
+                            }
+                        ]
+                    },
+                    {
+                        "method": "alchemy_getNFTsForOwner", 
+                        "params": [
+                            wallet_address, {
+                                "withMetadata": True,
+                                "tokenUriTimeoutInMs": 10000
+                            }
+                        ]
+                    }
+                ]
+
+                for method_config in nft_methods:
+                    try:
+                        nft_query_payload = {
+                            "id": 1,
+                            "jsonrpc": "2.0",
+                            **method_config
                         }
-                    ]
-                }
 
-                print(
-                    f"🖼️ [ETH NFT QUERY] Request payload: {nft_query_payload}")
+                        print(f"🖼️ [ETH NFT QUERY] Trying method: {method_config['method']}")
+                        print(f"🖼️ [ETH NFT QUERY] Request payload: {nft_query_payload}")
 
-                nft_response = await client.post(self.alchemy_url,
-                                                 json=nft_query_payload)
+                        nft_response = await client.post(
+                            self.alchemy_url,
+                            json=nft_query_payload,
+                            timeout=60.0
+                        )
 
-                print(
-                    f"🖼️ [ETH NFT QUERY] Response status: {nft_response.status_code}"
-                )
+                        print(f"🖼️ [ETH NFT QUERY] Response status: {nft_response.status_code}")
+                        print(f"🖼️ [ETH NFT QUERY] Response headers: {dict(nft_response.headers)}")
 
                 if nft_response.status_code == 200:
-                    nft_data = nft_response.json()
-                    print(
-                        f"🖼️ [ETH NFT QUERY] Raw response keys: {list(nft_data.keys())}"
-                    )
+                            try:
+                                nft_data = nft_response.json()
+                                print(f"🖼️ [ETH NFT QUERY] Raw response keys: {list(nft_data.keys())}")
+                                print(f"🖼️ [ETH NFT QUERY] Full response preview: {str(nft_data)[:500]}...")
 
-                    if "error" in nft_data:
-                        print(
-                            f"❌ [ETH NFT QUERY] API Error: {nft_data['error']}"
-                        )
-                        return assets
+                                if "error" in nft_data:
+                                    print(f"❌ [ETH NFT QUERY] API Error with {method_config['method']}: {nft_data['error']}")
+                                    continue  # Try next method
 
-                    result = nft_data.get("result", {})
-                    print(
-                        f"🖼️ [ETH NFT QUERY] Result keys: {list(result.keys())}"
-                    )
+                                result = nft_data.get("result", {})
+                                print(f"🖼️ [ETH NFT QUERY] Result keys: {list(result.keys())}")
 
-                    owned_nfts = result.get("ownedNfts", [])
-                    total_count = result.get("totalCount", 0)
+                                # Handle different response formats
+                                owned_nfts = []
+                                total_count = 0
 
-                    print(
-                        f"🖼️ [ETH NFT QUERY] ============ NFT QUERY RESULTS ============"
-                    )
-                    print(
-                        f"🖼️ [ETH NFT QUERY] Total NFTs found: {total_count}")
-                    print(
-                        f"🖼️ [ETH NFT QUERY] NFTs in result array: {len(owned_nfts)}"
-                    )
-                    print(f"🖼️ [ETH NFT QUERY] Wallet: {wallet_address}")
-                    print(
-                        f"🖼️ [ETH NFT QUERY] =========================================="
-                    )
+                                if "ownedNfts" in result:
+                                    owned_nfts = result["ownedNfts"]
+                                    total_count = result.get("totalCount", len(owned_nfts))
+                                elif "nfts" in result:
+                                    owned_nfts = result["nfts"] 
+                                    total_count = result.get("totalCount", len(owned_nfts))
+                                elif isinstance(result, list):
+                                    owned_nfts = result
+                                    total_count = len(result)
+                                else:
+                                    print(f"🖼️ [ETH NFT QUERY] Unexpected result format: {result}")
+                                    continue
 
-                    if len(owned_nfts) > 0:
-                        print(f"🖼️ [ETH NFT QUERY] Sample NFT structure:")
-                        sample_nft = owned_nfts[0]
-                        print(
-                            f"🖼️ [ETH NFT QUERY] Sample NFT keys: {list(sample_nft.keys())}"
-                        )
-                        print(
-                            f"🖼️ [ETH NFT QUERY] Sample contract: {sample_nft.get('contract', {})}"
-                        )
-                        print(
-                            f"🖼️ [ETH NFT QUERY] Sample tokenId: {sample_nft.get('tokenId')}"
-                        )
-                        print(
-                            f"🖼️ [ETH NFT QUERY] Sample metadata keys: {list(sample_nft.get('metadata', {}).keys())}"
-                        )
+                    print(f"🖼️ [ETH NFT QUERY] ============ NFT QUERY RESULTS ({method_config['method']}) ============")
+                                print(f"🖼️ [ETH NFT QUERY] Total NFTs found: {total_count}")
+                                print(f"🖼️ [ETH NFT QUERY] NFTs in result array: {len(owned_nfts)}")
+                                print(f"🖼️ [ETH NFT QUERY] Wallet: {wallet_address}")
+                                print(f"🖼️ [ETH NFT QUERY] Method: {method_config['method']}")
+                                print(f"🖼️ [ETH NFT QUERY] ========================================")
+
+                                if len(owned_nfts) > 0:
+                                    print(f"🖼️ [ETH NFT QUERY] Sample NFT structure:")
+                                    sample_nft = owned_nfts[0]
+                                    print(f"🖼️ [ETH NFT QUERY] Sample NFT keys: {list(sample_nft.keys())}")
+                                    
+                                    contract_info = sample_nft.get('contract', {})
+                                    print(f"🖼️ [ETH NFT QUERY] Sample contract: {contract_info}")
+                                    print(f"🖼️ [ETH NFT QUERY] Sample tokenId: {sample_nft.get('tokenId')}")
+                                    
+                                    metadata = sample_nft.get('metadata', {})
+                                    print(f"🖼️ [ETH NFT QUERY] Sample metadata keys: {list(metadata.keys()) if metadata else 'No metadata'}")
+                                    
+                                    # Check specifically for Mutant Ape Yacht Club
+                                    if contract_info:
+                                        contract_name = contract_info.get('name', '').lower()
+                                        contract_symbol = contract_info.get('symbol', '').lower()
+                                        contract_address = contract_info.get('address', '').lower()
+                                        
+                                        print(f"🖼️ [ETH NFT QUERY] Contract name: '{contract_name}'")
+                                        print(f"🖼️ [ETH NFT QUERY] Contract symbol: '{contract_symbol}'")  
+                                        print(f"🖼️ [ETH NFT QUERY] Contract address: '{contract_address}'")
+                                        
+                                        if 'mutant' in contract_name or 'mayc' in contract_symbol or contract_address == '0x60e4d786628fea6478f785a6d7e704777c86a7c6':
+                                            print(f"🚨 [ETH NFT QUERY] FOUND MUTANT APE NFT!")
+                                            print(f"🚨 [ETH NFT QUERY] Full NFT data: {sample_nft}")
 
                     # Group NFTs by collection with enhanced metadata
-                    nft_collections = {}
-                    print(
-                        f"🖼️ [ETH NFT] Processing {len(owned_nfts)} owned NFTs for wallet {wallet_address[:10]}..."
-                    )
+                                nft_collections = {}
+                                print(f"🖼️ [ETH NFT] Processing {len(owned_nfts)} owned NFTs for wallet {wallet_address[:10]}...")
 
-                    for i, nft in enumerate(owned_nfts):
-                        contract_info = nft.get("contract", {})
-                        contract_address = contract_info.get("address",
-                                                             "").lower()
-                        token_id = nft.get("tokenId", "")
+                                for i, nft in enumerate(owned_nfts):
+                                    try:
+                                        contract_info = nft.get("contract", {})
+                                        if not contract_info:
+                                            print(f"⚠️ [ETH NFT] NFT #{i+1}: No contract info found")
+                                            continue
+                                            
+                                        contract_address = contract_info.get("address", "")
+                                        if not contract_address:
+                                            print(f"⚠️ [ETH NFT] NFT #{i+1}: No contract address found")
+                                            continue
+                                            
+                                        contract_address = contract_address.lower()
+                                        token_id = nft.get("tokenId", "")
 
-                        print(
-                            f"🖼️ [ETH NFT] NFT #{i+1}: Contract {contract_address[:10]}... Token #{token_id}"
-                        )
+                                        print(f"🖼️ [ETH NFT] NFT #{i+1}: Contract {contract_address[:10]}... Token #{token_id}")
 
-                        if contract_address in hidden_addresses:
-                            print(
-                                f"🙈 [ETH NFT] Skipping hidden NFT contract: {contract_address[:10]}..."
-                            )
-                            continue
+                                        # Check for hidden addresses (both original and lowercase)
+                                        if (contract_address in hidden_addresses or 
+                                            contract_address.upper() in hidden_addresses or
+                                            any(addr.lower() == contract_address for addr in hidden_addresses)):
+                                            print(f"🙈 [ETH NFT] Skipping hidden NFT contract: {contract_address[:10]}...")
+                                            continue
 
-                        collection_name = contract_info.get(
-                            "name", "Unknown NFT Collection")
-                        collection_symbol = contract_info.get("symbol", "NFT")
+                                        collection_name = contract_info.get("name", "Unknown NFT Collection")
+                                        collection_symbol = contract_info.get("symbol", "NFT")
 
-                        print(
-                            f"🖼️ [ETH NFT] Found NFT: {collection_name} ({collection_symbol}) - Contract: {contract_address[:10]}..."
-                        )
+                                        print(f"🖼️ [ETH NFT] Found NFT: {collection_name} ({collection_symbol}) - Contract: {contract_address[:10]}...")
+                                        
+                                        # Special logging for Mutant Ape detection
+                                        if ('mutant' in collection_name.lower() or 
+                                            'mayc' in collection_symbol.lower() or 
+                                            contract_address == '0x60e4d786628fea6478f785a6d7e704777c86a7c6'):
+                                            print(f"🚨 [MUTANT APE DETECTED] Collection: {collection_name}")
+                                            print(f"🚨 [MUTANT APE DETECTED] Symbol: {collection_symbol}")
+                                            print(f"🚨 [MUTANT APE DETECTED] Address: {contract_address}")
+                                            print(f"🚨 [MUTANT APE DETECTED] Token ID: {token_id}")
+                                            print(f"🚨 [MUTANT APE DETECTED] Full NFT: {nft}")
 
                         # Extract image from metadata
-                        metadata = nft.get("metadata", {})
-                        image_url = None
-                        if metadata:
-                            image_url = metadata.get("image")
-                            if not image_url and "image_url" in metadata:
-                                image_url = metadata.get("image_url")
+                                        metadata = nft.get("metadata", {})
+                                        image_url = None
+                                        if metadata:
+                                            image_url = metadata.get("image")
+                                            if not image_url and "image_url" in metadata:
+                                                image_url = metadata.get("image_url")
+                                            # Try alternative image fields
+                                            if not image_url:
+                                                for img_field in ["imageUrl", "image_data", "external_url"]:
+                                                    if img_field in metadata:
+                                                        image_url = metadata[img_field]
+                                                        break
 
-                        if contract_address not in nft_collections:
-                            nft_collections[contract_address] = {
-                                "name":
-                                collection_name,
-                                "symbol":
-                                collection_symbol,
-                                "count":
-                                0,
-                                "token_ids": [],
-                                "image_url":
-                                image_url,
-                                "opensea_slug":
-                                contract_info.get("openSea",
-                                                  {}).get("collectionSlug")
-                            }
+                                        if contract_address not in nft_collections:
+                                            nft_collections[contract_address] = {
+                                                "name": collection_name,
+                                                "symbol": collection_symbol,
+                                                "count": 0,
+                                                "token_ids": [],
+                                                "image_url": image_url,
+                                                "opensea_slug": contract_info.get("openSea", {}).get("collectionSlug")
+                                            }
 
-                        nft_collections[contract_address]["count"] += 1
-                        if token_id:
-                            nft_collections[contract_address][
-                                "token_ids"].append(token_id)
+                                        nft_collections[contract_address]["count"] += 1
+                                        if token_id:
+                                            nft_collections[contract_address]["token_ids"].append(str(token_id))
 
-                        # Use first NFT image if collection doesn't have one
-                        if not nft_collections[contract_address][
-                                "image_url"] and image_url:
-                            nft_collections[contract_address][
-                                "image_url"] = image_url
+                                        # Use first NFT image if collection doesn't have one
+                                        if not nft_collections[contract_address]["image_url"] and image_url:
+                                            nft_collections[contract_address]["image_url"] = image_url
+
+                                    except Exception as nft_error:
+                                        print(f"❌ [ETH NFT] Error processing NFT #{i+1}: {nft_error}")
+                                        print(f"❌ [ETH NFT] Problematic NFT data: {nft}")
+                                        continue
 
                     print(
                         f"🖼️ [ETH NFT QUERY] ========== NFT COLLECTIONS SUMMARY =========="
@@ -3156,35 +3203,67 @@ async def debug_database():
 
 @app.get("/api/debug/nfts/{wallet_address}")
 async def debug_nft_query(wallet_address: str):
-    """Debug endpoint to manually test NFT queries"""
+    """Debug endpoint to manually test NFT queries with comprehensive logging"""
     try:
         print(f"🔍 [DEBUG NFT] Manual NFT query for wallet: {wallet_address}")
+        print(f"🔍 [DEBUG NFT] Alchemy API Key set: {bool(ALCHEMY_API_KEY)}")
 
         # Create Ethereum asset fetcher
         eth_fetcher = EthereumAssetFetcher(ALCHEMY_API_KEY)
 
-        # Fetch only NFTs
+        # Test direct Alchemy API call first
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            test_payload = {
+                "id": 1,
+                "jsonrpc": "2.0", 
+                "method": "alchemy_getNFTs",
+                "params": [wallet_address, {"withMetadata": True}]
+            }
+            
+            print(f"🔍 [DEBUG NFT] Testing direct Alchemy call...")
+            test_response = await client.post(eth_fetcher.alchemy_url, json=test_payload)
+            print(f"🔍 [DEBUG NFT] Direct API status: {test_response.status_code}")
+            
+            if test_response.status_code == 200:
+                test_data = test_response.json()
+                print(f"🔍 [DEBUG NFT] Direct API response preview: {str(test_data)[:300]}...")
+            else:
+                print(f"🔍 [DEBUG NFT] Direct API error: {test_response.text}")
+
+        # Fetch NFTs using the fetcher
         nft_assets = await eth_fetcher._fetch_nfts(wallet_address, set())
 
+        # Check specifically for Mutant Ape contracts
+        mutant_ape_contracts = [
+            "0x60e4d786628fea6478f785a6d7e704777c86a7c6",  # MAYC official
+            "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",  # BAYC (for reference)
+        ]
+
+        print(f"🔍 [DEBUG NFT] Checking for Mutant Ape contracts...")
+        for contract in mutant_ape_contracts:
+            found_mutant = any(asset.token_address.lower() == contract.lower() for asset in nft_assets)
+            print(f"🔍 [DEBUG NFT] {contract}: {'FOUND' if found_mutant else 'NOT FOUND'}")
+
         return {
-            "wallet_address":
-            wallet_address,
-            "nft_count":
-            len(nft_assets),
+            "wallet_address": wallet_address,
+            "nft_count": len(nft_assets),
+            "mutant_ape_found": any("mutant" in asset.name.lower() or "mayc" in asset.symbol.lower() for asset in nft_assets),
             "nfts": [{
                 "contract_address": asset.token_address,
                 "symbol": asset.symbol,
                 "name": asset.name,
                 "count": asset.balance,
                 "is_nft": asset.is_nft,
-                "token_ids": asset.token_ids[:5],
+                "token_ids": asset.token_ids[:10],  # Show more token IDs
                 "floor_price": asset.floor_price,
                 "image_url": asset.image_url
             } for asset in nft_assets]
         }
     except Exception as e:
         print(f"❌ [DEBUG NFT] Error: {e}")
-        return {"error": str(e)}
+        import traceback
+        print(f"❌ [DEBUG NFT] Full traceback: {traceback.format_exc()}")
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 
 @app.get("/api/portfolio/returns")
