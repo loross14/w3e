@@ -1,0 +1,81 @@
+2025-07-22T20:42:25Z info: Deployment: feb1305d-d3d8-4fc0-b892-f95c6772240f
+2025-07-22T20:42:25Z info: Build: 44c2d6ac-a5ab-4e47-b15f-56ddbdf48601
+2025-07-22T20:42:25Z info: Connecting to builder
+2025-07-22T20:42:27Z info: Builder connected
+2025-07-22T20:42:27Z info: Installing packages
+--> uv lock
+
+--> uv lock
+
+Resolved 1 package in 2ms
+
+--> uv sync
+
+Resolved 1 package in 0.79ms
+
+Audited in 0.00ms
+
+2025-07-22T20:42:28Z info: Starting Build
+
+> react-javascript@1.0.0 build
+> vite build
+
+
+NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
+
+vite v5.0.0 building for production...
+
+transforming...
+
+✓ 396 modules transformed.
+
+rendering chunks...
+
+computing gzip size...
+
+dist/index.html                            0.68 kB │ gzip:   0.42 kB
+dist/assets/index-02T_ScKA.css            48.48 kB │ gzip:   8.40 kB
+dist/assets/purify.es-zeYmSgJQ.js         21.93 kB │ gzip:   8.59 kB
+dist/assets/index.es-r5u-NWc_.js         150.60 kB │ gzip:  51.31 kB
+dist/assets/html2canvas.esm-3GUt5PBi.js  201.43 kB │ gzip:  47.70 kB
+dist/assets/index-7N8Pqi9n.js            776.20 kB │ gzip: 249.37 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 18.33s
+
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.4.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.4.2
+npm notice To update run: npm install -g npm@11.4.2
+npm notice
+
+2025-07-22T20:42:50Z info: Pushing pid1 binary layer...
+2025-07-22T20:42:51Z info: Pushing Repl layer...
+2025-07-22T20:42:51Z info: Pushing hosting layer...
+2025-07-22T20:42:51Z info: Created hosting layer
+2025-07-22T20:42:52Z info: Created pid1 binary layer
+2025-07-22T20:43:04Z info: Created Repl layer
+2025-07-22T20:43:04Z info: Pushing Repl (cache) layer...
+2025-07-22T20:43:04Z info: Created Repl (cache) layer
+2025-07-22T20:43:05Z info: Pushed image manifest
+2025-07-22T20:43:06Z info: Pushed soci index manifest
+2025-07-22T20:43:10Z info: Creating Autoscale service
+> vite build
+starting up user application
+> react-javascript@1.0.0 build
+NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
+transforming...
+✓ 396 modules transformed.
+dist/assets/index-02T_ScKA.css            48.48 kB │ gzip:   8.40 kB
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+npm notice
+Requirement already satisfied: psycopg2-binary==2.9.7 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from -r requirements.txt (line 8)) (2.9.7)
+Requirement already satisfied: protobuf>=4.21.6 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (6.31.1)
+Requirement already satisfied: click>=7.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from uvicorn==0.24.0->-r requirements.txt (line 3)) (8.2.1)
+Requirement already satisfied: eth-account>=0.8.0 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from web3==6.11.3->-r requirements.txt (line 5)) (0.11.3)
+Requirement already satisfied: ckzg<2,>=0.4.3 in /home/runner/workspace/.pythonlibs/lib/python3.11/site-packages (from eth-account>=0.8.0->web3==6.11.3->-r requirements.txt (line 5)) (1.0.2)
+a port configuration was specified but the required port was never opened
+2025-07-22T20:45:23Z error: The deployment failed because the application failed to open a port in time. This can happen because the application takes to long to open a server, or doesn't open one at all on the expected port. Note that this doesn't mean that the application is crashing, only that it's not opening a port in time. The application must serve traffic on the first port specified as 'localPort' in the port configuration specified in the .replit file. Make sure that the application opens a port quickly and that there are no operations taking too long on startup. Check the logs for more information.
