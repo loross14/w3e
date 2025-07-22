@@ -976,30 +976,56 @@ const SettingsModal = ({ isOpen, onClose, isEditor, password, setPassword, onPas
   );
 };
 
-// Determine API base URL with fallback logic
+// ================================================================================================
+// API BASE URL CONFIGURATION - CRITICAL FOR DEPLOYMENT SUCCESS
+// ================================================================================================
+// 
+// This function determines the correct API base URL for different environments.
+// 
+// PRODUCTION DEPLOYMENT (w3e.info, .replit.app):
+// - Backend runs on port 80 (same as frontend)
+// - Use same origin - NO PORT NUMBER needed
+// - Example: https://w3e.info (not https://w3e.info:8000)
+// 
+// DEVELOPMENT (.replit.dev):
+// - Backend runs on port 8000, frontend on port 5000
+// - Must specify port 8000 for API calls
+// - Example: https://abc.replit.dev:8000
+//
+// LOCAL DEVELOPMENT:
+// - Backend on localhost:8000, frontend on localhost:5000
+// - Use localhost:8000 for API calls
+//
+// DEPLOYMENT FAILURE PREVENTION:
+// - Production deployments MUST NOT include port numbers in API URLs
+// - Backend MUST run on port 80 in production (see server/main.py)
+// - If frontend tries to connect to :8000 in production, it will fail
+// ================================================================================================
   const getAPIBaseURL = () => {
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
       const protocol = window.location.protocol;
 
-      // Production deployment URLs - use same origin
+      // Production deployment URLs - use same origin (NO PORT!)
+      // CRITICAL: Do not add port numbers here - backend runs on port 80
       if (hostname === 'w3e.info' || hostname.includes('.replit.app')) {
         return `${protocol}//${hostname}`;
       }
 
-      // Development URLs
+      // Development URLs - localhost and 127.x.x.x
       if (hostname === 'localhost' || hostname.startsWith('127.')) {
-        // Try backend on port 8000 first, then 5000
+        // Backend runs on port 8000 in development
         return 'http://localhost:8000';
       }
 
-      // Replit development URLs
+      // Replit development URLs - .replit.dev domains
       if (hostname.includes('.replit.dev')) {
+        // Backend runs on port 8000, frontend on port 5000
         return `${protocol}//${hostname}:8000`;
       }
     }
 
-    // Fallback
+    // Fallback for any other case
     return 'http://localhost:8000';
   };
 

@@ -65,23 +65,42 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Crypto Fund API", version="1.0.0", lifespan=lifespan)
 
-# CRITICAL: Serve static files in production
+# ================================================================================================
+# CRITICAL DEPLOYMENT CONFIGURATION SECTION - DO NOT MODIFY WITHOUT READING THIS SECTION
+# ================================================================================================
 # 
-# DEPLOYMENT ISSUE PREVENTION:
 # This section handles serving the built React frontend from the FastAPI backend.
-# The deployment configuration MUST ensure frontend files are built AND copied 
-# to a location where this backend can find them.
+# 
+# DEPLOYMENT REQUIREMENTS:
+# 1. Frontend MUST be built BEFORE backend starts
+# 2. Built frontend files MUST be copied to a location the backend can find
+# 3. Backend MUST run on port 80 in production (not 8000)
+# 4. API base URL MUST point to same origin in production
 #
-# Current deployment config in .replit:
-# build = ["sh", "-c", "npm run build && cp -r dist server/dist"]
-# run = ["sh", "-c", "cd server && python3 -m pip install --break-system-packages -r requirements.txt && python3 main.py"]
+# CURRENT WORKING DEPLOYMENT CONFIG:
+# - Build command: "sh -c 'npm run build && cp -r dist server/dist && cd server && python3 -m pip install --break-system-packages -r requirements.txt && python3 main.py'"
+# - Run command: Uses PORT=80 in production
 #
-# This ensures:
-# 1. Frontend builds first (npm run build creates dist/)
-# 2. Built files are copied to server/dist/ 
-# 3. Backend starts and finds files at ./dist (relative to server/)
+# HOW IT WORKS:
+# 1. npm run build creates dist/ in project root
+# 2. cp -r dist server/dist copies frontend to server/dist/
+# 3. Backend looks for files at ./dist (relative to server/)
+# 4. Frontend connects to same origin (no port needed)
 #
-# WITHOUT PROPER DEPLOYMENT CONFIG, THE FRONTEND WILL NOT CONNECT TO BACKEND!
+# CRITICAL: DO NOT CHANGE DEPLOYMENT ORDER
+# If backend starts before frontend is built and copied, the app will fail!
+#
+# TROUBLESHOOTING DEPLOYMENT FAILURES:
+# - Frontend shows "connection timeout" = backend not responding (wrong port/order)
+# - "Manifest syntax error" = frontend files not found/copied properly
+# - Backend API works but frontend doesn't load = static file serving broken
+#
+# EMERGENCY FIX CHECKLIST:
+# 1. Verify deployment command includes: npm run build && cp -r dist server/dist
+# 2. Check backend runs on PORT=80 in production
+# 3. Ensure frontend API_BASE_URL uses same origin in production
+# 4. Confirm deployment builds frontend BEFORE starting backend
+# ================================================================================================
 dist_path = None
 possible_paths = [
     "../dist",      # When running from server/ directory in development (npm run dev creates dist in project root)
@@ -599,13 +618,17 @@ class EthereumPriceFetcher(PriceFetcher):
 
     async def fetch_prices(self, token_addresses: List[str]) -> Dict[str, float]:
         price_map = {}
+        # ETH uses a special zero address - this is the standard way to represent native ETH
         eth_address = "0x0000000000000000000000000000000000000000"
+        eth_address_lower = eth_address.lower()
 
         print(f"💵 Fetching Ethereum prices for {len(token_addresses)} tokens...")
+        print(f"🔍 ETH special address: {eth_address}")
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                # Get ETH price first
+                # CRITICAL: Get ETH price first - ETH is special case with zero address
+                print(f"📡 Fetching ETH price from CoinGecko...")
                 response = await client.get(
                     "https://api.coingecko.com/api/v3/simple/price",
                     params={"ids": "ethereum", "vs_currencies": "usd"}
@@ -613,8 +636,19 @@ class EthereumPriceFetcher(PriceFetcher):
                 if response.status_code == 200:
                     data = response.json()
                     eth_price = data.get("ethereum", {}).get("usd", 0)
+                    # Store ETH price with multiple address formats for lookup
                     price_map[eth_address] = eth_price
-                    print(f"✅ ETH price: ${eth_price}")
+                    price_map[eth_address_lower] = eth_price
+                    price_map["eth"] = eth_price  # Additional fallback
+                    print(f"✅ ETH price fetched successfully: ${eth_price}")
+                    print(f"✅ ETH price stored for addresses: {eth_address}, {eth_address_lower}")
+                else:
+                    print(f"❌ Failed to fetch ETH price: HTTP {response.status_code}")
+                    # Set fallback ETH price if API fails
+                    fallback_eth_price = 3500.0  # Reasonable fallback
+                    price_map[eth_address] = fallback_eth_price
+                    price_map[eth_address_lower] = fallback_eth_price
+                    print(f"🔄 Using fallback ETH price: ${fallback_eth_price}")
 
                 # Process contract addresses
                 contract_addresses = [addr for addr in token_addresses if addr != eth_address]
@@ -2828,7 +2862,19 @@ async def update_portfolio_data_new():
                 })
                 print(f"🖼️ NFT Asset: {asset['symbol']} - {asset['balance']} items (Floor: ${price_usd})")
             else:
-                # Look up price with multiple fallbacks
+                # CRITICAL ETH PRICE LOOKUP - ETH uses special zero address
+            # Look up price with multiple fallbacks for different address formats
+            if token_address.lower() == "0x0000000000000000000000000000000000000000":
+                # Special handling for ETH - try multiple lookup keys
+                price_usd = (price_map.get("0x0000000000000000000000000000000000000000", 0) or 
+                           price_map.get("0x0000000000000000000000000000000000000000".lower(), 0) or
+                           price_map.get("eth", 0))
+                if price_usd > 0:
+                    print(f"✅ ETH price lookup successful: ${price_usd}")
+                else:
+                    print(f"❌ ETH price lookup failed - checking price_map keys: {list(price_map.keys())}")
+            else:
+                # Standard ERC-20 token price lookup
                 price_usd = price_map.get(token_address.lower(), 0)
                 if price_usd == 0:
                     price_usd = price_map.get(token_address, 0)

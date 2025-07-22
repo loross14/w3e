@@ -1,4 +1,3 @@
-
 # 🚀 Deployment Configuration Guide
 
 ## Critical Deployment Flow
@@ -99,5 +98,27 @@ If deployment breaks:
 5. **Redeploy** after confirming local build works
 
 ---
+
+## Deployment Checklist
+
+Before deploying, ensure:
+
+1. **Environment Variables**: All required environment variables are set in Replit Secrets
+2. **Database**: PostgreSQL database is created and accessible
+3. **Frontend Build**: Run `npm run build` to create production build
+4. **Backend Dependencies**: All Python dependencies are in requirements.txt
+5. **Static Files**: Frontend build files are copied to server/dist/
+6. **Port Configuration**: Backend uses port 80 in production
+
+## Common Issues and Solutions
+
+### ETH Price Shows as $0
+- **Cause**: ETH uses special zero address `0x0000000000000000000000000000000000000000`
+- **Solution**: ETH price fetching has special handling in `EthereumPriceFetcher.fetch_prices()`
+- **Prevention**: Do not treat ETH like a regular ERC-20 token
+
+### Frontend Connection Timeout
+- **Cause**: Backend not responding or wrong port configuration
+- **Solution**: Ensure backend runs on port 80 in production, frontend uses same origin
 
 **Remember:** The deployment must build the frontend AND copy files to the right location for the backend to serve them. Both steps are critical.
