@@ -35,7 +35,7 @@ deploymentTarget = "cloudrun"
 # - Verify server/dist/ directory exists after cp command
 # - Check server logs for "STATIC FILES" messages
 build = ["sh", "-c", "npm run build && cp -r dist server/dist"]
-run = ["sh", "-c", "sh -c 'npm run build && cp -r dist server/dist && cd server && python3 -m pip install --break-system-packages -r requirements.txt && python3 main.py'"]
+run = ["sh", "-c", "cd server && python3 -m pip install --break-system-packages -r requirements.txt && python3 main.py"]
 
 [[ports]]
 localPort = 80
