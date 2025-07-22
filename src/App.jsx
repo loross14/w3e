@@ -564,7 +564,7 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
   const fetchReturnsData = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/portfolio/returns`);
+      const response = await fetch(`${API_BASE_URL}/api/portfolio/returns`);
       if (response.ok) {
         const data = await response.json();
         setReturnsData(data);
@@ -636,6 +636,7 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
                       <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()} profit</div>
                     </div>
                   ))}
+```python
                 </div>                  
               </div>
 
@@ -953,7 +954,7 @@ const App = () => {
 
       if (isCurrentlyHidden) {
         // Unhide the asset
-        const response = await fetch(`${API_BASE_URL}/assets/hide/${asset.id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/assets/hide/${asset.id}`, {
           method: 'DELETE',
         });
 
@@ -975,7 +976,7 @@ const App = () => {
           name: asset.name
         });
 
-        const response = await fetch(`${API_BASE_URL}/assets/hide?${params}`, {
+        const response = await fetch(`${API_BASE_URL}/api/assets/hide?${params}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1010,7 +1011,7 @@ const App = () => {
       const asset = portfolioData.assets.find(a => a.id === assetId);
       if (!asset) return;
 
-      const response = await fetch(`${API_BASE_URL}/assets/${asset.symbol}/notes?notes=${encodeURIComponent(notes)}`, {
+      const response = await fetch(`${API_BASE_URL}/api/assets/${asset.symbol}/notes?notes=${encodeURIComponent(notes)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1055,7 +1056,7 @@ const App = () => {
     try {
       addDebugInfo(`Adding wallet: ${newWalletLabel} (${newWalletNetwork})`);
 
-      const response = await fetch(`${API_BASE_URL}/wallets`, {
+      const response = await fetch(`${API_BASE_URL}/api/wallets`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1107,7 +1108,7 @@ const App = () => {
 
   const removeWallet = async (walletId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/wallets/${walletId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/wallets/${walletId}`, {
         method: 'DELETE',
       });
 
@@ -1170,7 +1171,7 @@ const App = () => {
         // Load hidden assets from backend
         try {
           addDebugInfo("Loading hidden assets...");
-          const hiddenResponse = await fetch(`${API_BASE_URL}/assets/hidden`);
+          const hiddenResponse = await fetch(`${API_BASE_URL}/api/assets/hidden`);
           if (hiddenResponse.ok) {
             const hiddenData = await hiddenResponse.json();
             const hiddenIds = hiddenData.map(asset => asset.token_address);
@@ -1186,7 +1187,7 @@ const App = () => {
 
         // Load saved portfolio data
         addDebugInfo("Loading portfolio data...");
-        const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
+        const portfolioResponse = await fetch(`${API_BASE_URL}/api/portfolio`);
 
         if (!portfolioResponse.ok) {
           throw new Error(`Portfolio fetch failed: ${portfolioResponse.status} ${portfolioResponse.statusText}`);
@@ -1307,7 +1308,7 @@ const App = () => {
 
         // Get current wallets from backend and sync with local state
         addDebugInfo("Loading wallets from backend...");
-        const walletsResponse = await fetch(`${API_BASE_URL}/wallets`);
+        const walletsResponse = await fetch(`${API_BASE_URL}/api/wallets`);
         if (walletsResponse.ok) {
           const backendWallets = await walletsResponse.json();
           addDebugInfo(`📋 Backend has ${backendWallets.length} wallets`, backendWallets);
@@ -1324,7 +1325,7 @@ const App = () => {
             const currentWallets = [...walletAddresses];
             const syncPromises = currentWallets.map(async (wallet) => {
               try {
-                const response = await fetch(`${API_BASE_URL}/wallets`, {
+                const response = await fetch(`${API_BASE_URL}/api/wallets`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -1361,7 +1362,7 @@ const App = () => {
 
           // Load wallet status information
           try {
-            const statusResponse = await fetch(`${API_BASE_URL}/wallets/status`);
+            const statusResponse = await fetch(`${API_BASE_URL}/api/wallets/status`);
             if (statusResponse.ok) {
               const statusData = await statusResponse.json();
               setWalletStatus(statusData);
@@ -1376,7 +1377,7 @@ const App = () => {
             addDebugInfo("Syncing local wallets to backend...");
             for (const wallet of walletAddresses) {
               try {
-                const syncResponse = await fetch(`${API_BASE_URL}/wallets`, {
+                const syncResponse = await fetch(`${API_BASE_URL}/api/wallets`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -1401,7 +1402,7 @@ const App = () => {
 
             // Reload backend wallets after sync
             try {
-              const refreshResponse = await fetch(`${API_BASE_URL}/wallets`);
+              const refreshResponse = await fetch(`${API_BASE_URL}/api/wallets`);
               if (refreshResponse.ok) {
                 const refreshedWallets = await refreshResponse.json();
                 setWalletAddresses(refreshedWallets);
@@ -1463,16 +1464,16 @@ const App = () => {
 
       // Step 2: Trigger portfolio update
       setUpdateStatus('🚀 Starting portfolio update...');
-      const updateResponse = await fetch(`${API_BASE_URL}/portfolio/update`, {
+      const response = await fetch(`${API_BASE_URL}/api/portfolio/update`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
-      if (!updateResponse.ok) {
-        const errorText = await updateResponse.text();
-        throw new Error(`Update failed (${updateResponse.status}): ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Update failed (${response.status}): ${errorText}`);
       }
 
       // Step 3: Wait for processing
@@ -1485,7 +1486,7 @@ const App = () => {
 
       // Step 5: Fetch updated portfolio data
       setUpdateStatus('📊 Fetching portfolio data...');
-      const portfolioResponse = await fetch(`${API_BASE_URL}/portfolio`);
+      const portfolioResponse = await fetch(`${API_BASE_URL}/api/portfolio`);
       if (!portfolioResponse.ok) {
         const errorText = await portfolioResponse.text();
         throw new Error(`Failed to fetch portfolio (${portfolioResponse.status}): ${errorText}`);
@@ -1558,13 +1559,13 @@ const App = () => {
       let walletCount = 0;
 
       // First, get updated wallet list from backend
-      const walletsListResponse = await fetch(`${API_BASE_URL}/wallets`);
+      const walletsListResponse = await fetch(`${API_BASE_URL}/api/wallets`);
       const currentWallets = walletsListResponse.ok ? await walletsListResponse.json() : walletAddresses;
 
       for (const wallet of currentWallets) {
         try {
           setUpdateStatus(`💼 Processing ${wallet.label} (${++walletCount}/${currentWallets.length})...`);
-          const walletResponse = await fetch(`${API_BASE_URL}/wallets/${wallet.id}/details`);
+          const walletResponse = await fetch(`${API_BASE_URL}/api/wallets/${wallet.id}/details`);
 
           if (walletResponse.ok) {
             const walletDetails = await walletResponse.json();
@@ -1660,7 +1661,7 @@ const App = () => {
       // Force a fresh load from the API to ensure sync
       setUpdateStatus('🔄 Verifying update...');
       try {
-        const verifyResponse = await fetch(`${API_BASE_URL}/portfolio`);
+        const verifyResponse = await fetch(`${API_BASE_URL}/api/portfolio`);
         if (verifyResponse.ok) {
           const verifyData = await verifyResponse.json();
           addDebugInfo("✅ Verification successful", {
@@ -1675,7 +1676,7 @@ const App = () => {
       // Step 9: Load updated wallet status
       setUpdateStatus('📊 Loading wallet status...');
       try {
-        const statusResponse = await fetch(`${API_BASE_URL}/wallets/status`);
+        const statusResponse = await fetch(`${API_BASE_URL}/api/wallets/status`);
         if (statusResponse.ok) {
           const statusData = await statusResponse.json();
           setWalletStatus(statusData);
@@ -1917,7 +1918,7 @@ const App = () => {
         {/* Action Cards for Editor */}
         {isEditor && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 sm:mb-8">
-            
+
 
             <ActionCard
               title="📊 Returns Analysis"
@@ -2048,7 +2049,7 @@ const App = () => {
                 >
                   Add Wallet
                 </button>
-                
+
               </div>
             </div>
           </div>
@@ -2101,9 +2102,9 @@ const App = () => {
             )}
           </div>
         </div>
-            
-          
-        
+
+
+
 
         {/* Current Positions Grid - Mobile responsive */}
         <div className="mb-6 sm:mb-8">
@@ -2150,7 +2151,7 @@ const App = () => {
             </div>
           )}
         </div>
-        
+
 
         {/* Wallets Section */}
         <div className="mb-6 sm:mb-8">
@@ -2207,7 +2208,7 @@ const App = () => {
             </div>
           )}
         </div>
-        
+
 
         {/* Hidden Assets */}
         {hiddenAssets.length > 0 && isEditor && (
@@ -2241,7 +2242,7 @@ const App = () => {
             </div>
           </div>
         )}
-      
+
 
       {/* Asset Modal */}
       {selectedAsset && (
@@ -2280,7 +2281,7 @@ const App = () => {
         onClose={() => setShowReturnsModal(false)}
         portfolioData={portfolioData}
       />
-      
+
       </div>
     </div>
   );

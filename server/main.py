@@ -696,7 +696,8 @@ class SolanaAssetFetcher(AssetFetcher):
                             print(f"❌ [SPL TOKENS] Invalid parameters for {program_id}")
                         continue
 
-                    if "result" in data and "value" in data["result"]:
+                    if "result" in data```python
+ and "value" in data["result"]:
                         token_accounts = data["result"]["value"]
                         print(f"📊 [SPL TOKENS] Found {len(token_accounts)} token accounts from {program_id}")
 
@@ -1393,7 +1394,8 @@ def init_db():
                 assets_found INTEGER,
                 total_value REAL,
                 error_message TEXT,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                last_updated TIMESTAMP DEFAULT CURRENT```python
+TIMESTAMP
             )
         ''')
 
@@ -1603,7 +1605,7 @@ async def get_wallets():
         for w in wallets
     ]
 
-@app.delete("/wallets/{wallet_id}")
+@app.delete("/api/wallets/{wallet_id}")
 async def delete_wallet(wallet_id: int):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1624,12 +1626,12 @@ async def delete_wallet(wallet_id: int):
         cursor.close()
         conn.close()
 
-@app.post("/portfolio/update")
+@app.post("/api/portfolio/update")
 async def update_portfolio(background_tasks: BackgroundTasks):
     background_tasks.add_task(update_portfolio_data_new)
     return {"message": "Portfolio update started"}
 
-@app.get("/portfolio", response_model=PortfolioResponse)
+@app.get("/api/portfolio", response_model=PortfolioResponse)
 async def get_portfolio():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -2597,19 +2599,19 @@ async def update_portfolio_data_new():
         conn.close()
 
 # Catch-all route for SPA routing (must be last)
-@app.get("/{full_path:path}")
+@app.get("/api/{full_path:path}")
 async def serve_spa(full_path: str):
     # Don't catch API routes
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="API endpoint not found")
-    
+
     # Serve static assets
     if full_path.startswith("assets/") or full_path.endswith(".js") or full_path.endswith(".css"):
         if os.path.exists(f"../dist/{full_path}"):
             return FileResponse(f"../dist/{full_path}")
         elif os.path.exists(f"./dist/{full_path}"):
             return FileResponse(f"./dist/{full_path}")
-    
+
     # For all other routes, serve the React app
     if os.path.exists("../dist/index.html"):
         print(f"🌐 [SPA] Serving React app for route: /{full_path}")
