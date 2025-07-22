@@ -19,22 +19,46 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("🚀 [STARTUP] Initializing application...")
+    print("🚀 [STARTUP] Initializing Crypto Fund Application...")
+    print(f"🚀 [STARTUP] Environment: {os.getenv('NODE_ENV', 'development')}")
     
-    # Test database connection first
-    if not test_database_connection():
+    # Verify environment variables are set
+    print("🔍 [STARTUP] Checking environment variables...")
+    print(f"   DATABASE_URL: {'✅ Set' if DATABASE_URL else '❌ Missing'}")
+    print(f"   ALCHEMY_API_KEY: {'✅ Set' if ALCHEMY_API_KEY else '❌ Missing'}")
+    
+    # Test database connection with retry logic
+    print("🔍 [STARTUP] Testing database connection...")
+    connection_attempts = 0
+    max_attempts = 3
+    
+    while connection_attempts < max_attempts:
+        if test_database_connection():
+            break
+        connection_attempts += 1
+        if connection_attempts < max_attempts:
+            print(f"⏳ [STARTUP] Retrying database connection ({connection_attempts}/{max_attempts})...")
+            await asyncio.sleep(5)  # Wait 5 seconds before retry
+    
+    if connection_attempts >= max_attempts:
         print("❌ [STARTUP FAILED] Cannot start without database connection")
-        raise RuntimeError("Database connection failed during startup")
+        print("❌ [STARTUP FAILED] Please check:")
+        print("   1. PostgreSQL database is created in Replit")
+        print("   2. DATABASE_URL is set correctly")
+        print("   3. Database service is running")
+        raise RuntimeError("Database connection failed after multiple attempts")
     
     # Initialize database tables
     try:
+        print("🏗️ [STARTUP] Initializing database schema...")
         init_db()
-        print("✅ [STARTUP] Database initialized successfully")
+        print("✅ [STARTUP] Database schema initialized successfully")
     except Exception as e:
         print(f"❌ [STARTUP] Database initialization failed: {e}")
+        print("❌ [STARTUP] This may indicate a schema or permissions issue")
         raise e
     
-    print("🎉 [STARTUP] Application ready!")
+    print("🎉 [STARTUP] Application ready and healthy!")
     yield
     # Shutdown (if needed)
     print("🛑 [SHUTDOWN] Application shutting down...")
@@ -88,40 +112,94 @@ ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
 print(f"🔍 [STARTUP] DATABASE_URL set: {bool(DATABASE_URL)}")
 print(f"🔍 [STARTUP] ALCHEMY_API_KEY set: {bool(ALCHEMY_API_KEY)}")
 
+# Check for environment variables with better error handling
 if not DATABASE_URL:
     print("❌ [STARTUP ERROR] DATABASE_URL environment variable is required")
-    print("❌ [STARTUP ERROR] Please set up PostgreSQL database in Replit")
-    raise RuntimeError("DATABASE_URL environment variable is required - Please add PostgreSQL database in Replit")
+    print("❌ [STARTUP ERROR] To fix this:")
+    print("   1. Go to the Database tab in Replit")
+    print("   2. Click 'Create Database'")
+    print("   3. Select PostgreSQL")
+    print("   4. Wait for setup to complete")
+    print("   5. Restart your application")
+    raise RuntimeError("DATABASE_URL missing - Please add PostgreSQL database in Replit")
 
 if not ALCHEMY_API_KEY:
     print("❌ [STARTUP ERROR] ALCHEMY_API_KEY environment variable is required")
-    print("❌ [STARTUP ERROR] Please add ALCHEMY_API_KEY to Replit Secrets")
-    raise RuntimeError("ALCHEMY_API_KEY environment variable is required - Please add to Replit Secrets")
+    print("❌ [STARTUP ERROR] To fix this:")
+    print("   1. Go to the Secrets tab (🔒) in Replit")
+    print("   2. Add key: ALCHEMY_API_KEY")
+    print("   3. Add your Alchemy API key as the value")
+    print("   4. Restart your application")
+    raise RuntimeError("ALCHEMY_API_KEY missing - Please add to Replit Secrets")
 
 def get_db_connection():
-    """Get a PostgreSQL database connection"""
+    """Get a PostgreSQL database connection with enhanced error handling"""
     try:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        # Add connection timeout and retry logic
+        conn = psycopg2.connect(
+            DATABASE_URL, 
+            cursor_factory=RealDictCursor,
+            connect_timeout=10,
+            application_name="crypto_fund_app"
+        )
         return conn
+    except psycopg2.OperationalError as e:
+        error_msg = str(e).lower()
+        print(f"❌ [DATABASE ERROR] PostgreSQL connection failed: {e}")
+        
+        if "could not connect to server" in error_msg:
+            print("❌ [DATABASE ERROR] Database server not reachable")
+            print("❌ [DATABASE ERROR] Possible fixes:")
+            print("   1. Check if PostgreSQL database is created in Replit")
+            print("   2. Wait for database to start (can take 30-60 seconds)")
+            print("   3. Restart the application")
+        elif "authentication failed" in error_msg:
+            print("❌ [DATABASE ERROR] Authentication failed")
+            print("❌ [DATABASE ERROR] DATABASE_URL credentials may be incorrect")
+        elif "database" in error_msg and "does not exist" in error_msg:
+            print("❌ [DATABASE ERROR] Database does not exist")
+            print("❌ [DATABASE ERROR] Please create PostgreSQL database in Replit")
+        
+        raise e
     except Exception as e:
-        print(f"❌ [DATABASE ERROR] Failed to connect to database: {e}")
-        print(f"❌ [DATABASE ERROR] DATABASE_URL: {DATABASE_URL[:50]}...")
+        print(f"❌ [DATABASE ERROR] Unexpected error: {e}")
+        print(f"❌ [DATABASE ERROR] DATABASE_URL format: {DATABASE_URL[:30]}...")
         raise e
 
 def test_database_connection():
-    """Test database connection at startup"""
+    """Test database connection at startup with detailed error reporting"""
     try:
         print("🔍 [STARTUP] Testing database connection...")
+        print(f"🔍 [STARTUP] DATABASE_URL format: postgresql://...")
+        
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT 1")
+        cursor.execute("SELECT 1 as test")
         result = cursor.fetchone()
+        
+        # Additional connection health checks
+        cursor.execute("SELECT current_database(), current_user")
+        db_info = cursor.fetchone()
+        print(f"✅ [STARTUP] Connected to database: {db_info['current_database']} as {db_info['current_user']}")
+        
         cursor.close()
         conn.close()
-        print("✅ [STARTUP] Database connection successful")
+        print("✅ [STARTUP] Database connection test successful")
         return True
+    except psycopg2.OperationalError as e:
+        print(f"❌ [STARTUP] PostgreSQL connection failed: {e}")
+        print("❌ [STARTUP] This usually means:")
+        print("   - PostgreSQL database not created in Replit")
+        print("   - DATABASE_URL is incorrect")
+        print("   - Database is starting up (wait 30 seconds and try again)")
+        return False
+    except psycopg2.Error as e:
+        print(f"❌ [STARTUP] PostgreSQL error: {e}")
+        print("❌ [STARTUP] Database exists but has configuration issues")
+        return False
     except Exception as e:
-        print(f"❌ [STARTUP] Database connection failed: {e}")
+        print(f"❌ [STARTUP] Unexpected database error: {e}")
+        print(f"❌ [STARTUP] Error type: {type(e).__name__}")
         return False
 
 # ERC-20 ABI for token interactions
@@ -1616,46 +1694,94 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for debugging"""
+    """Health check endpoint for debugging and monitoring"""
     try:
+        # Environment check
+        env_status = {
+            "DATABASE_URL": bool(DATABASE_URL),
+            "ALCHEMY_API_KEY": bool(ALCHEMY_API_KEY),
+            "NODE_ENV": os.getenv("NODE_ENV", "development")
+        }
+        
+        # Database connection test
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Test database connection
+        # Test basic connectivity
+        cursor.execute("SELECT current_database(), current_user, version()")
+        db_info = cursor.fetchone()
+        
+        # Get table counts
         cursor.execute("SELECT COUNT(*) FROM wallets")
-        result = cursor.fetchone()
-        wallet_count = result['count'] if result else 0
+        wallet_result = cursor.fetchone()
+        wallet_count = wallet_result['count'] if wallet_result else 0
 
         cursor.execute("SELECT COUNT(*) FROM assets")
-        result = cursor.fetchone()
-        asset_count = result['count'] if result else 0
+        asset_result = cursor.fetchone()
+        asset_count = asset_result['count'] if asset_result else 0
 
         cursor.execute("SELECT COUNT(*) FROM hidden_assets")
-        result = cursor.fetchone()
-        hidden_count = result['count'] if result else 0
+        hidden_result = cursor.fetchone()
+        hidden_count = hidden_result['count'] if hidden_result else 0
+        
+        # Check table structure
+        cursor.execute("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            ORDER BY table_name
+        """)
+        tables = [row['table_name'] for row in cursor.fetchall()]
+
+        cursor.close()
+        conn.close()
 
         return {
             "status": "healthy",
-            "database": "connected",
-            "database_type": "PostgreSQL",
-            "tables": {
-                "wallets": wallet_count,
-                "assets": asset_count,
-                "hidden_assets": hidden_count
+            "timestamp": datetime.now().isoformat(),
+            "environment": env_status,
+            "database": {
+                "status": "connected",
+                "type": "PostgreSQL",
+                "database": db_info['current_database'],
+                "user": db_info['current_user'],
+                "version": db_info['version'].split(',')[0],
+                "tables": tables,
+                "counts": {
+                    "wallets": wallet_count,
+                    "assets": asset_count,
+                    "hidden_assets": hidden_count
+                }
             },
-            "timestamp": datetime.now().isoformat()
+            "application": {
+                "name": "Crypto Fund API",
+                "version": "1.0.0"
+            }
+        }
+    except psycopg2.OperationalError as e:
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.now().isoformat(),
+            "error": "database_connection_failed",
+            "error_details": str(e),
+            "suggestions": [
+                "Check if PostgreSQL database is created in Replit",
+                "Verify DATABASE_URL environment variable",
+                "Wait for database to start (30-60 seconds)",
+                "Restart the application"
+            ]
         }
     except Exception as e:
         return {
-            "status": "unhealthy",
-            "database": "error",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
+            "status": "unhealthy", 
+            "timestamp": datetime.now().isoformat(),
+            "error": "unexpected_error",
+            "error_details": str(e),
+            "error_type": type(e).__name__
         }
     finally:
-        if 'cursor' in locals():
+        if 'cursor' in locals() and cursor:
             cursor.close()
-        if 'conn' in locals():
+        if 'conn' in locals() and conn:
             conn.close()
 
 @app.post("/api/wallets", response_model=WalletResponse)
