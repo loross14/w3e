@@ -112,9 +112,7 @@ if dist_path:
     else:
         print(f"⚠️ [STATIC FILES] No assets directory found at: {assets_path}")
     
-    # Mount the main static files (this serves index.html and handles SPA routing)
-    app.mount("/static", StaticFiles(directory=dist_path, html=True), name="static")
-    print(f"✅ [STATIC FILES] Mounted frontend from: {dist_path}")
+    print(f"✅ [STATIC FILES] Frontend files ready to serve from: {dist_path}")
 else:
     print("❌ [STATIC FILES] CRITICAL: No valid frontend build found!")
     print("❌ [STATIC FILES] This means the deployment is misconfigured.")
@@ -1708,33 +1706,14 @@ async def get_token_prices_new(token_addresses_by_network: Dict[str, List[str]])
 async def root():
     """
     CRITICAL DEPLOYMENT ENDPOINT: Serves the React frontend
-    
-    This endpoint is the entry point for users visiting the deployed application.
-    If this fails to serve index.html, users will see JSON instead of the UI.
-    
-    DEPLOYMENT TROUBLESHOOTING:
-    - If you see {"message": "Crypto Fund API", ...} instead of the React app,
-      it means the frontend build files are not properly copied during deployment.
-    - Check the deployment build command includes: cp -r dist server/dist
-    - Verify npm run build completed successfully before backend starts
     """
-    possible_paths = [
-        "../dist/index.html",    # Development: server runs from server/, frontend builds to ../dist
-        "./dist/index.html",     # Deployment: frontend files copied to server/dist
-        "dist/index.html"        # Alternative deployment structure
-    ]
-    
-    print("🌐 [ROOT] Attempting to serve React frontend...")
-    for path in possible_paths:
-        if os.path.exists(path):
-            print(f"✅ [ROOT] Successfully serving React app from: {path}")
-            return FileResponse(path)
-        else:
-            print(f"❌ [ROOT] Frontend not found at: {path}")
+    if dist_path:
+        index_path = os.path.join(dist_path, "index.html")
+        if os.path.exists(index_path):
+            print(f"✅ [ROOT] Successfully serving React app from: {index_path}")
+            return FileResponse(index_path)
     
     print("❌ [ROOT] DEPLOYMENT ERROR: Frontend build not found!")
-    print("❌ [ROOT] Users will see this JSON instead of the React app")
-    print("❌ [ROOT] Check deployment configuration - frontend files missing")
     return {
         "message": "Crypto Fund API", 
         "status": "running", 
@@ -3035,23 +3014,16 @@ async def serve_spa(full_path: str):
     # Skip API and asset routes
     if (full_path.startswith("api/") or 
         full_path.startswith("health") or 
-        full_path.startswith("assets/") or
-        full_path.startswith("static/")):
+        full_path.startswith("assets/")):
         raise HTTPException(status_code=404, detail="Not found")
 
-    # Find and serve the React app using same logic as static files
-    possible_paths = [
-        "../dist/index.html",
-        "./dist/index.html", 
-        "dist/index.html"
-    ]
+    # Serve React app for all other routes (SPA routing)
+    if dist_path:
+        index_path = os.path.join(dist_path, "index.html")
+        if os.path.exists(index_path):
+            print(f"🌐 [SPA] Serving React app from {index_path} for route: {full_path}")
+            return FileResponse(index_path)
     
-    for path in possible_paths:
-        if os.path.exists(path):
-            print(f"🌐 [SPA] Serving React app from {path}")
-            return FileResponse(path)
-    
-    print(f"❌ [SPA] Frontend not found. Searched: {possible_paths}")
     raise HTTPException(status_code=404, detail="Frontend not found")
 
 if __name__ == "__main__":
