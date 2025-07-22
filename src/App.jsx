@@ -635,7 +635,8 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium text-white">{performer.symbol}</span>
                         <span className="text-xs text-green-400">#{index + 1}</span>
-                      </div>                      <div className="text-xs text-gray-400 mb-1">{performer.name}</div>
+                      </div>                      ```python
+                      <div className="text-xs text-gray-400 mb-1">{performer.name}</div>
                       <div className="text-lg font-bold text-green-400">+{performer.return_pct.toFixed(1)}%</div>
                       <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()} profit</div>
                                         </div>
