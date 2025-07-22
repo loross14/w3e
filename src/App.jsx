@@ -636,7 +636,6 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
                       <div className="text-sm text-gray-300">${performer.unrealized_pnl.toLocaleString()} profit</div>
                     </div>
                   ))}
-```python
                 </div>                  
               </div>
 
@@ -1309,7 +1308,8 @@ const App = () => {
                      asset.symbol?.includes('NFT') || 
                      asset.name?.includes('Collection') ||
                      (asset.balance_formatted && asset.balance_formatted.includes('NFTs')) ||
-                     (nftMetadata && nftMetadata.token_ids);
+                     (nftMetadata && nftMetadata.token_ids) ||
+                     false;
 
         if (isNFT) {
           console.log(`🖼️ [NFT DEBUG] Detected NFT: ${asset.symbol} - ${asset.name} - Backend isNFT: ${asset.is_nft}`);
@@ -1585,7 +1585,8 @@ const App = () => {
                      asset.symbol?.includes('NFT') || 
                      asset.name?.includes('Collection') ||
                      (asset.balance_formatted && asset.balance_formatted.includes('NFTs')) ||
-                     (nftMetadata && nftMetadata.token_ids);
+                     (nftMetadata && nftMetadata.token_ids) ||
+                     false;
 
         return {
           id: asset.id,
@@ -1655,7 +1656,8 @@ const App = () => {
                            asset.symbol?.includes('NFT') || 
                            asset.name?.includes('Collection') ||
                            (asset.balance_formatted && asset.balance_formatted.includes('NFTs')) ||
-                           (nftMetadata && nftMetadata.token_ids);
+                           (nftMetadata && nftMetadata.token_ids) ||
+                           false;
 
               return {
                 id: asset.id,
@@ -1758,12 +1760,12 @@ const App = () => {
       // Step 10: Complete
       const assetCount = updatedAssets.length;
       const valueFormatted = newTotalValue.toLocaleString();
-      
+
       // Update the last updated timestamp
       const now = new Date();
       setLastUpdated(now);
       localStorage.setItem("lastUpdated", now.toISOString());
-      
+
       setUpdateStatus(`✅ Updated ${assetCount} assets • $${valueFormatted}`);
       setTimeout(() => setUpdateStatus(''), 5000);
 
