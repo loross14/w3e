@@ -41,23 +41,36 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Crypto Fund API", version="1.0.0", lifespan=lifespan)
 
-# Serve static files in production
+# Serve static files in production - check multiple possible locations
 dist_path = None
-if os.path.exists("../dist"):
-    dist_path = "../dist"
-    print("🌐 [DEPLOYMENT] Serving static files from ../dist")
-elif os.path.exists("./dist"):
-    dist_path = "./dist"
-    print("🌐 [DEPLOYMENT] Serving static files from ./dist")
+possible_paths = [
+    "../dist",      # When running from server/ directory in development
+    "./dist",       # When running from project root in deployment
+    "dist",         # Alternative deployment path
+]
+
+for path in possible_paths:
+    if os.path.exists(path) and os.path.isdir(path):
+        # Verify it contains essential files
+        index_file = os.path.join(path, "index.html")
+        if os.path.exists(index_file):
+            dist_path = path
+            print(f"🌐 [DEPLOYMENT] Serving static files from {dist_path}")
+            break
 
 if dist_path:
     # Mount static assets
     assets_path = os.path.join(dist_path, "assets")
     if os.path.exists(assets_path):
         app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+        print(f"📁 [DEPLOYMENT] Mounted assets from {assets_path}")
     
     # Mount any other static files
     app.mount("/static", StaticFiles(directory=dist_path, html=True), name="static")
+    print(f"📄 [DEPLOYMENT] Mounted static files from {dist_path}")
+else:
+    print("⚠️ [DEPLOYMENT] No dist directory found - running API-only mode")
+    print(f"🔍 [DEPLOYMENT] Searched paths: {possible_paths}")
 
 # CORS middleware for frontend
 app.add_middleware(
@@ -1586,12 +1599,19 @@ async def get_token_prices_new(token_addresses_by_network: Dict[str, List[str]])
 
 @app.get("/")
 async def root():
-    # In deployment, serve the React app
-    for path in ["../dist/index.html", "./dist/index.html", "dist/index.html"]:
+    # In deployment, serve the React app using consistent path logic
+    possible_paths = [
+        "../dist/index.html",
+        "./dist/index.html", 
+        "dist/index.html"
+    ]
+    
+    for path in possible_paths:
         if os.path.exists(path):
-            print(f"🌐 [DEPLOYMENT] Serving React app from {path}")
+            print(f"🌐 [ROOT] Serving React app from {path}")
             return FileResponse(path)
     
+    print("⚠️ [ROOT] No frontend found - serving API info")
     return {"message": "Crypto Fund API", "status": "running", "mode": "api-only"}
 
 @app.get("/health")
@@ -2843,11 +2863,19 @@ async def serve_spa(full_path: str):
         full_path.startswith("static/")):
         raise HTTPException(status_code=404, detail="Not found")
 
-    # Find and serve the React app
-    for path in ["../dist/index.html", "./dist/index.html", "dist/index.html"]:
+    # Find and serve the React app using same logic as static files
+    possible_paths = [
+        "../dist/index.html",
+        "./dist/index.html", 
+        "dist/index.html"
+    ]
+    
+    for path in possible_paths:
         if os.path.exists(path):
+            print(f"🌐 [SPA] Serving React app from {path}")
             return FileResponse(path)
     
+    print(f"❌ [SPA] Frontend not found. Searched: {possible_paths}")
     raise HTTPException(status_code=404, detail="Frontend not found")
 
 if __name__ == "__main__":
