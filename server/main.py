@@ -2060,7 +2060,7 @@ def init_db():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS asset_cost_basis (
                 id SERIAL PRIMARY KEY,
-                token_address TEXT NOT NULL,
+                token_address TEXT NOT NULL UNIQUE,
                 symbol TEXT NOT NULL,
                 average_purchase_price REAL NOT NULL,
                 total_quantity_purchased REAL NOT NULL,
@@ -2097,6 +2097,18 @@ def init_db():
                 symbol TEXT NOT NULL,
                 name TEXT NOT NULL,
                 hidden_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Purchase price overrides table for permanent manual overrides
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS purchase_price_overrides (
+                id SERIAL PRIMARY KEY,
+                token_address TEXT UNIQUE NOT NULL,
+                symbol TEXT NOT NULL,
+                override_price REAL NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 
@@ -2895,6 +2907,22 @@ async def update_asset_purchase_price(symbol: str, request: dict):
             f"📈 [PURCHASE PRICE] Calculated metrics: Invested=${total_invested:.2f}, P&L=${unrealized_pnl:.2f}, Return={total_return_pct:.2f}%"
         )
 
+        # Store the override in the permanent overrides table
+        cursor.execute(
+            """
+            INSERT INTO purchase_price_overrides 
+            (token_address, symbol, override_price, updated_at)
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (token_address) DO UPDATE SET
+            symbol = EXCLUDED.symbol,
+            override_price = EXCLUDED.override_price,
+            updated_at = EXCLUDED.updated_at
+        """, (token_address, matched_symbol, purchase_price))
+
+        print(
+            f"✅ [PURCHASE PRICE] Stored permanent override for '{matched_symbol}': ${purchase_price}"
+        )
+
         # Update the asset using the exact matched symbol (important for symbols with whitespace)
         update_count = cursor.execute(
             """
@@ -3039,6 +3067,43 @@ async def get_hidden_assets():
         "name": h['name'],
         "hidden_at": h['hidden_at']
     } for h in hidden_assets]
+
+
+@app.get("/api/assets/overrides")
+async def get_purchase_price_overrides():
+    """Get list of purchase price overrides"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT token_address, symbol, override_price, updated_at FROM purchase_price_overrides ORDER BY updated_at DESC")
+    overrides = cursor.fetchall()
+    conn.close()
+
+    return [{
+        "token_address": o['token_address'],
+        "symbol": o['symbol'],
+        "override_price": o['override_price'],
+        "updated_at": o['updated_at']
+    } for o in overrides]
+
+
+@app.delete("/api/assets/overrides/{token_address}")
+async def delete_purchase_price_override(token_address: str):
+    """Remove a purchase price override"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM purchase_price_overrides WHERE token_address = %s",
+                   (token_address, ))
+
+    if cursor.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Override not found")
+
+    conn.commit()
+    conn.close()
+    return {"message": "Purchase price override removed successfully"}
 
 
 @app.get("/api/debug/database")
@@ -3659,32 +3724,54 @@ async def update_portfolio_data_new():
                         f"🔍 [NFT DEBUG] Possible missed NFT: {asset['symbol']} - {asset['name']} - isNFT: {is_nft}"
                     )
 
-                # Get purchase price data if exists
+                # Check for purchase price override first (highest priority)
                 cursor.execute(
                     """
-                    SELECT average_purchase_price, total_invested, realized_gains 
-                    FROM asset_cost_basis 
+                    SELECT override_price 
+                    FROM purchase_price_overrides 
                     WHERE token_address = %s
                 """, (token_address, ))
-                cost_basis_data = cursor.fetchone()
+                override_data = cursor.fetchone()
 
-                if cost_basis_data:
-                    purchase_price, total_invested, realized_pnl = cost_basis_data
-                    unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
-                    total_return_pct = ((value_usd - total_invested) /
-                                        total_invested *
-                                        100) if total_invested > 0 else 0
-                else:
-                    # Estimate purchase price for new assets
-                    purchase_price = await estimate_asset_purchase_price(
-                        asset['symbol'], asset['name'],
-                        price_usd) if price_usd > 0 else 0
+                if override_data:
+                    # Use the permanent override price
+                    purchase_price = override_data['override_price']
                     total_invested = asset['balance'] * purchase_price
                     realized_pnl = 0
                     unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
                     total_return_pct = ((value_usd - total_invested) /
                                         total_invested *
                                         100) if total_invested > 0 else 0
+                    print(
+                        f"✅ [OVERRIDE] Using override price for {asset['symbol']}: ${purchase_price}"
+                    )
+                else:
+                    # Check for cost basis data
+                    cursor.execute(
+                        """
+                        SELECT average_purchase_price, total_invested, realized_gains 
+                        FROM asset_cost_basis 
+                        WHERE token_address = %s
+                    """, (token_address, ))
+                    cost_basis_data = cursor.fetchone()
+
+                    if cost_basis_data:
+                        purchase_price, total_invested, realized_pnl = cost_basis_data
+                        unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
+                        total_return_pct = ((value_usd - total_invested) /
+                                            total_invested *
+                                            100) if total_invested > 0 else 0
+                    else:
+                        # Estimate purchase price for new assets
+                        purchase_price = await estimate_asset_purchase_price(
+                            asset['symbol'], asset['name'],
+                            price_usd) if price_usd > 0 else 0
+                        total_invested = asset['balance'] * purchase_price
+                        realized_pnl = 0
+                        unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
+                        total_return_pct = ((value_usd - total_invested) /
+                                            total_invested *
+                                            100) if total_invested > 0 else 0
 
                 # Insert asset into database
                 cursor.execute(
