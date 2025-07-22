@@ -132,6 +132,11 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
                     {returnIcon} {safeAsset.total_return_pct >= 0 ? '+' : ''}{safeAsset.total_return_pct.toFixed(0)}%
                   </span>
                 )}
+                {isEditor && !isNFTCollection && safeAsset.purchase_price > 0 && (
+                  <span className="ml-2 px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded-full text-xs border border-blue-500/30" title="Purchase price set manually">
+                    📝
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -674,15 +679,60 @@ const ReturnsModal = ({ isOpen, onClose, portfolioData }) => {
   );
 };
 
-// Enhanced Asset Details Modal with returns data
-const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
+// Enhanced Asset Details Modal with returns data and purchase price override
+const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEditor }) => {
   const [notes, setNotes] = useState(asset?.notes || "");
+  const [purchasePrice, setPurchasePrice] = useState((asset?.purchase_price || 0).toString());
+  const [isUpdatingPrice, setIsUpdatingPrice] = useState(false);
+  const [priceError, setPriceError] = useState("");
 
   if (!asset) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isEditor && purchasePrice !== (asset?.purchase_price || 0).toString()) {
+      await handlePurchasePriceUpdate();
+    }
     onUpdateNotes(asset.id, notes);
     onClose();
+  };
+
+  const handlePurchasePriceUpdate = async () => {
+    setPriceError("");
+    
+    // Validate input
+    const priceValue = parseFloat(purchasePrice);
+    if (isNaN(priceValue)) {
+      setPriceError("Please enter a valid number");
+      return;
+    }
+    
+    if (priceValue < 0) {
+      setPriceError("Purchase price cannot be negative");
+      return;
+    }
+    
+    // Allow zero for airdrops or free tokens, but warn user
+    if (priceValue === 0 && !confirm("Setting purchase price to $0. This is typically used for airdrops or free tokens. Continue?")) {
+      return;
+    }
+
+    setIsUpdatingPrice(true);
+    
+    try {
+      const success = await onUpdatePurchasePrice(asset.symbol, priceValue);
+      if (success) {
+        // Update local state to reflect the change immediately
+        asset.purchase_price = priceValue;
+        asset.total_invested = (asset.balance || 0) * priceValue;
+        asset.unrealized_pnl = (asset.valueUSD || 0) - asset.total_invested;
+        asset.total_return_pct = asset.total_invested > 0 ? 
+          ((asset.valueUSD || 0) - asset.total_invested) / asset.total_invested * 100 : 0;
+      }
+    } catch (error) {
+      setPriceError(`Failed to update price: ${error.message}`);
+    } finally {
+      setIsUpdatingPrice(false);
+    }
   };
 
   const returnColor = (asset.total_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400';
@@ -726,10 +776,40 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, isEditor }) => {
               <span className="text-gray-400">Current Price:</span>
               <span className="text-white font-mono">${(asset?.priceUSD || 0).toFixed(4)}</span>
             </div>
-            <div className="flex justify-between">
+            
+            {/* Purchase Price - Editable in editor mode */}
+            <div className="flex justify-between items-center">
               <span className="text-gray-400">Purchase Price:</span>
-              <span className="text-blue-400 font-mono">${(asset?.purchase_price || 0).toFixed(4)}</span>
+              {isEditor ? (
+                <div className="flex items-center space-x-2">
+                  <span className="text-gray-400">$</span>
+                  <input
+                    type="number"
+                    value={purchasePrice}
+                    onChange={(e) => {
+                      setPurchasePrice(e.target.value);
+                      setPriceError("");
+                    }}
+                    onBlur={handlePurchasePriceUpdate}
+                    onKeyPress={(e) => e.key === "Enter" && handlePurchasePriceUpdate()}
+                    className="w-24 p-1 bg-gray-800 border border-gray-600 rounded text-blue-400 font-mono text-sm focus:border-blue-500 focus:outline-none"
+                    step="0.0001"
+                    min="0"
+                    disabled={isUpdatingPrice}
+                  />
+                  {isUpdatingPrice && (
+                    <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                  )}
+                </div>
+              ) : (
+                <span className="text-blue-400 font-mono">${(asset?.purchase_price || 0).toFixed(4)}</span>
+              )}
             </div>
+            
+            {priceError && (
+              <div className="text-red-400 text-xs">{priceError}</div>
+            )}
+            
             <div className="flex justify-between">
               <span className="text-gray-400">Total Invested:</span>
               <span className="text-blue-400 font-mono">${(asset?.total_invested || 0).toLocaleString()}</span>
@@ -1125,6 +1205,83 @@ const App = () => {
     } catch (error) {
       console.error('Error updating notes:', error);
       alert(`Failed to update notes: ${error.message}`);
+    }
+  };
+
+  const updatePurchasePrice = async (symbol, purchasePrice) => {
+    if (!symbol) {
+      throw new Error('Symbol is required');
+    }
+
+    // Validate purchase price
+    if (typeof purchasePrice !== 'number' || isNaN(purchasePrice)) {
+      throw new Error('Invalid purchase price');
+    }
+
+    if (purchasePrice < 0) {
+      throw new Error('Purchase price cannot be negative');
+    }
+
+    try {
+      addDebugInfo(`Updating purchase price for ${symbol}: $${purchasePrice}`);
+
+      const response = await fetch(`${API_BASE_URL}/api/assets/${symbol}/purchase_price`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          purchase_price: purchasePrice
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.detail || 'Failed to update purchase price';
+        } catch {
+          errorMessage = `HTTP ${response.status}: ${errorText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Update local state immediately for better UX
+      setPortfolioData((prev) => ({
+        ...prev,
+        assets: prev.assets.map((asset) => {
+          if (asset.symbol === symbol) {
+            const balance = parseFloat(asset.balance) || 0;
+            const currentValue = asset.valueUSD || 0;
+            const totalInvested = balance * purchasePrice;
+            const unrealizedPnl = currentValue - totalInvested;
+            const returnPct = totalInvested > 0 ? (unrealizedPnl / totalInvested) * 100 : 0;
+
+            return {
+              ...asset,
+              purchase_price: purchasePrice,
+              total_invested: totalInvested,
+              unrealized_pnl: unrealizedPnl,
+              total_return_pct: returnPct
+            };
+          }
+          return asset;
+        }),
+      }));
+
+      addDebugInfo(`✅ Purchase price updated for ${symbol}`);
+      
+      // Show success message briefly
+      setUpdateStatus(`✅ Updated ${symbol} purchase price to $${purchasePrice.toFixed(4)}`);
+      setTimeout(() => setUpdateStatus(''), 3000);
+
+      return true;
+
+    } catch (error) {
+      console.error('Error updating purchase price:', error);
+      addDebugInfo(`❌ Error updating purchase price for ${symbol}: ${error.message}`);
+      throw error; // Re-throw so the modal can handle it
     }
   };
 
@@ -2400,6 +2557,7 @@ const App = () => {
           asset={selectedAsset}
           onClose={() => setSelectedAsset(null)}
           onUpdateNotes={updateNotes}
+          onUpdatePurchasePrice={updatePurchasePrice}
           isEditor={isEditor}
         />
       )}

@@ -1918,43 +1918,138 @@ async def update_asset_notes(symbol: str, notes: str):
 
 @app.put("/api/assets/{symbol}/purchase_price")
 async def update_asset_purchase_price(symbol: str, request: dict):
-    """Update purchase price for a specific asset and recalculate metrics"""
+    """Update purchase price for a specific asset and recalculate metrics with comprehensive validation"""
+    if not symbol or not symbol.strip():
+        raise HTTPException(status_code=400, detail="Symbol is required")
+    
+    symbol = symbol.strip()
+    
+    try:
+        purchase_price = request.get('purchase_price')
+        
+        # Comprehensive input validation
+        if purchase_price is None:
+            raise HTTPException(status_code=400, detail="Purchase price is required")
+        
+        # Convert to float and validate
+        try:
+            purchase_price = float(purchase_price)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="Purchase price must be a valid number")
+        
+        # Business logic validation
+        if purchase_price < 0:
+            raise HTTPException(status_code=400, detail="Purchase price cannot be negative")
+        
+        # Handle extremely large values to prevent overflow
+        if purchase_price > 1e15:  # 1 quadrillion - reasonable upper limit
+            raise HTTPException(status_code=400, detail="Purchase price is too large")
+        
+        print(f"🔄 Updating purchase price for {symbol}: ${purchase_price}")
+        
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except Exception as e:
+        print(f"❌ Error validating purchase price input: {e}")
+        raise HTTPException(status_code=400, detail="Invalid input format")
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
-        purchase_price = request.get('purchase_price', 0)
+        # First check if asset exists and get current data
+        cursor.execute("""
+            SELECT symbol, balance, value_usd, purchase_price as old_purchase_price
+            FROM assets 
+            WHERE symbol = %s
+            LIMIT 1
+        """, (symbol,))
+        
+        asset_data = cursor.fetchone()
+        if not asset_data:
+            raise HTTPException(status_code=404, detail=f"Asset with symbol '{symbol}' not found")
+        
+        balance = float(asset_data['balance']) if asset_data['balance'] else 0
+        current_value = float(asset_data['value_usd']) if asset_data['value_usd'] else 0
+        old_purchase_price = float(asset_data['old_purchase_price']) if asset_data['old_purchase_price'] else 0
+        
+        print(f"📊 Asset {symbol} current data: Balance={balance}, Value=${current_value}, Old Price=${old_purchase_price}")
+        
+        # Calculate new metrics with safe division
+        total_invested = balance * purchase_price
+        unrealized_pnl = current_value - total_invested
+        
+        # Safe percentage calculation
+        if total_invested > 0:
+            total_return_pct = (unrealized_pnl / total_invested) * 100
+        else:
+            total_return_pct = 0 if unrealized_pnl == 0 else float('inf') if unrealized_pnl > 0 else float('-inf')
+            # Cap infinite values for database storage
+            if total_return_pct == float('inf'):
+                total_return_pct = 999999  # Very large positive number
+            elif total_return_pct == float('-inf'):
+                total_return_pct = -999999  # Very large negative number
 
-        # Update the purchase price in the assets table
+        print(f"📈 Calculated metrics: Invested=${total_invested}, P&L=${unrealized_pnl}, Return={total_return_pct}%")
+
+        # Update the asset with new purchase price and recalculated metrics
         cursor.execute("""
             UPDATE assets 
             SET purchase_price = %s,
-                total_invested = balance * %s,
-                unrealized_pnl = value_usd - (balance * %s),
-                total_return_pct = CASE 
-                    WHEN (balance * %s) > 0 
-                    THEN ((value_usd - (balance * %s)) / (balance * %s)) * 100 
-                    ELSE 0 
-                END
+                total_invested = %s,
+                unrealized_pnl = %s,
+                total_return_pct = %s,
+                last_updated = CURRENT_TIMESTAMP
             WHERE symbol = %s
-        """, (purchase_price, purchase_price, purchase_price, purchase_price, purchase_price, purchase_price, symbol))
+        """, (purchase_price, total_invested, unrealized_pnl, total_return_pct, symbol))
 
         if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail=f"Asset {symbol} not found")
+            raise HTTPException(status_code=500, detail=f"Failed to update asset {symbol}")
+
+        # Also update the cost basis table for consistency
+        cursor.execute("""
+            INSERT INTO asset_cost_basis 
+            (token_address, symbol, average_purchase_price, total_quantity_purchased, total_invested, last_updated)
+            SELECT token_address, symbol, %s, balance, %s, CURRENT_TIMESTAMP
+            FROM assets 
+            WHERE symbol = %s
+            ON CONFLICT (token_address) DO UPDATE SET
+            average_purchase_price = EXCLUDED.average_purchase_price,
+            total_quantity_purchased = EXCLUDED.total_quantity_purchased,
+            total_invested = EXCLUDED.total_invested,
+            last_updated = EXCLUDED.last_updated
+        """, (purchase_price, total_invested, symbol))
 
         conn.commit()
-        print(f"✅ Updated purchase price for {symbol}: ${purchase_price}")
-        conn.close()
-        return {"message": f"Purchase price updated for {symbol}"}
+        
+        print(f"✅ Successfully updated purchase price for {symbol}: ${purchase_price}")
+        print(f"   New metrics: Invested=${total_invested:.2f}, P&L=${unrealized_pnl:.2f}, Return={total_return_pct:.2f}%")
+        
+        return {
+            "message": f"Purchase price updated for {symbol}",
+            "symbol": symbol,
+            "purchase_price": purchase_price,
+            "total_invested": total_invested,
+            "unrealized_pnl": unrealized_pnl,
+            "total_return_pct": total_return_pct,
+            "updated_at": "now"
+        }
 
+    except HTTPException:
+        conn.rollback()
+        raise  # Re-raise HTTP exceptions as-is
+    except psycopg2.Error as e:
+        conn.rollback()
+        print(f"❌ Database error updating purchase price for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         conn.rollback()
-        print(f"❌ Error updating purchase price for {symbol}: {e}")
-        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+        print(f"❌ Unexpected error updating purchase price for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
     finally:
-        if 'cursor' in locals():
+        if 'cursor' in locals() and cursor:
             cursor.close()
-        if 'conn' in locals():
+        if 'conn' in locals() and conn:
             conn.close()
 
 @app.post("/api/assets/hide")
