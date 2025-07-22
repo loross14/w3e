@@ -2806,8 +2806,8 @@ async def serve_spa(full_path: str):
 
 if __name__ == "__main__":
     import uvicorn
-    # Use PORT from environment, fallback to 80 for deployment
-    port = int(os.environ.get("PORT", 80))
+    # Use PORT from environment, fallback to 8000 for development, 80 for deployment
+    port = int(os.environ.get("PORT", 8000))
     print(f"🚀 [SERVER] Starting server on port {port}")
     print(f"🔍 [SERVER] Checking for static files...")
     
@@ -2827,6 +2827,6 @@ if __name__ == "__main__":
         app, 
         host="0.0.0.0", 
         port=port,
-        log_level="warning",  # Reduce log verbosity in production
-        access_log=False      # Disable access logs for better performance
+        log_level="info" if os.environ.get("NODE_ENV") != "production" else "warning",
+        access_log=True if os.environ.get("NODE_ENV") != "production" else False
     )
