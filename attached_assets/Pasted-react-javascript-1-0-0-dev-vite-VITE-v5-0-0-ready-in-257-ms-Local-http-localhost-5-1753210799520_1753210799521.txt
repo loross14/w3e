@@ -1,0 +1,85 @@
+react-javascript@1.0.0 dev
+> vite
+
+
+  VITE v5.0.0  ready in 257 ms
+
+  ➜  Local:   http://localhost:5000/
+  ➜  Network: http://172.31.77.66:5000/
+  ➜  press h + enter to show help
+6:59:44 PM [vite] Pre-transform error: /home/runner/workspace/src/App.jsx: Missing semicolon. (1991:5)
+
+  1989 |       });
+  1990 |
+> 1991 |     } catch (error) {
+       |      ^
+  1992 |       console.error('Error updating portfolio:', error);
+  1993 |       console.log(`🔍 [UPDATE ERROR] API_BASE_URL was: ${API_BASE_URL}`);
+  1994 |       console.log(`🔍 [UPDATE ERROR] Error type: ${error.name}`);
+6:59:45 PM [vite] Internal server error: /home/runner/workspace/src/App.jsx: Missing semicolon. (1991:5)
+
+  1989 |       });
+  1990 |
+> 1991 |     } catch (error) {
+       |      ^
+  1992 |       console.error('Error updating portfolio:', error);
+  1993 |       console.log(`🔍 [UPDATE ERROR] API_BASE_URL was: ${API_BASE_URL}`);
+  1994 |       console.log(`🔍 [UPDATE ERROR] Error type: ${error.name}`);
+  Plugin: vite:react-babel
+  File: /home/runner/workspace/src/App.jsx:1991:5
+  1989|        });
+  1990|  
+  1991|      } catch (error) {
+     |       ^
+  1992|        console.error('Error updating portfolio:', error);
+  1993|        console.log(`🔍 [UPDATE ERROR] API_BASE_URL was: ${API_BASE_URL}`);
+      at constructor (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:356:19)
+      at JSXParserMixin.raise (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:3223:19)
+      at JSXParserMixin.semicolon (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:3580:10)
+      at JSXParserMixin.parseVarStatement (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:13101:10)
+      at JSXParserMixin.parseStatementContent (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:12683:23)
+      at JSXParserMixin.parseStatementLike (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:12588:17)
+      at JSXParserMixin.parseStatementListItem (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:12568:17)
+      at JSXParserMixin.parseBlockOrModuleBlockBody (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:13189:61)
+      at JSXParserMixin.parseBlockBody (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:13182:10)
+      at JSXParserMixin.parseBlock (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:13170:10)
+      at JSXParserMixin.parseFunctionBody (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:11935:24)
+      at JSXParserMixin.parseArrowExpression (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:11910:10)
+      at JSXParserMixin.parseParenAndDistinguishExpression (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:11511:12)
+      at JSXParserMixin.parseExprAtom (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:11137:23)
+      at JSXParserMixin.parseExprAtom (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:6932:20)
+      at JSXParserMixin.parseExprSubscripts (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:10857:23)
+      at JSXParserMixin.parseUpdate (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:10840:21)
+      at JSXParserMixin.parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:10816:23)
+      at JSXParserMixin.parseMaybeUnaryOrPrivate (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:10654:61)
+      at JSXParserMixin.parseExprOps (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:10659:23)
+      at JSXParserMixin.parseMaybeConditional (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:10636:23)
+      at JSXParserMixin.parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:10597:21)
+      at /home/runner/workspace/node_modules/@babel/parser/lib/index.js:10567:39
+      at JSXParserMixin.allowInAnd (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:12279:16)
+      at JSXParserMixin.parseMaybeAssignAllowIn (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:10567:17)
+      at JSXParserMixin.parseVar (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:13259:91)
+      at JSXParserMixin.parseVarStatement (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:13100:10)
+      at JSXParserMixin.parseStatementContent (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:12683:23)
+      at JSXParserMixin.parseStatementLike (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:12588:17)
+      at JSXParserMixin.parseModuleItem (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:12565:17)
+      at JSXParserMixin.parseBlockOrModuleBlockBody (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:13189:36)
+      at JSXParserMixin.parseBlockBody (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:13182:10)
+      at JSXParserMixin.parseProgram (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:12464:10)
+      at JSXParserMixin.parseTopLevel (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:12454:25)
+      at JSXParserMixin.parse (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:14376:10)
+      at parse (/home/runner/workspace/node_modules/@babel/parser/lib/index.js:14417:38)
+      at parser (/home/runner/workspace/node_modules/@babel/core/lib/parser/index.js:41:34)
+      at parser.next (<anonymous>)
+      at normalizeFile (/home/runner/workspace/node_modules/@babel/core/lib/transformation/normalize-file.js:64:37)
+      at normalizeFile.next (<anonymous>)
+      at run (/home/runner/workspace/node_modules/@babel/core/lib/transformation/index.js:21:50)
+      at run.next (<anonymous>)
+      at transform (/home/runner/workspace/node_modules/@babel/core/lib/transform.js:22:33)
+      at transform.next (<anonymous>)
+      at step (/home/runner/workspace/node_modules/gensync/index.js:261:32)
+      at /home/runner/workspace/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/home/runner/workspace/node_modules/gensync/index.js:223:11)
+      at /home/runner/workspace/node_modules/gensync/index.js:189:28
+      at /home/runner/workspace/node_modules/@babel/core/lib/gensync-utils/async.js:67:7
+      at /home/runner/workspace/node_modules/gensync/index.js:113:33
