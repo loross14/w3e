@@ -729,10 +729,12 @@ const AssetModal = ({ asset, onClose, onUpdateNotes, onUpdatePurchasePrice, isEd
           ((asset.valueUSD || 0) - asset.total_invested) / asset.total_invested * 100 : 0;
       }
     } catch (error) {
+      console.error('Purchase price update error:', error);
       setPriceError(`Failed to update price: ${error.message}`);
-    } finally {
-      setIsUpdatingPrice(false);
     }
+    
+    // Always reset loading state, even if there was an error
+    setIsUpdatingPrice(false);
   };
 
   const returnColor = (asset.total_return_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400';
