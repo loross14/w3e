@@ -1727,6 +1727,7 @@ const App = () => {
 
     addDebugInfo(`🔍 [UPDATE] Using API_BASE_URL: ${API_BASE_URL}`);
 
+    try {
       // Step 1: Test backend connection
       setUpdateStatus('🔗 Testing backend connection...');
 
