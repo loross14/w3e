@@ -1894,7 +1894,7 @@ const App = () => {
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
               {/* Removing the icon */}
               <div className="min-w-0 flex-1">
-                <h1 className="text-lg sm:text-2xl font-bold truncate">w3e.info</h1>
+                <h1 className="text-lg sm:text-2xl font-bold truncate">📊 w3e.info</h1>
                 {/* Status Display */}
                 {updateStatus && (
                   <div className="flex items-center space-x-2 mt-1">
