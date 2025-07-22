@@ -1,19 +1,20 @@
 
-# Core testing framework
+# Minimal, conflict-free testing dependencies
 pytest==7.4.4
 pytest-asyncio==0.21.1
 pytest-mock==3.14.1
 
-# HTTP testing without web3 conflicts
+# HTTP testing without blockchain conflicts
 httpx==0.25.2
 requests==2.31.0
 responses==0.23.3
 
-# Mocking utilities
-unittest-mock==1.0.1
+# Mock and testing utilities (no unittest-mock - it's built-in)
+faker==20.1.0
 
-# JSON handling
+# JSON and async support
 orjson==3.9.10
-
-# Async support
 aiofiles==23.2.1
+
+# Database testing
+sqlite3

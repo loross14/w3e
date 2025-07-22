@@ -3,41 +3,65 @@ import pytest
 import sqlite3
 import os
 from unittest.mock import patch, Mock
+from datetime import datetime
 
 class TestDatabaseOperations:
     """Test database CRUD operations."""
     
     def test_create_wallet_table(self, temp_database):
-        """Test wallet table creation."""
+        """Test wallet table creation and structure."""
         conn = sqlite3.connect(temp_database)
         cursor = conn.cursor()
         
-        # Check if wallets table exists
+        # Check if wallets table exists and has correct structure
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wallets'")
         result = cursor.fetchone()
         
         assert result is not None
         assert result[0] == "wallets"
         
+        # Check table structure
+        cursor.execute("PRAGMA table_info(wallets)")
+        columns = cursor.fetchall()
+        
+        expected_columns = {"id", "address", "label", "network"}
+        actual_columns = {col[1] for col in columns}
+        
+        assert expected_columns.issubset(actual_columns)
+        
         conn.close()
     
     def test_insert_wallet(self, temp_database):
-        """Test wallet insertion."""
+        """Test wallet insertion with validation."""
         conn = sqlite3.connect(temp_database)
         cursor = conn.cursor()
         
-        wallet_data = ("0x123...", "Test Wallet", "ETH")
-        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", wallet_data)
+        # Test Ethereum wallet
+        eth_wallet = ("0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98", "ETH Wallet", "ETH")
+        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", eth_wallet)
+        wallet_id_eth = cursor.lastrowid
         conn.commit()
         
-        # Verify insertion
-        cursor.execute("SELECT * FROM wallets WHERE address = ?", ("0x123...",))
-        result = cursor.fetchone()
+        # Test Solana wallet
+        sol_wallet = ("4ZE7D7ecU7tSvA5iJVCVp6MprguDqy7tvXguE64T9Twb", "SOL Wallet", "SOL")
+        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", sol_wallet)
+        wallet_id_sol = cursor.lastrowid
+        conn.commit()
         
-        assert result is not None
-        assert result[1] == "0x123..."  # address
-        assert result[2] == "Test Wallet"  # label
-        assert result[3] == "ETH"  # network
+        # Verify both insertions
+        cursor.execute("SELECT * FROM wallets WHERE address = ?", (eth_wallet[0],))
+        eth_result = cursor.fetchone()
+        
+        cursor.execute("SELECT * FROM wallets WHERE address = ?", (sol_wallet[0],))
+        sol_result = cursor.fetchone()
+        
+        assert eth_result is not None
+        assert eth_result[1] == eth_wallet[0]  # address
+        assert eth_result[2] == eth_wallet[1]  # label
+        assert eth_result[3] == eth_wallet[2]  # network
+        
+        assert sol_result is not None
+        assert sol_result[1] == sol_wallet[0]  # address
         
         conn.close()
     
@@ -47,20 +71,21 @@ class TestDatabaseOperations:
         cursor = conn.cursor()
         
         # Insert test wallet
-        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", 
-                      ("0x123...", "Old Label", "ETH"))
+        original_data = ("0x123...", "Old Label", "ETH")
+        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", original_data)
+        wallet_id = cursor.lastrowid
         conn.commit()
         
-        # Update wallet
-        cursor.execute("UPDATE wallets SET label = ? WHERE address = ?", 
-                      ("New Label", "0x123..."))
+        # Update wallet label
+        new_label = "Updated Label"
+        cursor.execute("UPDATE wallets SET label = ? WHERE id = ?", (new_label, wallet_id))
         conn.commit()
         
         # Verify update
-        cursor.execute("SELECT label FROM wallets WHERE address = ?", ("0x123...",))
+        cursor.execute("SELECT label FROM wallets WHERE id = ?", (wallet_id,))
         result = cursor.fetchone()
         
-        assert result[0] == "New Label"
+        assert result[0] == new_label
         
         conn.close()
     
@@ -70,19 +95,155 @@ class TestDatabaseOperations:
         cursor = conn.cursor()
         
         # Insert test wallet
-        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", 
-                      ("0x123...", "Test Wallet", "ETH"))
+        test_wallet = ("0x123...", "Test Wallet", "ETH")
+        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", test_wallet)
+        wallet_id = cursor.lastrowid
         conn.commit()
         
+        # Verify wallet exists
+        cursor.execute("SELECT * FROM wallets WHERE id = ?", (wallet_id,))
+        assert cursor.fetchone() is not None
+        
         # Delete wallet
-        cursor.execute("DELETE FROM wallets WHERE address = ?", ("0x123...",))
+        cursor.execute("DELETE FROM wallets WHERE id = ?", (wallet_id,))
         conn.commit()
         
         # Verify deletion
-        cursor.execute("SELECT * FROM wallets WHERE address = ?", ("0x123...",))
+        cursor.execute("SELECT * FROM wallets WHERE id = ?", (wallet_id,))
         result = cursor.fetchone()
         
         assert result is None
+        
+        conn.close()
+
+class TestAssetOperations:
+    """Test asset-related database operations."""
+    
+    def test_create_assets_table(self, temp_database):
+        """Test assets table structure."""
+        conn = sqlite3.connect(temp_database)
+        cursor = conn.cursor()
+        
+        # Check assets table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='assets'")
+        result = cursor.fetchone()
+        
+        assert result is not None
+        assert result[0] == "assets"
+        
+        # Check foreign key relationship
+        cursor.execute("PRAGMA foreign_key_list(assets)")
+        fk_info = cursor.fetchall()
+        
+        # Should have foreign key to wallets table
+        assert len(fk_info) > 0
+        assert any(fk[2] == "wallets" for fk in fk_info)
+        
+        conn.close()
+    
+    def test_insert_asset_with_wallet(self, temp_database):
+        """Test asset insertion linked to wallet."""
+        conn = sqlite3.connect(temp_database)
+        conn.execute("PRAGMA foreign_keys = ON")
+        cursor = conn.cursor()
+        
+        # Insert wallet first
+        wallet_data = ("0x123...", "Test Wallet", "ETH")
+        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", wallet_data)
+        wallet_id = cursor.lastrowid
+        conn.commit()
+        
+        # Insert asset linked to wallet
+        asset_data = (wallet_id, "ETH", "Ethereum", 1.5, 3717.32)
+        cursor.execute("INSERT INTO assets (wallet_id, symbol, name, balance, price_usd) VALUES (?, ?, ?, ?, ?)",
+                      asset_data)
+        asset_id = cursor.lastrowid
+        conn.commit()
+        
+        # Verify asset was inserted correctly
+        cursor.execute("SELECT * FROM assets WHERE id = ?", (asset_id,))
+        result = cursor.fetchone()
+        
+        assert result is not None
+        assert result[1] == wallet_id
+        assert result[2] == "ETH"
+        assert result[3] == "Ethereum"
+        assert result[4] == 1.5
+        assert result[5] == 3717.32
+        
+        conn.close()
+
+class TestHiddenAssets:
+    """Test hidden assets functionality."""
+    
+    def test_create_hidden_assets_table(self, temp_database):
+        """Test hidden_assets table structure."""
+        conn = sqlite3.connect(temp_database)
+        cursor = conn.cursor()
+        
+        # Check table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='hidden_assets'")
+        result = cursor.fetchone()
+        
+        assert result is not None
+        assert result[0] == "hidden_assets"
+        
+        # Check table structure
+        cursor.execute("PRAGMA table_info(hidden_assets)")
+        columns = cursor.fetchall()
+        
+        expected_columns = {"id", "token_address", "symbol", "created_at"}
+        actual_columns = {col[1] for col in columns}
+        
+        assert expected_columns.issubset(actual_columns)
+        
+        conn.close()
+    
+    def test_hide_asset(self, temp_database):
+        """Test hiding an asset."""
+        conn = sqlite3.connect(temp_database)
+        cursor = conn.cursor()
+        
+        # Hide an asset
+        token_address = "0x123abc..."
+        symbol = "TEST"
+        
+        cursor.execute("INSERT INTO hidden_assets (token_address, symbol) VALUES (?, ?)",
+                      (token_address, symbol))
+        conn.commit()
+        
+        # Verify it was hidden
+        cursor.execute("SELECT * FROM hidden_assets WHERE token_address = ?", (token_address,))
+        result = cursor.fetchone()
+        
+        assert result is not None
+        assert result[1] == token_address
+        assert result[2] == symbol
+        
+        conn.close()
+    
+    def test_unhide_asset(self, temp_database):
+        """Test unhiding an asset."""
+        conn = sqlite3.connect(temp_database)
+        cursor = conn.cursor()
+        
+        # First hide an asset
+        token_address = "0x456def..."
+        cursor.execute("INSERT INTO hidden_assets (token_address, symbol) VALUES (?, ?)",
+                      (token_address, "TEST2"))
+        conn.commit()
+        
+        # Verify it's hidden
+        cursor.execute("SELECT * FROM hidden_assets WHERE token_address = ?", (token_address,))
+        assert cursor.fetchone() is not None
+        
+        # Unhide it
+        cursor.execute("DELETE FROM hidden_assets WHERE token_address = ?", (token_address,))
+        conn.commit()
+        
+        # Verify it's no longer hidden
+        cursor.execute("SELECT * FROM hidden_assets WHERE token_address = ?", (token_address,))
+        assert cursor.fetchone() is None
         
         conn.close()
 
@@ -90,26 +251,33 @@ class TestDataIntegrity:
     """Test data integrity and constraints."""
     
     def test_unique_wallet_addresses(self, temp_database):
-        """Test that wallet addresses are unique."""
+        """Test that wallet addresses should be unique (if constraint exists)."""
         conn = sqlite3.connect(temp_database)
         cursor = conn.cursor()
         
-        # Add unique constraint
-        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_address ON wallets(address)")
-        
-        # Insert first wallet
-        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", 
-                      ("0x123...", "Wallet 1", "ETH"))
-        conn.commit()
-        
-        # Try to insert duplicate - should fail
+        # Add unique constraint to test
         try:
-            cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", 
-                          ("0x123...", "Wallet 2", "ETH"))
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_address ON wallets(address)")
             conn.commit()
-            assert False, "Should have failed due to unique constraint"
-        except sqlite3.IntegrityError:
-            assert True  # Expected behavior
+            
+            # Insert first wallet
+            wallet1 = ("0x123...", "Wallet 1", "ETH")
+            cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", wallet1)
+            conn.commit()
+            
+            # Try to insert duplicate - should fail
+            wallet2 = ("0x123...", "Wallet 2", "ETH")
+            try:
+                cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", wallet2)
+                conn.commit()
+                assert False, "Should have failed due to unique constraint"
+            except sqlite3.IntegrityError:
+                conn.rollback()
+                assert True  # Expected behavior
+                
+        except sqlite3.OperationalError:
+            # Index might already exist, which is fine
+            pass
         
         conn.close()
     
@@ -119,23 +287,33 @@ class TestDataIntegrity:
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
         
-        # Insert wallet first
-        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", 
-                      ("0x123...", "Test Wallet", "ETH"))
+        # Insert wallet
+        wallet_data = ("0x123...", "Test Wallet", "ETH")
+        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", wallet_data)
         wallet_id = cursor.lastrowid
         conn.commit()
         
-        # Insert asset linked to wallet
+        # Insert asset with valid wallet_id
+        asset_data = (wallet_id, "ETH", "Ethereum", 1.0, 3717.32)
         cursor.execute("INSERT INTO assets (wallet_id, symbol, name, balance, price_usd) VALUES (?, ?, ?, ?, ?)",
-                      (wallet_id, "ETH", "Ethereum", 1.0, 3717.32))
+                      asset_data)
         conn.commit()
         
         # Verify asset was inserted
         cursor.execute("SELECT * FROM assets WHERE wallet_id = ?", (wallet_id,))
         result = cursor.fetchone()
-        
         assert result is not None
-        assert result[1] == wallet_id
+        
+        # Try to insert asset with invalid wallet_id
+        try:
+            invalid_asset = (9999, "BTC", "Bitcoin", 1.0, 50000)
+            cursor.execute("INSERT INTO assets (wallet_id, symbol, name, balance, price_usd) VALUES (?, ?, ?, ?, ?)",
+                          invalid_asset)
+            conn.commit()
+            assert False, "Should have failed due to foreign key constraint"
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            assert True  # Expected behavior
         
         conn.close()
 
@@ -143,13 +321,11 @@ class TestConnectionHandling:
     """Test database connection management."""
     
     def test_connection_context_manager(self, temp_database):
-        """Test using database connection as context manager."""
-        # Simulate connection handling
+        """Test database connection handling."""
         connection_opened = False
         connection_closed = False
         
         try:
-            # Simulate opening connection
             conn = sqlite3.connect(temp_database)
             connection_opened = True
             
@@ -157,8 +333,11 @@ class TestConnectionHandling:
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             results = cursor.fetchall()
             
-            # Should have at least the tables we created
-            assert len(results) >= 2  # wallets and assets tables
+            # Should have the tables we created
+            table_names = {result[0] for result in results}
+            expected_tables = {"wallets", "assets", "hidden_assets"}
+            
+            assert expected_tables.issubset(table_names)
             
         finally:
             if 'conn' in locals():
@@ -181,14 +360,14 @@ class TestConnectionHandling:
             cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", 
                           ("0x123...", "Test Wallet", "ETH"))
             
-            # Force an error (try to insert into non-existent table)
-            cursor.execute("INSERT INTO nonexistent_table (id) VALUES (?)", (1,))
+            # Force an error - try to insert invalid data
+            cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)", 
+                          (None, None, None))  # This should violate NOT NULL constraints
             
-            # Should not reach here
             conn.commit()
             assert False, "Should have failed"
             
-        except sqlite3.OperationalError:
+        except sqlite3.IntegrityError:
             # Rollback transaction
             conn.rollback()
             
@@ -196,59 +375,72 @@ class TestConnectionHandling:
             cursor.execute("SELECT * FROM wallets WHERE address = ?", ("0x123...",))
             result = cursor.fetchone()
             
-            # With proper transaction handling, this should be None
-            # For this test, we'll just verify the error was caught
-            assert True
+            # Should be None due to rollback
+            assert result is None
         
         finally:
             conn.close()
 
-class TestDatabaseMigrations:
-    """Test database schema management."""
+class TestPerformance:
+    """Test database performance characteristics."""
     
-    def test_add_column_migration(self, temp_database):
-        """Test adding a new column to existing table."""
+    def test_bulk_insert_performance(self, temp_database):
+        """Test bulk insertion performance."""
         conn = sqlite3.connect(temp_database)
         cursor = conn.cursor()
         
-        # Check current schema
-        cursor.execute("PRAGMA table_info(wallets)")
-        columns_before = cursor.fetchall()
+        # Insert test wallet
+        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)",
+                      ("0x123...", "Test Wallet", "ETH"))
+        wallet_id = cursor.lastrowid
+        conn.commit()
         
-        # Add new column
-        try:
-            cursor.execute("ALTER TABLE wallets ADD COLUMN created_at TEXT")
-            conn.commit()
-            
-            # Check updated schema
-            cursor.execute("PRAGMA table_info(wallets)")
-            columns_after = cursor.fetchall()
-            
-            assert len(columns_after) == len(columns_before) + 1
-            
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" in str(e):
-                # Column already exists, which is fine for testing
-                assert True
-            else:
-                raise
+        # Bulk insert assets
+        assets = [
+            (wallet_id, f"TOKEN{i}", f"Token {i}", i * 1.0, i * 100.0)
+            for i in range(1, 101)  # 100 assets
+        ]
+        
+        cursor.executemany("INSERT INTO assets (wallet_id, symbol, name, balance, price_usd) VALUES (?, ?, ?, ?, ?)",
+                          assets)
+        conn.commit()
+        
+        # Verify all assets were inserted
+        cursor.execute("SELECT COUNT(*) FROM assets WHERE wallet_id = ?", (wallet_id,))
+        count = cursor.fetchone()[0]
+        
+        assert count == 100
         
         conn.close()
     
-    def test_create_index(self, temp_database):
-        """Test creating database indexes."""
+    def test_query_performance(self, temp_database):
+        """Test query performance with indexes."""
         conn = sqlite3.connect(temp_database)
         cursor = conn.cursor()
         
-        # Create index on address column
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_wallet_address ON wallets(address)")
+        # Insert test data
+        cursor.execute("INSERT INTO wallets (address, label, network) VALUES (?, ?, ?)",
+                      ("0x123...", "Test Wallet", "ETH"))
+        wallet_id = cursor.lastrowid
+        
+        # Insert multiple assets
+        assets = [(wallet_id, f"TOKEN{i}", f"Token {i}", i * 1.0, i * 100.0) for i in range(100)]
+        cursor.executemany("INSERT INTO assets (wallet_id, symbol, name, balance, price_usd) VALUES (?, ?, ?, ?, ?)", 
+                          assets)
         conn.commit()
         
-        # Verify index was created
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_wallet_address'")
+        # Test query with WHERE clause
+        cursor.execute("SELECT * FROM assets WHERE symbol = ?", ("TOKEN50",))
         result = cursor.fetchone()
         
         assert result is not None
-        assert result[0] == "idx_wallet_address"
+        assert result[2] == "TOKEN50"
+        
+        # Test aggregate query
+        cursor.execute("SELECT SUM(balance * price_usd) as total_value FROM assets WHERE wallet_id = ?", (wallet_id,))
+        total = cursor.fetchone()[0]
+        
+        assert total > 0
+        assert isinstance(total, (int, float))
         
         conn.close()

@@ -4,14 +4,46 @@ import asyncio
 import os
 import tempfile
 import json
-from unittest.mock import patch, MagicMock, Mock
 import sqlite3
 from pathlib import Path
+from unittest.mock import patch, MagicMock, Mock
+from typing import Dict, List, Any
 
-# Set test environment variables
+# CRITICAL: Set test environment before any imports
 os.environ["NODE_ENV"] = "test"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["ALCHEMY_API_KEY"] = "test_api_key_12345"
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+
+# Prevent any web3 imports by mocking them at import time
+import sys
+sys.modules['web3'] = MagicMock()
+sys.modules['eth_typing'] = MagicMock()
+sys.modules['eth_utils'] = MagicMock()
+sys.modules['eth_account'] = MagicMock()
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_environment():
+    """Setup test environment before any tests run."""
+    # Mock all blockchain-related modules
+    blockchain_mocks = {
+        'web3': MagicMock(),
+        'eth_typing': MagicMock(),
+        'eth_utils': MagicMock(),
+        'eth_account': MagicMock(),
+        'solana': MagicMock(),
+        'solders': MagicMock()
+    }
+    
+    for module_name, mock_module in blockchain_mocks.items():
+        sys.modules[module_name] = mock_module
+    
+    yield
+    
+    # Cleanup
+    for module_name in blockchain_mocks:
+        if module_name in sys.modules:
+            del sys.modules[module_name]
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -32,6 +64,7 @@ def mock_database():
     mock_cursor.fetchone.return_value = None
     mock_cursor.rowcount = 0
     mock_cursor.description = []
+    mock_cursor.lastrowid = 1
     
     # Configure connection methods
     mock_connection.cursor.return_value = mock_cursor
@@ -56,6 +89,7 @@ def mock_http_client():
     mock_response.json.return_value = {"status": "ok"}
     mock_response.text = '{"status": "ok"}'
     mock_response.headers = {"content-type": "application/json"}
+    mock_response.raise_for_status.return_value = None
     
     client.get.return_value = mock_response
     client.post.return_value = mock_response
@@ -107,7 +141,7 @@ def sample_wallet_data():
         {
             "id": 2,
             "address": "4ZE7D7ecU7tSvA5iJVCVp6MprguDqy7tvXguE64T9Twb",
-            "label": "Solana EOA",
+            "label": "Solana EOA", 
             "network": "SOL"
         }
     ]
@@ -163,6 +197,15 @@ def temp_database():
         )
     ''')
     
+    cursor.execute('''
+        CREATE TABLE hidden_assets (
+            id INTEGER PRIMARY KEY,
+            token_address TEXT NOT NULL UNIQUE,
+            symbol TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     conn.commit()
     conn.close()
     
@@ -177,8 +220,18 @@ def mock_environment():
     env_vars = {
         "DATABASE_URL": "sqlite:///:memory:",
         "ALCHEMY_API_KEY": "test_key_123",
-        "NODE_ENV": "test"
+        "NODE_ENV": "test",
+        "PYTHONDONTWRITEBYTECODE": "1"
     }
     
     with patch.dict(os.environ, env_vars):
         yield env_vars
+
+@pytest.fixture
+def mock_server_startup():
+    """Mock server startup without actually starting it."""
+    with patch('subprocess.run') as mock_run:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "Server started successfully"
+        mock_run.return_value.stderr = ""
+        yield mock_run
