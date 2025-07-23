@@ -563,17 +563,36 @@ class EthereumAssetFetcher(AssetFetcher):
                         ]
                         
                         # Known legitimate collections that should never be filtered
+                        # Include both contract names and common variations
                         legitimate_collections = [
-                            "mutantapeyachtclub", "boredapeyachtclub", "cryptopunks",
-                            "azuki", "doodles", "pudgypenguins", "0n1 force"
+                            "mutantapeyachtclub", "mutant ape yacht club", "mayc",
+                            "boredapeyachtclub", "bored ape yacht club", "bayc", 
+                            "cryptopunks", "azuki", "doodles", "pudgypenguins", "0n1 force"
+                        ]
+                        
+                        # Also check contract address for known legitimate NFT contracts
+                        legitimate_contract_addresses = [
+                            "0x60e4d786628fea6478f785a6d7e704777c86a7c6",  # MAYC official
+                            "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",  # BAYC official
+                            "0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb",  # CryptoPunks
+                            "0xed5af388653567af2f388e6224dc7c4b3241c544",  # Azuki
                         ]
                         
                         is_spam = any(indicator.lower() in contract_name.lower() for indicator in spam_indicators)
-                        is_legitimate = any(legit.lower() in contract_name.lower() for legit in legitimate_collections)
+                        is_legitimate = (
+                            any(legit.lower() in contract_name.lower() for legit in legitimate_collections) or
+                            contract_address.lower() in [addr.lower() for addr in legitimate_contract_addresses]
+                        )
                         
                         if is_spam and not is_legitimate:
                             print(f"🚫 [ETH NFT] Skipping spam NFT: {contract_name}")
                             continue
+                        
+                        # Log legitimate NFT detection for debugging
+                        if is_legitimate:
+                            print(f"🏆 [ETH NFT] Detected legitimate NFT: {contract_name} ({contract_address})")
+                        elif not is_spam:
+                            print(f"✅ [ETH NFT] Processing clean NFT: {contract_name}")
 
                         # Initialize collection
                         if contract_address not in collections:
@@ -584,6 +603,7 @@ class EthereumAssetFetcher(AssetFetcher):
                                 "token_ids": [],
                                 "image_url": None
                             }
+                            print(f"🆕 [ETH NFT] New collection initialized: {contract.get('name')} ({contract_address})")
 
                         # Add this NFT to the collection
                         collection = collections[contract_address]
@@ -3464,8 +3484,8 @@ async def update_portfolio_data_new():
                     and  # Never auto-hide NFTs based on value
                     asset['symbol'] not in [
                         'ETH', 'BTC', 'SOL', 'USDC', 'USDT', 'WBTC',
-                        'PENDLE'
-                    ]  # Preserve major tokens even if small amounts
+                        'PENDLE', 'MAYC', 'BAYC'  # Add known NFT symbols
+                    ]  # Preserve major tokens and legitimate NFTs even if small amounts
                 )
 
                 if is_spam_token or is_low_value_token:
