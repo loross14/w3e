@@ -488,7 +488,7 @@ class EthereumAssetFetcher(AssetFetcher):
                 # Extract API key from alchemy_url
                 api_key = self.alchemy_url.split("/v2/")[-1]
                 
-                # Use correct REST API endpoint for getNFTsForOwner  
+                # Use correct REST API endpoint for getNFTsForOwner (capital NFT)
                 nft_url = f"https://eth-mainnet.g.alchemy.com/nft/v3/{api_key}/getNFTsForOwner"
                 
                 params = {
