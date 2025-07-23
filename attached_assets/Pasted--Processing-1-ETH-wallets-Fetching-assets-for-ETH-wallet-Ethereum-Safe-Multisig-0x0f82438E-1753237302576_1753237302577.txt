@@ -1,0 +1,183 @@
+🔗 Processing 1 ETH wallets...
+📡 Fetching assets for ETH wallet: Ethereum Safe Multisig (0x0f82438E...)
+🖼️ [ETH NFT] Starting NFT query for wallet: 0x0f82438E...
+🖼️ [ETH NFT] Making REST API request following Alchemy sample...
+🖼️ [ETH NFT] URL: https://eth-mainnet.g.alchemy.com/nft/v3/JlWnUY62Jlfn4RVNBULaIwZN916B58SA/getNFTsForOwner
+🔍 [ETH NFT] API Response status: 200
+🖼️ [ETH NFT] Found 31 NFTs, processing collections...
+🚫 [ETH NFT] Skipping spam NFT: wrappedbtc.org
+🚫 [ETH NFT] Skipping spam NFT: OLAS Mysterybox NFT
+🚫 [ETH NFT] Skipping spam NFT: Pendle Mysterybox NFT
+🚫 [ETH NFT] Skipping spam NFT: pooled-ether.org
+🚫 [ETH NFT] Skipping spam NFT: origin-eth.com
+🚫 [ETH NFT] Skipping spam NFT: apyusd.org
+🚫 [ETH NFT] Skipping spam NFT:  visit usdcaward.com Claim Award
+🚫 [ETH NFT] Skipping spam NFT: genesis-eth.com
+🚫 [ETH NFT] Skipping spam NFT: Noox.top : lido airdrop recipient
+🚫 [ETH NFT] Skipping spam NFT: makerpool.net
+🚫 [ETH NFT] Skipping spam NFT: pooleth.org
+🚫 [ETH NFT] Skipping spam NFT: Access wbtc.gifts
+🚫 [ETH NFT] Skipping spam NFT: usdgift.net
+🚫 [ETH NFT] Skipping spam NFT: Access Liquidether.fun
+🚫 [ETH NFT] Skipping spam NFT: wbtcprotocol.net
+🚫 [ETH NFT] Skipping spam NFT: Yugamerch.org Genesis Recipient
+🚫 [ETH NFT] Skipping spam NFT: origindollar.net
+🚫 [ETH NFT] Skipping spam NFT: WBTC Mysterybox NFT
+🚫 [ETH NFT] Skipping spam NFT: liquidETH.net
+🚫 [ETH NFT] Skipping spam NFT: wbtcnetwork.net
+🚫 [ETH NFT] Skipping spam NFT: apecointoken.net
+🚫 [ETH NFT] Skipping spam NFT: olas.gift
+🖼️ [ETH NFT] Processed 8 unique collections
+✅ [ETH NFT] Added collection: usdcoin.events (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: Unisocks.fi NFT (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: 0N1 Force (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: MutantApeYachtClub (2 items, floor: $10.00)
+✅ [ETH NFT] Added collection: CIRCLE: USDC Gold Badge (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: makertoken.io (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: # BAYC apparel badge (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: Unisocks NFT (1 items, floor: $1.00)
+🖼️ [ETH NFT] Final result: 8 NFT collections
+✅ Fetched 19 assets for ETH wallet 0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98
+✅ Successfully fetched 19 assets from Ethereum Safe Multisig
+📊 Total assets fetched: 33
+🪙 Token addresses by network: {'SOL': 14, 'ETH': 19}
+📋 Wallet Status: 2 successful, 0 failed
+🪙 [JUPITER] Processing 13 mints...
+📡 [JUPITER] Batch 1: 13 mints
+🔍 [JUPITER] Request URL: https://price.jup.ag/v4/price?ids=3sJsVyTynExLnwoaJZprzz9GAdnm41SaFJGkyS8CBSmr,3m1K8LSukPtzyHHeaYn7JQrwuFSHYeLLZ7qij4Rupump,fjMJh8GxSQ...
+❌ [JUPITER] Batch error: [Errno -5] No address associated with hostname
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04516
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.66
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.67
+✅ DexScreener price: CboMcTUYUcy9... = $0.01104
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04514
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.67
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.67
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04537
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.67
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.67
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04524
+✅ DexScreener price: 7atgF8KQo4wJ... = $1.021e-07
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.66
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04557
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04515
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04516
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.67
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04645
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.67
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04513
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.67
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.68
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04532
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.69
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.67
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04517
+✅ DexScreener price: 7atgF8KQo4wJ... = $1.103e-07
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04543
+✅ DexScreener price: 2zMMhcVQEXDt... = $0.04614
+✅ DexScreener price: 9BB6NFEcjBCt... = $1.67
+🪙 [COINGECKO SPL] Processing 9 mints...
+📡 [COINGECKO SPL] Batch 1: 9 mints
+📊 [COINGECKO SPL] Response status: 400
+❌ [COINGECKO SPL] HTTP error 400
+✅ Fetched 27 prices for SOL
+💵 Fetching Ethereum prices for 19 tokens...
+🔍 ETH special address: 0x0000000000000000000000000000000000000000
+📡 Fetching ETH price from CoinGecko...
+✅ ETH price fetched successfully: $3744.6
+✅ ETH price stored for addresses: 0x0000000000000000000000000000000000000000, 0x0000000000000000000000000000000000000000
+✅ Found known Ethereum token: WBTC -> wrapped-bitcoin
+✅ Found known Ethereum token: PENDLE -> pendle
+✅ Got Ethereum price: 0x808507121b80c02388fad14726482e061b8da827 = $4.8
+✅ Got Ethereum price: 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599 = $119379
+📡 Trying CoinGecko contract API for 16 remaining tokens...
+📊 CoinGecko contract API response: 400
+❌ CoinGecko contract API error: 400
+✅ Fetched 4 prices for ETH
+💰 Starting purchase price estimation and returns calculation...
+❌ Error processing symbol: can't multiply sequence by non-int of type 'float'
+❌ Error processing symbol: can't multiply sequence by non-int of type 'float'
+❌ Error processing symbol: can't multiply sequence by non-int of type 'float'
+❌ Error processing symbol: can't multiply sequence by non-int of type 'float'
+❌ Error processing symbol: can't multiply sequence by non-int of type 'float'
+❌ Error processing symbol: can't multiply sequence by non-int of type 'float'
+❌ Error processing symbol: can't multiply sequence by non-int of type 'float'
+❌ Error processing symbol: can't multiply sequence by non-int of type 'float'
+🎯 Purchase price estimation completed for 8 assets
+🔄 [ASSET PROCESSING] Processing 33 assets in priority order...
+✅ ETH current market price lookup: $3744.6
+🔍 [ETH VALUE DEBUG] Balance: 18.34943194739735
+🔍 [ETH VALUE DEBUG] Price: $3744.6
+🔍 [ETH VALUE DEBUG] Calculated Value: $68711.282870
+🔍 [ETH VALUE DEBUG] Token Address: 0x0000000000000000000000000000000000000000
+💰 ETH Asset: ETH = $68711.28 (Balance: 18.349432 × Price: $3744.60)
+✅ [OVERRIDE] Using override price for ETH: Purchase=$2400.404, Market Value=$68711.28
+🔍 [ETH DEBUG] PROTECTED ETH inserted with:
+   - Token Address: 0x0000000000000000000000000000000000000000
+   - Current Price: $3744.6
+   - Current Value: $68711.28287022411
+   - Purchase Price: $2400.404
+   - Total Invested: $44046.049844260386
+   - P&L: $24665.233025963724
+   - Return: 56.0%
+✅ [ETH PROTECTION] ETH safely processed - no overwrites possible
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: SOL = $17851.40 (Balance: 87.911929 × Price: $203.06)
+🧹 Cleaning up hidden assets table...
+💰 ETH Asset: WBTC = $18208.20 (Balance: 0.152524 × Price: $119379.00)
+✅ [OVERRIDE] Using override price for WBTC: Purchase=$65712.35, Market Value=$18208.20
+🧹 Cleaning up hidden assets table...
+💰 ETH Asset: PENDLE = $12000.00 (Balance: 2500.000010 × Price: $4.80)
+✅ [OVERRIDE] Using override price for PENDLE: Purchase=$1.896, Market Value=$12000.00
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: PENGU = $22471.83 (Balance: 487035.758890 × Price: $0.05)
+✅ [OVERRIDE] Using override price for PENGU: Purchase=$0.024, Market Value=$22471.83
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: ABYSS = $0.00 (Balance: 2300.000000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: SPL-H9y7Vv = $0.00 (Balance: 10.000000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: SPL-6Fdt49 = $0.00 (Balance: 1.000000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: SPL-fjMJh8 = $0.00 (Balance: 1.000000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: SPL-4YeEtV = $0.00 (Balance: 3000.000000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: SPL-7bnb1S = $0.00 (Balance: 1.000000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: SPL-3sJsVy = $0.00 (Balance: 26625.000000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: SPL-9ik9os = $0.00 (Balance: 4.440000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: MNDE = $0.00 (Balance: 0.802301 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: Butthole = $0.01 (Balance: 0.532393 × Price: $0.01)
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: Fartcoin  = $6803.65 (Balance: 4074.041665 × Price: $1.67)
+✅ [OVERRIDE] Using override price for Fartcoin : Purchase=$1.17, Market Value=$6803.65
+🧹 Cleaning up hidden assets table...
+💰 SOL Asset: CWIF = $0.08 (Balance: 768000.000000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 ETH Asset:  = $0.00 (Balance: 4.750000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 ETH Asset: Visit https://usd-coin.net to claim rewards = $0.00 (Balance: 3999.990000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 ETH Asset:  = $0.00 (Balance: 801000000000000000000.000000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 ETH Asset: olas.gift = $0.00 (Balance: 0.100000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 ETH Asset: Visit usdgift.net to claim rewards = $0.00 (Balance: 3999.990000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 ETH Asset: Visit liquidETH.net to claim rewards = $0.00 (Balance: 1.700000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 ETH Asset: Visit website wbtc.gifts to claim rewards = $0.00 (Balance: 1.200000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+💰 ETH Asset:  = $0.00 (Balance: 909000000000000000000.000000 × Price: $0.00)
+🧹 Cleaning up hidden assets table...
+🖼️ NFT Asset: Airdrop - 1 items (Floor: $0)
+🧹 Cleaning up hidden assets table...
+🖼️ NFT Asset: Unisocks - 1 items (Floor: $0)
+🧹 Cleaning up hidden assets table...
+🖼️ NFT Asset: 0N1 - 1 items (Floor: $0)
+🧹 Cleaning up hidden assets table...
+🖼️ NFT Asset: MAYC - 2 items (Floor: $0)
