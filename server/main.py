@@ -3354,7 +3354,29 @@ async def update_portfolio_data_new():
         # First, estimate purchase prices for new assets
         await estimate_purchase_prices_and_calculate_returns()
 
-        for asset in all_assets:
+        # CRITICAL FIX: Sort assets to process valuable ones first and protect from overwrites
+        # This prevents spam tokens from overwriting legitimate tokens with same symbols
+        def asset_priority(asset):
+            # Highest priority: ETH (zero address)
+            if asset['token_address'].lower() == "0x0000000000000000000000000000000000000000":
+                return 0
+            # High priority: Major tokens by symbol
+            if asset['symbol'] in ['SOL', 'WBTC', 'PENDLE', 'USDC', 'USDT']:
+                return 1
+            # Medium priority: Assets with significant balance
+            if asset.get('balance', 0) > 0:
+                return 2
+            # Low priority: Everything else
+            return 3
+
+        # Sort assets by priority to process valuable ones first
+        sorted_assets = sorted(all_assets, key=asset_priority)
+        print(f"🔄 [ASSET PROCESSING] Processing {len(sorted_assets)} assets in priority order...")
+
+        # Track processed token addresses to prevent overwrites
+        processed_addresses = set()
+
+        for asset in sorted_assets:
             is_nft = asset.get('is_nft', False)
             token_address = asset['token_address']
             wallet_id = asset['wallet_id']
@@ -3522,6 +3544,14 @@ async def update_portfolio_data_new():
                                             total_invested *
                                             100) if total_invested > 0 else 0
 
+                # CRITICAL FIX: Check if this token address was already processed
+                if token_address.lower() in processed_addresses:
+                    print(f"⚠️ [DUPLICATE PROTECTION] Skipping duplicate token address: {asset['symbol']} ({token_address[:12]}...)")
+                    continue
+
+                # Mark this token address as processed
+                processed_addresses.add(token_address.lower())
+
                 # Insert asset into database
                 # CRITICAL: price_usd and value_usd are CURRENT MARKET DATA, not purchase data
                 cursor.execute(
@@ -3538,15 +3568,17 @@ async def update_portfolio_data_new():
                       purchase_price, total_invested, realized_pnl,
                       unrealized_pnl, total_return_pct))
 
-                # Debug log to verify correct values
+                # Debug log to verify correct values and protect ETH
                 if asset['symbol'] == 'ETH':
-                    print(f"🔍 [ETH DEBUG] Inserted ETH with:")
+                    print(f"🔍 [ETH DEBUG] PROTECTED ETH inserted with:")
+                    print(f"   - Token Address: {token_address}")
                     print(f"   - Current Price: ${price_usd}")
                     print(f"   - Current Value: ${value_usd}")
                     print(f"   - Purchase Price: ${purchase_price}")
                     print(f"   - Total Invested: ${total_invested}")
                     print(f"   - P&L: ${unrealized_pnl}")
                     print(f"   - Return: {total_return_pct:.1f}%")
+                    print(f"✅ [ETH PROTECTION] ETH safely processed - no overwrites possible")
 
                 # Debug NFT insertion
                 if is_nft:
@@ -3576,11 +3608,20 @@ async def update_portfolio_data_new():
                 f"🔓 Unhid valuable asset: {symbol} (${cursor.rowcount} rows removed)"
             )
 
-        # Auto-hide spam/scam tokens and low-value tokens
+        # Auto-hide spam/scam tokens and low-value tokens (but protect valuable ones)
         if auto_hide_candidates:
             print(f"🔍 Auto-hiding {len(auto_hide_candidates)} tokens...")
             for hide_asset in auto_hide_candidates:
                 try:
+                    # CRITICAL: Never auto-hide ETH or major tokens, even if they appear to be spam
+                    if hide_asset['token_address'].lower() == "0x0000000000000000000000000000000000000000":
+                        print(f"🛡️ [PROTECTION] Refusing to auto-hide ETH: {hide_asset['symbol']}")
+                        continue
+                    
+                    if hide_asset['symbol'] in ['ETH', 'SOL', 'WBTC', 'PENDLE', 'USDC', 'USDT']:
+                        print(f"🛡️ [PROTECTION] Refusing to auto-hide major token: {hide_asset['symbol']}")
+                        continue
+
                     cursor.execute(
                         """
                         INSERT INTO hidden_assets (token_address, symbol, name) 
