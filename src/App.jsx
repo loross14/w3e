@@ -94,13 +94,7 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
     unrealized_pnl: asset?.unrealized_pnl || 0,
     total_return_pct: asset?.total_return_pct || 0,
     notes: asset?.notes || "",
-    isNFT:
-      asset?.isNFT === true ||
-      asset?.symbol?.includes("NFT") ||
-      asset?.name?.includes("Collection") ||
-      (asset?.balance &&
-        typeof asset.balance === "string" &&
-        asset.balance.includes("NFTs")),
+    isNFT: asset?.isNFT === true, // Trust the backend flag for NFT detection
     floorPrice: asset?.floorPrice || 0,
     imageUrl: asset?.imageUrl || null,
     tokenIds: asset?.tokenIds || [],
@@ -109,13 +103,14 @@ const AssetCard = ({ asset, onClick, onHide, isEditor, totalValue }) => {
   // Debug NFT detection
   if (safeAsset.isNFT) {
     console.log(
-      `🖼️ [CARD DEBUG] Rendering NFT card: ${safeAsset.symbol} - ${safeAsset.name}`,
+      `🖼️ [CARD DEBUG] Rendering NFT collection card: ${safeAsset.symbol} - ${safeAsset.name}`,
       {
         isNFT: safeAsset.isNFT,
         balance: safeAsset.balance,
         floorPrice: safeAsset.floorPrice,
         imageUrl: safeAsset.imageUrl,
         valueUSD: safeAsset.valueUSD,
+        itemCount: Math.floor(safeAsset.balance),
       },
     );
   }
@@ -1552,15 +1547,20 @@ const App = () => {
       const asset = portfolioData.assets.find((a) => a.id === assetId);
       if (!asset) return;
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/assets/${asset.symbol}/notes?notes=${encodeURIComponent(notes)}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
+      // Choose the appropriate endpoint based on asset type
+      let endpoint;
+      if (asset.isNFT) {
+        endpoint = `${API_BASE_URL}/api/nfts/${asset.id}/notes?notes=${encodeURIComponent(notes)}`;
+      } else {
+        endpoint = `${API_BASE_URL}/api/assets/${asset.symbol}/notes?notes=${encodeURIComponent(notes)}`;
+      }
+
+      const response = await fetch(endpoint, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       if (!response.ok) {
         throw new Error("Failed to update notes");
@@ -1595,18 +1595,27 @@ const App = () => {
     try {
       addDebugInfo(`Updating purchase price for ${symbol}: $${purchasePrice}`);
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/assets/${symbol}/purchase_price`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            purchase_price: purchasePrice,
-          }),
+      // Find the asset to determine if it's an NFT
+      const asset = portfolioData.assets.find(a => a.symbol === symbol);
+      const isNFT = asset?.isNFT || false;
+      
+      // Choose the appropriate endpoint
+      let endpoint;
+      if (isNFT) {
+        endpoint = `${API_BASE_URL}/api/nfts/${asset.id}/purchase_price`;
+      } else {
+        endpoint = `${API_BASE_URL}/api/assets/${symbol}/purchase_price`;
+      }
+
+      const response = await fetch(endpoint, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          purchase_price: purchasePrice,
+        }),
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -1625,30 +1634,48 @@ const App = () => {
         ...prev,
         assets: prev.assets.map((asset) => {
           if (asset.symbol === symbol) {
-            const balance = parseFloat(asset.balance) || 0;
-            const currentValue = asset.valueUSD || 0;
-            const totalInvested = balance * purchasePrice;
-            const unrealizedPnl = currentValue - totalInvested;
-            const returnPct =
-              totalInvested > 0 ? (unrealizedPnl / totalInvested) * 100 : 0;
+            if (asset.isNFT) {
+              // NFT calculation
+              const itemCount = parseFloat(asset.balance) || 0;
+              const currentValue = asset.valueUSD || 0;
+              const totalInvested = itemCount * purchasePrice;
+              const unrealizedPnl = currentValue - totalInvested;
+              const returnPct = totalInvested > 0 ? (unrealizedPnl / totalInvested) * 100 : 0;
 
-            return {
-              ...asset,
-              purchase_price: purchasePrice,
-              total_invested: totalInvested,
-              unrealized_pnl: unrealizedPnl,
-              total_return_pct: returnPct,
-            };
+              return {
+                ...asset,
+                purchase_price: purchasePrice,
+                total_invested: totalInvested,
+                unrealized_pnl: unrealizedPnl,
+                total_return_pct: returnPct,
+              };
+            } else {
+              // Regular asset calculation
+              const balance = parseFloat(asset.balance) || 0;
+              const currentValue = asset.valueUSD || 0;
+              const totalInvested = balance * purchasePrice;
+              const unrealizedPnl = currentValue - totalInvested;
+              const returnPct = totalInvested > 0 ? (unrealizedPnl / totalInvested) * 100 : 0;
+
+              return {
+                ...asset,
+                purchase_price: purchasePrice,
+                total_invested: totalInvested,
+                unrealized_pnl: unrealizedPnl,
+                total_return_pct: returnPct,
+              };
+            }
           }
           return asset;
         }),
       }));
 
-      addDebugInfo(`✅ Purchase price updated for ${symbol}`);
+      addDebugInfo(`✅ Purchase price updated for ${isNFT ? 'NFT collection' : 'asset'} ${symbol}`);
 
       // Show success message briefly
+      const assetType = isNFT ? "NFT collection" : "asset";
       setUpdateStatus(
-        `✅ Updated ${symbol} purchase price to $${purchasePrice.toFixed(4)}`,
+        `✅ Updated ${assetType} ${symbol} purchase price to $${purchasePrice.toFixed(4)}`,
       );
       setTimeout(() => setUpdateStatus(""), 3000);
 

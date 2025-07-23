@@ -58,8 +58,8 @@ def migrate_data():
                 ON CONFLICT (address) DO NOTHING
             """, (wallet[1], wallet[2], wallet[3]))
         
-        # Create other tables and migrate data as needed
-        print("💰 Creating assets table...")
+        # Create separated tables for assets and NFTs
+        print("💰 Creating assets table (regular tokens only)...")
         postgres_cursor.execute("""
             CREATE TABLE IF NOT EXISTS assets (
                 id SERIAL PRIMARY KEY,
@@ -76,11 +76,32 @@ def migrate_data():
                 realized_pnl REAL DEFAULT 0,
                 unrealized_pnl REAL DEFAULT 0,
                 total_return_pct REAL DEFAULT 0,
-                is_nft BOOLEAN DEFAULT FALSE,
-                nft_metadata TEXT,
-                floor_price REAL DEFAULT 0,
-                image_url TEXT,
                 price_change_24h REAL DEFAULT 0,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        print("🖼️ Creating NFT collections table...")
+        postgres_cursor.execute("""
+            CREATE TABLE IF NOT EXISTS nft_collections (
+                id SERIAL PRIMARY KEY,
+                wallet_id INTEGER REFERENCES wallets(id) ON DELETE CASCADE,
+                contract_address TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                name TEXT NOT NULL,
+                item_count INTEGER NOT NULL DEFAULT 1,
+                token_ids TEXT,
+                floor_price_usd REAL DEFAULT 0,
+                total_value_usd REAL DEFAULT 0,
+                image_url TEXT,
+                collection_url TEXT,
+                marketplace_data TEXT,
+                purchase_price REAL DEFAULT 0,
+                total_invested REAL DEFAULT 0,
+                realized_pnl REAL DEFAULT 0,
+                unrealized_pnl REAL DEFAULT 0,
+                total_return_pct REAL DEFAULT 0,
+                notes TEXT DEFAULT '',
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)

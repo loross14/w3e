@@ -131,3 +131,284 @@ args = "cd server && python3 -m pip install --break-system-packages -r requireme
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run dev"
+
+[[workflows.workflow]]
+name = "Migrate NFT Separation"
+author = 21724697
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd server && python3 -c \""
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "import psycopg2"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "from psycopg2.extras import RealDictCursor"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "import os"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = ""
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "DATABASE_URL = os.getenv('DATABASE_URL')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "if not DATABASE_URL:"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "    print('❌ DATABASE_URL not found')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "    exit(1)"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = ""
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cursor = conn.cursor()"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = ""
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "print('🔄 Creating NFT collections table...')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cursor.execute('''"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "    CREATE TABLE IF NOT EXISTS nft_collections ("
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        id SERIAL PRIMARY KEY,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        wallet_id INTEGER REFERENCES wallets(id) ON DELETE CASCADE,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        contract_address TEXT NOT NULL,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        symbol TEXT NOT NULL,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        name TEXT NOT NULL,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        item_count INTEGER NOT NULL DEFAULT 1,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        token_ids TEXT,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        floor_price_usd REAL DEFAULT 0,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        total_value_usd REAL DEFAULT 0,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        image_url TEXT,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        collection_url TEXT,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        marketplace_data TEXT,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        purchase_price REAL DEFAULT 0,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        total_invested REAL DEFAULT 0,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        realized_pnl REAL DEFAULT 0,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        unrealized_pnl REAL DEFAULT 0,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        total_return_pct REAL DEFAULT 0,"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        notes TEXT DEFAULT '',"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "    )"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "''')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = ""
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "print('🔄 Migrating existing NFT data...')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cursor.execute('''"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "    INSERT INTO nft_collections "
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "    (wallet_id, contract_address, symbol, name, item_count, token_ids, "
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "     floor_price_usd, total_value_usd, image_url, purchase_price, "
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "     total_invested, realized_pnl, unrealized_pnl, total_return_pct)"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "    SELECT wallet_id, token_address, symbol, name, COALESCE(balance, 1),"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "           nft_metadata, COALESCE(floor_price, 0), COALESCE(value_usd, 0),"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "           image_url, COALESCE(purchase_price, 0), COALESCE(total_invested, 0),"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "           COALESCE(realized_pnl, 0), COALESCE(unrealized_pnl, 0), "
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "           COALESCE(total_return_pct, 0)"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "    FROM assets "
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "    WHERE is_nft = TRUE"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "    ON CONFLICT DO NOTHING"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "''')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = ""
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "print('🔄 Removing NFT columns from assets table...')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cursor.execute('ALTER TABLE assets DROP COLUMN IF EXISTS is_nft')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cursor.execute('ALTER TABLE assets DROP COLUMN IF EXISTS nft_metadata') "
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cursor.execute('ALTER TABLE assets DROP COLUMN IF EXISTS floor_price')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cursor.execute('ALTER TABLE assets DROP COLUMN IF EXISTS image_url')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = ""
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "print('🔄 Removing NFT records from assets table...')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cursor.execute('DELETE FROM assets WHERE token_address IN (SELECT contract_address FROM nft_collections)')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = ""
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "conn.commit()"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cursor.close()"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "conn.close()"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = ""
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "print('✅ NFT separation migration completed!')"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "\""
