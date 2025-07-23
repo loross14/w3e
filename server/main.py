@@ -474,65 +474,62 @@ class EthereumAssetFetcher(AssetFetcher):
     async def _fetch_nfts(self, wallet_address: str,
                           hidden_addresses: set) -> List[AssetData]:
         """
-        Enhanced NFT fetching using Alchemy's comprehensive getNFTsForOwner API.
+        Fixed NFT fetching using Alchemy's standard getNFTs API.
         Returns AssetData objects with is_nft=True for each collection.
         """
         assets = []
 
         try:
             print(
-                f"🖼️ [ETH NFT] Starting enhanced NFT query for wallet: {wallet_address[:10]}..."
+                f"🖼️ [ETH NFT] Starting NFT query for wallet: {wallet_address[:10]}..."
             )
 
-            async with httpx.AsyncClient(timeout=90.0) as client:  # Increased timeout for NFT queries
-                # Use Alchemy's enhanced getNFTsForOwner with comprehensive parameters
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                # Use standard getNFTs method with basic parameters
                 nft_payload = {
                     "id": 1,
                     "jsonrpc": "2.0",
-                    "method": "alchemy_getNFTsForOwner",
+                    "method": "alchemy_getNFTs",
                     "params": [
                         wallet_address,
                         {
                             "withMetadata": True,
-                            "excludeFilters": ["SPAM", "AIRDROPS"],  # Filter out spam/airdrop NFTs
-                            "includeFilters": [],  # Include all non-spam
-                            "tokenUriTimeoutInMs": 15000,  # Increased timeout
-                            "omitMetadata": False,
-                            "orderBy": "TRANSFERTIME"  # Order by most recent
+                            "tokenUriTimeoutInMs": 10000
                         }
                     ]
                 }
 
-                print(f"🖼️ [ETH NFT] Making enhanced API request to Alchemy...")
-                print(f"🔍 [ETH NFT] Using excludeFilters: ['SPAM', 'AIRDROPS']")
+                print(f"🖼️ [ETH NFT] Making API request to Alchemy...")
 
-                # Try enhanced API first, with retries
+                # Try standard API with retries
                 response = None
-                for attempt in range(3):
+                for attempt in range(2):
                     try:
                         response = await client.post(
                             self.alchemy_url,
                             json=nft_payload,
-                            timeout=60.0,
+                            timeout=30.0,
                             headers={"Content-Type": "application/json"})
                         
                         if response.status_code == 200:
                             break
-                        elif attempt < 2:  # Only log retries for first 2 attempts
+                        elif attempt < 1:
                             print(f"⚠️ [ETH NFT] Attempt {attempt + 1} failed with status {response.status_code}, retrying...")
-                            await asyncio.sleep(2 * (attempt + 1))  # Exponential backoff
+                            await asyncio.sleep(2)
                         
                     except Exception as e:
-                        if attempt < 2:
+                        if attempt < 1:
                             print(f"⚠️ [ETH NFT] Attempt {attempt + 1} failed with error: {e}, retrying...")
-                            await asyncio.sleep(2 * (attempt + 1))
+                            await asyncio.sleep(2)
                         else:
-                            raise e
+                            print(f"❌ [ETH NFT] All attempts failed: {e}")
+                            return assets
 
                 if not response or response.status_code != 200:
-                    # Fallback to basic getNFTs method
-                    print(f"🔄 [ETH NFT] Enhanced API failed, falling back to basic getNFTs...")
-                    return await self._fetch_nfts_fallback(client, wallet_address, hidden_addresses)
+                    print(f"❌ [ETH NFT] API failed with status: {response.status_code if response else 'No response'}")
+                    if response:
+                        print(f"❌ [ETH NFT] Error response: {response.text[:200]}...")
+                    return assets
 
                 # Parse response
                 try:
@@ -540,16 +537,14 @@ class EthereumAssetFetcher(AssetFetcher):
                     print(f"🔍 [ETH NFT] API Response status: {response.status_code}")
                 except Exception as parse_error:
                     print(f"❌ [ETH NFT] JSON parsing failed: {parse_error}")
-                    return await self._fetch_nfts_fallback(client, wallet_address, hidden_addresses)
+                    return assets
 
                 # Check for API errors
                 if "error" in data:
                     print(f"❌ [ETH NFT] API error: {data['error']}")
-                    if data["error"].get("code") == -32602:  # Invalid params, try fallback
-                        return await self._fetch_nfts_fallback(client, wallet_address, hidden_addresses)
                     return assets
 
-                # Extract NFTs from enhanced response
+                # Extract NFTs from response
                 result = data.get("result", {})
                 owned_nfts = result.get("ownedNfts", [])
                 total_count = result.get("totalCount", len(owned_nfts))
@@ -558,15 +553,14 @@ class EthereumAssetFetcher(AssetFetcher):
                     print(f"🖼️ [ETH NFT] No NFTs found for wallet (totalCount: {total_count})")
                     return assets
 
-                print(f"🖼️ [ETH NFT] Found {len(owned_nfts)} NFTs (total: {total_count}), processing collections...")
+                print(f"🖼️ [ETH NFT] Found {len(owned_nfts)} NFTs, processing collections...")
 
-                # Enhanced collection processing with Alchemy's data
+                # Simple collection processing
                 collections = {}
-                valid_nft_count = 0
 
                 for nft in owned_nfts:
                     try:
-                        # Extract contract information with enhanced validation
+                        # Extract contract information
                         contract = nft.get("contract", {})
                         contract_address = contract.get("address", "").lower()
 
@@ -574,71 +568,47 @@ class EthereumAssetFetcher(AssetFetcher):
                             continue
 
                         # Skip hidden collections
-                        if (contract_address in hidden_addresses
-                                or any(addr.lower() == contract_address
-                                       for addr in hidden_addresses)):
+                        if contract_address in hidden_addresses:
                             print(f"🙈 [ETH NFT] Skipping hidden collection: {contract_address}")
                             continue
 
-                        # Enhanced spam detection (beyond Alchemy's filters)
+                        # Basic spam detection
                         contract_name = contract.get("name", "")
-                        if (not contract_name or 
-                            len(contract_name) < 2 or
-                            "test" in contract_name.lower() or
-                            contract_name.lower().startswith("nft-")):
-                            print(f"🚫 [ETH NFT] Skipping likely spam contract: {contract_name}")
+                        if not contract_name or len(contract_name) < 2:
+                            print(f"🚫 [ETH NFT] Skipping unnamed contract: {contract_address}")
                             continue
 
-                        valid_nft_count += 1
-
-                        # Initialize collection with enhanced data
+                        # Initialize collection
                         if contract_address not in collections:
-                            # Extract collection-level data from contract
-                            opensea_data = contract.get("openSea", {})
                             collections[contract_address] = {
                                 "name": contract.get("name", "Unknown Collection"),
                                 "symbol": contract.get("symbol", "NFT"),
                                 "count": 0,
                                 "token_ids": [],
-                                "image_url": None,
-                                "opensea_slug": opensea_data.get("collectionSlug"),
-                                "floor_price_eth": opensea_data.get("floorPrice", 0),
-                                "description": opensea_data.get("description", ""),
-                                "external_url": opensea_data.get("externalUrl", ""),
-                                "twitter": opensea_data.get("twitterUsername", ""),
-                                "discord": opensea_data.get("discordUrl", "")
+                                "image_url": None
                             }
 
                         # Add this NFT to the collection
                         collection = collections[contract_address]
                         collection["count"] += 1
 
-                        # Enhanced token ID tracking
+                        # Track token ID
                         token_id = nft.get("tokenId")
-                        if token_id:
-                            # Convert hex to decimal if needed
+                        if token_id and len(collection["token_ids"]) < 10:
                             try:
                                 if isinstance(token_id, str) and token_id.startswith("0x"):
                                     token_id_decimal = str(int(token_id, 16))
                                 else:
                                     token_id_decimal = str(token_id)
-                                
-                                if len(collection["token_ids"]) < 25:  # Increased limit
-                                    collection["token_ids"].append(token_id_decimal)
+                                collection["token_ids"].append(token_id_decimal)
                             except ValueError:
-                                pass  # Skip invalid token IDs
+                                pass
 
-                        # Enhanced image URL extraction with multiple sources
+                        # Get image URL
                         if not collection["image_url"]:
-                            # Try multiple sources for image URL
                             image_sources = [
-                                nft.get("image", {}).get("originalUrl"),
-                                nft.get("image", {}).get("thumbnailUrl"),
-                                nft.get("media", [{}])[0].get("gateway") if nft.get("media") else None,
-                                nft.get("metadata", {}).get("image"),
-                                nft.get("metadata", {}).get("image_url"),
-                                nft.get("metadata", {}).get("imageUrl"),
-                                contract.get("openSea", {}).get("imageUrl")
+                                nft.get("image", {}).get("originalUrl") if isinstance(nft.get("image"), dict) else nft.get("image"),
+                                nft.get("metadata", {}).get("image")
                             ]
                             
                             for img_url in image_sources:
@@ -650,30 +620,15 @@ class EthereumAssetFetcher(AssetFetcher):
                         print(f"⚠️ [ETH NFT] Error processing NFT: {nft_error}")
                         continue
 
-                print(f"🖼️ [ETH NFT] Processed {len(collections)} unique collections from {valid_nft_count} valid NFTs")
+                print(f"🖼️ [ETH NFT] Processed {len(collections)} unique collections")
 
-                # Convert collections to AssetData objects with enhanced processing
+                # Convert collections to AssetData objects
                 for contract_address, collection_data in collections.items():
                     try:
-                        # Enhanced floor price calculation
-                        floor_price_usd = 0
-                        floor_price_eth = collection_data.get("floor_price_eth", 0)
-                        
-                        if floor_price_eth and floor_price_eth > 0:
-                            # Convert ETH floor price to USD (use current ETH price)
-                            eth_price_usd = 3800  # Could fetch this dynamically
-                            floor_price_usd = floor_price_eth * eth_price_usd
-                            print(f"💰 [ETH NFT] {collection_data['name']}: Floor price {floor_price_eth} ETH = ${floor_price_usd:.2f}")
-                        else:
-                            # Fallback floor price estimation based on collection quality indicators
-                            if collection_data["opensea_slug"] and collection_data["description"]:
-                                floor_price_usd = 50.0  # Assume legitimate collections have some value
-                            elif collection_data["count"] > 10:
-                                floor_price_usd = 10.0  # Large collections likely have some value
-                            else:
-                                floor_price_usd = 1.0   # Minimal floor for small collections
+                        # Simple floor price estimation
+                        floor_price_usd = 10.0 if collection_data["count"] > 1 else 1.0
 
-                        # Create enhanced NFT asset
+                        # Create NFT asset
                         nft_asset = AssetData(
                             token_address=contract_address,
                             symbol=collection_data["symbol"],
@@ -690,8 +645,7 @@ class EthereumAssetFetcher(AssetFetcher):
 
                         print(
                             f"✅ [ETH NFT] Added collection: {collection_data['name']} "
-                            f"({collection_data['count']} items, floor: ${floor_price_usd:.2f}, "
-                            f"slug: {collection_data['opensea_slug'] or 'none'})"
+                            f"({collection_data['count']} items, floor: ${floor_price_usd:.2f})"
                         )
 
                     except Exception as asset_error:
@@ -699,7 +653,7 @@ class EthereumAssetFetcher(AssetFetcher):
                         continue
 
         except asyncio.TimeoutError:
-            print(f"⏰ [ETH NFT] Request timeout after 90s - continuing without NFTs")
+            print(f"⏰ [ETH NFT] Request timeout - continuing without NFTs")
         except Exception as e:
             print(f"❌ [ETH NFT] Unexpected error: {e}")
             import traceback
@@ -707,94 +661,6 @@ class EthereumAssetFetcher(AssetFetcher):
             # Don't fail the entire asset fetch if NFTs fail
 
         print(f"🖼️ [ETH NFT] Final result: {len(assets)} NFT collections")
-        return assets
-
-    async def _fetch_nfts_fallback(self, client: httpx.AsyncClient, wallet_address: str, 
-                                   hidden_addresses: set) -> List[AssetData]:
-        """Fallback NFT fetching using basic getNFTs method"""
-        assets = []
-        
-        try:
-            print(f"🔄 [ETH NFT] Using fallback getNFTs method...")
-            
-            nft_payload = {
-                "id": 1,
-                "jsonrpc": "2.0",
-                "method": "alchemy_getNFTs",
-                "params": [
-                    wallet_address, 
-                    {
-                        "withMetadata": True,
-                        "tokenUriTimeoutInMs": 10000,
-                        "omitMetadata": False
-                    }
-                ]
-            }
-
-            response = await client.post(
-                self.alchemy_url,
-                json=nft_payload,
-                timeout=45.0,
-                headers={"Content-Type": "application/json"})
-
-            if response.status_code != 200:
-                print(f"❌ [ETH NFT] Fallback HTTP error {response.status_code}")
-                return assets
-
-            data = response.json()
-            if "error" in data:
-                print(f"❌ [ETH NFT] Fallback API error: {data['error']}")
-                return assets
-
-            result = data.get("result", {})
-            owned_nfts = result.get("ownedNfts", [])
-            
-            if owned_nfts:
-                print(f"🖼️ [ETH NFT] Fallback found {len(owned_nfts)} NFTs")
-                # Process using simplified logic
-                collections = {}
-                for nft in owned_nfts:
-                    contract = nft.get("contract", {})
-                    contract_address = contract.get("address", "").lower()
-                    
-                    if not contract_address or contract_address in hidden_addresses:
-                        continue
-                    
-                    if contract_address not in collections:
-                        collections[contract_address] = {
-                            "name": contract.get("name", "Unknown Collection"),
-                            "symbol": contract.get("symbol", "NFT"),
-                            "count": 0,
-                            "token_ids": [],
-                            "image_url": None
-                        }
-                    
-                    collections[contract_address]["count"] += 1
-                    
-                    token_id = nft.get("tokenId")
-                    if token_id:
-                        collections[contract_address]["token_ids"].append(str(token_id))
-                
-                # Convert to AssetData objects
-                for contract_address, collection_data in collections.items():
-                    nft_asset = AssetData(
-                        token_address=contract_address,
-                        symbol=collection_data["symbol"],
-                        name=collection_data["name"],
-                        balance=collection_data["count"],
-                        balance_formatted=f"{collection_data['count']} NFTs",
-                        decimals=0,
-                        is_nft=True,
-                        token_ids=collection_data["token_ids"],
-                        floor_price=10.0,  # Basic floor price estimate
-                        image_url=collection_data.get("image_url"))
-                    
-                    assets.append(nft_asset)
-                    print(f"✅ [ETH NFT] Fallback added: {collection_data['name']} ({collection_data['count']} items)")
-            
-        except Exception as e:
-            print(f"❌ [ETH NFT] Fallback method failed: {e}")
-        
         return assets
 
     
