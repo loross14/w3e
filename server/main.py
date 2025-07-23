@@ -474,70 +474,50 @@ class EthereumAssetFetcher(AssetFetcher):
     async def _fetch_nfts(self, wallet_address: str,
                           hidden_addresses: set) -> List[AssetData]:
         """
-        Fixed NFT fetching using Alchemy's correct REST API endpoints.
+        NFT fetching using Alchemy's REST API following the official sample pattern.
         Returns AssetData objects with is_nft=True for each collection.
         """
         assets = []
 
         try:
-            print(
-                f"🖼️ [ETH NFT] Starting NFT query for wallet: {wallet_address[:10]}..."
-            )
+            print(f"🖼️ [ETH NFT] Starting NFT query for wallet: {wallet_address[:10]}...")
 
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                # Extract API key from alchemy_url
-                api_key = self.alchemy_url.split("/v2/")[-1]
+            # Extract API key from alchemy_url
+            api_key = self.alchemy_url.split("/v2/")[-1]
+            
+            # Follow Alchemy sample pattern: GET request with query parameters
+            nft_url = f"https://eth-mainnet.g.alchemy.com/nft/v3/{api_key}/getNFTsForOwner"
+            
+            params = {
+                "owner": wallet_address,
+                "withMetadata": "true", 
+                "pageSize": "100"
+            }
+
+            print(f"🖼️ [ETH NFT] Making REST API request following Alchemy sample...")
+            print(f"🖼️ [ETH NFT] URL: {nft_url}")
+
+            # Use requests library like the Alchemy sample
+            import requests
+            
+            try:
+                response = requests.get(
+                    nft_url,
+                    params=params,
+                    headers={"accept": "application/json"},
+                    timeout=30.0
+                )
                 
-                # Use correct REST API endpoint for getNFTsForOwner (capital NFT)
-                nft_url = f"https://eth-mainnet.g.alchemy.com/nft/v3/{api_key}/getNFTsForOwner"
+                print(f"🔍 [ETH NFT] API Response status: {response.status_code}")
                 
-                params = {
-                    "owner": wallet_address,
-                    "withMetadata": "true",
-                    "pageSize": "100"
-                }
-
-                print(f"🖼️ [ETH NFT] Making API request to Alchemy REST API...")
-                print(f"🖼️ [ETH NFT] URL: {nft_url}")
-
-                # Try REST API with retries
-                response = None
-                for attempt in range(2):
-                    try:
-                        response = await client.get(
-                            nft_url,
-                            params=params,
-                            timeout=30.0,
-                            headers={"accept": "application/json"})
-                        
-                        if response.status_code == 200:
-                            break
-                        elif attempt < 1:
-                            print(f"⚠️ [ETH NFT] Attempt {attempt + 1} failed with status {response.status_code}, retrying...")
-                            await asyncio.sleep(2)
-                        
-                    except Exception as e:
-                        if attempt < 1:
-                            print(f"⚠️ [ETH NFT] Attempt {attempt + 1} failed with error: {e}, retrying...")
-                            await asyncio.sleep(2)
-                        else:
-                            print(f"❌ [ETH NFT] All attempts failed: {e}")
-                            return assets
-
-                if not response or response.status_code != 200:
-                    print(f"❌ [ETH NFT] API failed with status: {response.status_code if response else 'No response'}")
-                    if response:
-                        print(f"❌ [ETH NFT] Error response: {response.text[:200]}...")
+                if response.status_code != 200:
+                    print(f"❌ [ETH NFT] API failed with status: {response.status_code}")
+                    print(f"❌ [ETH NFT] Error response: {response.text[:200]}...")
                     return assets
 
-                # Parse response
-                try:
-                    data = response.json()
-                    print(f"🔍 [ETH NFT] API Response status: {response.status_code}")
-                except Exception as parse_error:
-                    print(f"❌ [ETH NFT] JSON parsing failed: {parse_error}")
-                    return assets
-
+                # Parse JSON response like the Alchemy sample
+                data = response.json()
+                
                 # Check for API errors
                 if "error" in data:
                     print(f"❌ [ETH NFT] API error: {data['error']}")
@@ -553,7 +533,7 @@ class EthereumAssetFetcher(AssetFetcher):
 
                 print(f"🖼️ [ETH NFT] Found {len(owned_nfts)} NFTs, processing collections...")
 
-                # Simple collection processing
+                # Group NFTs by collection
                 collections = {}
 
                 for nft in owned_nfts:
@@ -602,7 +582,7 @@ class EthereumAssetFetcher(AssetFetcher):
                             except ValueError:
                                 pass
 
-                        # Get image URL
+                        # Get image URL from metadata
                         if not collection["image_url"]:
                             image_sources = [
                                 nft.get("image", {}).get("originalUrl") if isinstance(nft.get("image"), dict) else nft.get("image"),
@@ -650,8 +630,11 @@ class EthereumAssetFetcher(AssetFetcher):
                         print(f"❌ [ETH NFT] Error creating asset for {contract_address}: {asset_error}")
                         continue
 
-        except asyncio.TimeoutError:
-            print(f"⏰ [ETH NFT] Request timeout - continuing without NFTs")
+            except requests.exceptions.Timeout:
+                print(f"⏰ [ETH NFT] Request timeout - continuing without NFTs")
+            except requests.exceptions.RequestException as e:
+                print(f"❌ [ETH NFT] Request error: {e}")
+
         except Exception as e:
             print(f"❌ [ETH NFT] Unexpected error: {e}")
             import traceback
