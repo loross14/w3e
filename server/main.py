@@ -3685,38 +3685,38 @@ async def update_portfolio_data_new():
                     f"💰 {asset['network']} Asset: {asset['symbol']} = ${value_usd:.2f} (Balance: {asset['balance']:.6f} × Price: ${price_usd:.2f})"
                 )
 
-                    # Identify spam/scam tokens and low-value tokens for auto-hiding
-                    is_spam_token = (
-                        value_usd == 0 and asset['balance'] > 0 and
-                        ("visit" in asset['name'].lower()
-                         or "claim" in asset['name'].lower()
-                         or "rewards" in asset['name'].lower()
-                         or "gift" in asset['name'].lower()
-                         or "airdrop" in asset['name'].lower() or
-                         (asset['symbol'] == "" and asset['name'] == "")
-                         or len(asset['name']) > 50  # Suspiciously long names
-                         ))
+                # Identify spam/scam tokens and low-value tokens for auto-hiding
+                is_spam_token = (
+                    value_usd == 0 and asset['balance'] > 0 and
+                    ("visit" in asset['name'].lower()
+                     or "claim" in asset['name'].lower()
+                     or "rewards" in asset['name'].lower()
+                     or "gift" in asset['name'].lower()
+                     or "airdrop" in asset['name'].lower() or
+                     (asset['symbol'] == "" and asset['name'] == "")
+                     or len(asset['name']) > 50  # Suspiciously long names
+                     ))
 
-                    # Auto-hide tokens with value less than $1 (excluding NFTs and major tokens)
-                    is_low_value_token = (
-                        value_usd > 0 and value_usd < 1.0 and not is_nft
-                        and  # Never auto-hide NFTs
-                        asset['symbol'] not in [
-                            'ETH', 'BTC', 'SOL', 'USDC', 'USDT', 'WBTC',
-                            'PENDLE'
-                        ]  # Preserve major tokens even if small amounts
-                    )
+                # Auto-hide tokens with value less than $1 (excluding NFTs and major tokens)
+                is_low_value_token = (
+                    value_usd > 0 and value_usd < 1.0 and not is_nft
+                    and  # Never auto-hide NFTs
+                    asset['symbol'] not in [
+                        'ETH', 'BTC', 'SOL', 'USDC', 'USDT', 'WBTC',
+                        'PENDLE'
+                    ]  # Preserve major tokens even if small amounts
+                )
 
-                    if is_spam_token or is_low_value_token:
-                        reason = "spam/scam" if is_spam_token else f"low value (${value_usd:.6f})"
-                        auto_hide_candidates.append({
-                            'token_address': token_address,
-                            'symbol': asset['symbol'],
-                            'name': asset['name'],
-                            'balance': asset['balance'],
-                            'value_usd': value_usd,
-                            'reason': reason
-                        })
+                if is_spam_token or is_low_value_token:
+                    reason = "spam/scam" if is_spam_token else f"low value (${value_usd:.6f})"
+                    auto_hide_candidates.append({
+                        'token_address': token_address,
+                        'symbol': asset['symbol'],
+                        'name': asset['name'],
+                        'balance': asset['balance'],
+                        'value_usd': value_usd,
+                        'reason': reason
+                    })
 
                 # Update wallet status with value
                 wallet_status[wallet_id]['total_value'] += value_usd
