@@ -474,7 +474,7 @@ class EthereumAssetFetcher(AssetFetcher):
     async def _fetch_nfts(self, wallet_address: str,
                           hidden_addresses: set) -> List[AssetData]:
         """
-        Fixed NFT fetching using Alchemy's standard getNFTs API.
+        Fixed NFT fetching using Alchemy's correct REST API endpoints.
         Returns AssetData objects with is_nft=True for each collection.
         """
         assets = []
@@ -485,31 +485,30 @@ class EthereumAssetFetcher(AssetFetcher):
             )
 
             async with httpx.AsyncClient(timeout=60.0) as client:
-                # Use standard getNFTs method with basic parameters
-                nft_payload = {
-                    "id": 1,
-                    "jsonrpc": "2.0",
-                    "method": "alchemy_getNFTs",
-                    "params": [
-                        wallet_address,
-                        {
-                            "withMetadata": True,
-                            "tokenUriTimeoutInMs": 10000
-                        }
-                    ]
+                # Extract API key from alchemy_url
+                api_key = self.alchemy_url.split("/v2/")[-1]
+                
+                # Use correct REST API endpoint for getNftsForOwner
+                nft_url = f"https://eth-mainnet.g.alchemy.com/nft/v3/{api_key}/getNftsForOwner"
+                
+                params = {
+                    "owner": wallet_address,
+                    "withMetadata": "true",
+                    "pageSize": "100"
                 }
 
-                print(f"🖼️ [ETH NFT] Making API request to Alchemy...")
+                print(f"🖼️ [ETH NFT] Making API request to Alchemy REST API...")
+                print(f"🖼️ [ETH NFT] URL: {nft_url}")
 
-                # Try standard API with retries
+                # Try REST API with retries
                 response = None
                 for attempt in range(2):
                     try:
-                        response = await client.post(
-                            self.alchemy_url,
-                            json=nft_payload,
+                        response = await client.get(
+                            nft_url,
+                            params=params,
                             timeout=30.0,
-                            headers={"Content-Type": "application/json"})
+                            headers={"accept": "application/json"})
                         
                         if response.status_code == 200:
                             break
@@ -544,10 +543,9 @@ class EthereumAssetFetcher(AssetFetcher):
                     print(f"❌ [ETH NFT] API error: {data['error']}")
                     return assets
 
-                # Extract NFTs from response
-                result = data.get("result", {})
-                owned_nfts = result.get("ownedNfts", [])
-                total_count = result.get("totalCount", len(owned_nfts))
+                # Extract NFTs from response (REST API format)
+                owned_nfts = data.get("ownedNfts", [])
+                total_count = data.get("totalCount", len(owned_nfts))
 
                 if not owned_nfts:
                     print(f"🖼️ [ETH NFT] No NFTs found for wallet (totalCount: {total_count})")
