@@ -1,0 +1,39 @@
+🖼️ [ETH NFT] Starting NFT query for wallet: 0x0f82438E...
+🖼️ [ETH NFT] Making REST API request following Alchemy sample...
+🖼️ [ETH NFT] URL: https://eth-mainnet.g.alchemy.com/nft/v3/JlWnUY62Jlfn4RVNBULaIwZN916B58SA/getNFTsForOwner
+🔍 [ETH NFT] API Response status: 200
+🖼️ [ETH NFT] Found 31 NFTs, processing collections...
+🖼️ [ETH NFT] Processed 30 unique collections
+✅ [ETH NFT] Added collection: usdcoin.events (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: wrappedbtc.org (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: Unisocks.fi NFT (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: OLAS Mysterybox NFT (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: Pendle Mysterybox NFT (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: 0N1 Force (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: pooled-ether.org (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: origin-eth.com (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: apyusd.org (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection:  visit usdcaward.com Claim Award (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: genesis-eth.com (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: Noox.top : lido airdrop recipient (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: MutantApeYachtClub (2 items, floor: $10.00)
+✅ [ETH NFT] Added collection: makerpool.net (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: pooleth.org (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: Access wbtc.gifts (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: CIRCLE: USDC Gold Badge (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: usdgift.net (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: makertoken.io (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: Access Liquidether.fun (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: wbtcprotocol.net (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: Yugamerch.org Genesis Recipient (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: origindollar.net (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: WBTC Mysterybox NFT (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: liquidETH.net (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: wbtcnetwork.net (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: apecointoken.net (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: olas.gift (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: # BAYC apparel badge (1 items, floor: $1.00)
+✅ [ETH NFT] Added collection: Unisocks NFT (1 items, floor: $1.00)
+🖼️ [ETH NFT] Final result: 30 NFT collections
+✅ Fetched 41 assets for ETH wallet 0x0f82438E71EF21e07b6A5871Df2a481B2Dd92A98
+✅ Successfully fetched 41 assets from Ethereum Safe Multisig
