@@ -3615,7 +3615,6 @@ async def update_portfolio_data_new():
             wallet_id = asset['wallet_id']
 
             if is_nft:
-                # For NFTs, use the floor_price from AssetData object
                 price_usd = asset.floor_price if hasattr(asset, 'floor_price') else 0
                 value_usd = price_usd * asset.balance if price_usd > 0 else 0
                 nft_metadata = json.dumps({
@@ -3818,12 +3817,12 @@ async def update_portfolio_data_new():
                      realized_pnl, unrealized_pnl, total_return_pct)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (wallet_id, token_address, asset.symbol, asset.name,
-                      asset.balance, asset.balance_formatted, price_usd,
-                      value_usd, is_nft, nft_metadata,
-                      asset.floor_price if hasattr(asset, 'floor_price') else 0, 
-                      asset.image_url if hasattr(asset, 'image_url') else None,
-                      purchase_price, total_invested, realized_pnl,
-                      unrealized_pnl, total_return_pct))
+                     asset.balance, asset.balance_formatted, price_usd,
+                     value_usd, is_nft, nft_metadata,
+                     asset.floor_price if hasattr(asset, 'floor_price') else 0,
+                     asset.image_url if hasattr(asset, 'image_url') else None,
+                     purchase_price, total_invested, realized_pnl,
+                     unrealized_pnl, total_return_pct))
 
                 # Debug log to verify correct values and protect ETH
                 if asset['symbol'] == 'ETH':
