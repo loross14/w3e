@@ -1,0 +1,51 @@
+
+                # Insert asset into database
+                # CRITICAL: price_usd and value_usd are CURRENT MARKET DATA, not purchase data
+                cursor.execute(
+                    """
+                    INSERT INTO assets 
+                    (wallet_id, token_address, symbol, name, balance, balance_formatted, price_usd, value_usd, 
+                     is_nft, nft_metadata, floor_price, image_url, purchase_price, total_invested, 
+                     realized_pnl, unrealized_pnl, total_return_pct)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (wallet_id, token_address, asset.get('symbol', 'Unknown'),
+                      asset.get('name', 'Unknown'), asset.get('balance', 0),
+                      asset.get('balance_formatted',
+                                '0.000000'), price_usd, value_usd, is_nft,
+                      nft_metadata, floor_price if is_nft else 0,
+                      image_url if is_nft else None, purchase_price,
+                      total_invested, realized_pnl, unrealized_pnl,
+                      total_return_pct))
+
+                # Debug log to verify correct values and protect ETH
+                if asset['symbol'] == 'ETH':
+                    print(f"🔍 [ETH DEBUG] PROTECTED ETH inserted with:")
+                    print(f"   - Token Address: {token_address}")
+                    print(f"   - Current Price: ${price_usd}")
+                    print(f"   - Current Value: ${value_usd}")
+                    print(f"   - Purchase Price: ${purchase_price}")
+                    print(f"   - Total Invested: ${total_invested}")
+                    print(f"   - P&L: ${unrealized_pnl}")
+                    print(f"   - Return: {total_return_pct:.1f}%")
+                    print(
+                        f"✅ [ETH PROTECTION] ETH safely processed - no overwrites possible"
+                    )
+
+                # Debug NFT insertion
+                if is_nft:
+                    print(
+                        f"🖼️ [DATABASE] Inserted NFT: {asset['symbol']} - {asset['name']} - Count: {asset['balance']} - Floor: ${asset.floor_price}"
+                    )
+                    print(f"🖼️ [DATABASE] NFT metadata: {nft_metadata}")
+                    print(f"🖼️ [DATABASE] Image URL: {asset.get('image_url')}")
+
+            # CRITICAL FIX: Clean up hidden assets table to remove legitimate tokens
+            print("🧹 Cleaning up hidden assets table...")
+
+            # Get current valuable assets (assets with significant value)
+            cursor.execute("""
+                SELECT DISTINCT token_address, symbol, name 
+                FROM assets 
+                WHERE value_usd > 2
+            """)
+            valuable_assets = cursor.fetchall()

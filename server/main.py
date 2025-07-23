@@ -366,24 +366,25 @@ class EthereumAssetFetcher(AssetFetcher):
         self.alchemy_url = f"https://eth-mainnet.g.alchemy.com/v2/{alchemy_api_key}"
         self.w3 = Web3(Web3.HTTPProvider(self.alchemy_url))
 
-    def _is_legitimate_nft(self, contract_name: str, contract_address: str) -> bool:
+    def _is_legitimate_nft(self, contract_name: str,
+                           contract_address: str) -> bool:
         """
         Validate if an NFT collection is legitimate based on name and contract address.
         Returns True for known legitimate collections, False for obvious spam.
         """
         if not contract_name:
             return False
-            
+
         contract_name_lower = contract_name.lower()
         contract_address_lower = contract_address.lower()
-        
+
         # Known legitimate collections
         legitimate_collections = [
-            "mutant ape yacht club", "mayc", "boredapeyachtclub", 
-            "bored ape yacht club", "bayc", "cryptopunks", "azuki", 
-            "doodles", "pudgypenguins", "0n1 force", "cool cats"
+            "mutant ape yacht club", "mayc", "boredapeyachtclub",
+            "bored ape yacht club", "bayc", "cryptopunks", "azuki", "doodles",
+            "pudgypenguins", "0n1 force", "cool cats"
         ]
-        
+
         # Known legitimate contract addresses
         legitimate_contracts = [
             "0x60e4d786628fea6478f785a6d7e704777c86a7c6",  # MAYC
@@ -391,21 +392,22 @@ class EthereumAssetFetcher(AssetFetcher):
             "0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb",  # CryptoPunks
             "0xed5af388653567af2f388e6224dc7c4b3241c544",  # Azuki
         ]
-        
+
         # Check for legitimate collections
-        is_legitimate = (
-            any(legit in contract_name_lower for legit in legitimate_collections) or
-            contract_address_lower in [addr.lower() for addr in legitimate_contracts]
-        )
-        
+        is_legitimate = (any(legit in contract_name_lower
+                             for legit in legitimate_collections)
+                         or contract_address_lower
+                         in [addr.lower() for addr in legitimate_contracts])
+
         # Spam indicators
         spam_indicators = [
-            "visit ", "claim ", "access ", ".com", ".net", ".org", 
-            "award", "gift", "airdrop", "mysterybox", "recipient", "rewards"
+            "visit ", "claim ", "access ", ".com", ".net", ".org", "award",
+            "gift", "airdrop", "mysterybox", "recipient", "rewards"
         ]
-        
-        is_spam = any(indicator in contract_name_lower for indicator in spam_indicators)
-        
+
+        is_spam = any(indicator in contract_name_lower
+                      for indicator in spam_indicators)
+
         # Return True only if legitimate and not spam
         return is_legitimate or (not is_spam and len(contract_name) >= 3)
 
@@ -415,12 +417,9 @@ class EthereumAssetFetcher(AssetFetcher):
         """
         try:
             contract = nft_data.get("contract", {})
-            return (
-                isinstance(contract, dict) and
-                contract.get("address") and
-                contract.get("name") and
-                nft_data.get("tokenId") is not None
-            )
+            return (isinstance(contract, dict) and contract.get("address")
+                    and contract.get("name")
+                    and nft_data.get("tokenId") is not None)
         except Exception:
             return False
 
@@ -609,7 +608,9 @@ class EthereumAssetFetcher(AssetFetcher):
                     try:
                         # Validate NFT data structure first
                         if not self._validate_nft_data(nft):
-                            print(f"⚠️ [ETH NFT] Invalid NFT data structure, skipping")
+                            print(
+                                f"⚠️ [ETH NFT] Invalid NFT data structure, skipping"
+                            )
                             continue
 
                         # Extract contract information
@@ -621,16 +622,25 @@ class EthereumAssetFetcher(AssetFetcher):
                             continue
 
                         # Skip hidden collections (use lowercase for comparison)
-                        if contract_address in [addr.lower() for addr in hidden_addresses]:
-                            print(f"🙈 [ETH NFT] Skipping hidden collection: {contract_address}")
+                        if contract_address in [
+                                addr.lower() for addr in hidden_addresses
+                        ]:
+                            print(
+                                f"🙈 [ETH NFT] Skipping hidden collection: {contract_address}"
+                            )
                             continue
 
                         # Use the validation helper function
-                        if not self._is_legitimate_nft(contract_name, contract_address):
-                            print(f"🚫 [ETH NFT] Skipping spam/invalid NFT: {contract_name}")
+                        if not self._is_legitimate_nft(contract_name,
+                                                       contract_address):
+                            print(
+                                f"🚫 [ETH NFT] Skipping spam/invalid NFT: {contract_name}"
+                            )
                             continue
 
-                        print(f"✅ [ETH NFT] Processing legitimate NFT: {contract_name}")
+                        print(
+                            f"✅ [ETH NFT] Processing legitimate NFT: {contract_name}"
+                        )
 
                         # Initialize collection
                         if contract_address not in collections:
@@ -795,13 +805,14 @@ class EthereumAssetFetcher(AssetFetcher):
                     eth_price_usd = 3750.0  # Current approximate ETH price
 
                     # Try OpenSea first - with proper None checking
-                    if ("openSea" in data and 
-                        isinstance(data["openSea"], dict) and 
-                        "floorPrice" in data["openSea"] and 
-                        data["openSea"]["floorPrice"] is not None):
-                        
+                    if ("openSea" in data
+                            and isinstance(data["openSea"], dict)
+                            and "floorPrice" in data["openSea"]
+                            and data["openSea"]["floorPrice"] is not None):
+
                         try:
-                            floor_price_eth = float(data["openSea"]["floorPrice"])
+                            floor_price_eth = float(
+                                data["openSea"]["floorPrice"])
                             if floor_price_eth > 0:
                                 floor_price_usd = floor_price_eth * eth_price_usd
                                 print(
@@ -809,16 +820,19 @@ class EthereumAssetFetcher(AssetFetcher):
                                 )
                                 return floor_price_usd
                         except (ValueError, TypeError) as e:
-                            print(f"⚠️ [FLOOR PRICE] OpenSea price conversion error: {e}")
+                            print(
+                                f"⚠️ [FLOOR PRICE] OpenSea price conversion error: {e}"
+                            )
 
                     # Try LooksRare as backup - with proper None checking
-                    if ("looksRare" in data and 
-                        isinstance(data["looksRare"], dict) and 
-                        "floorPrice" in data["looksRare"] and 
-                        data["looksRare"]["floorPrice"] is not None):
-                        
+                    if ("looksRare" in data
+                            and isinstance(data["looksRare"], dict)
+                            and "floorPrice" in data["looksRare"]
+                            and data["looksRare"]["floorPrice"] is not None):
+
                         try:
-                            floor_price_eth = float(data["looksRare"]["floorPrice"])
+                            floor_price_eth = float(
+                                data["looksRare"]["floorPrice"])
                             if floor_price_eth > 0:
                                 floor_price_usd = floor_price_eth * eth_price_usd
                                 print(
@@ -826,24 +840,31 @@ class EthereumAssetFetcher(AssetFetcher):
                                 )
                                 return floor_price_usd
                         except (ValueError, TypeError) as e:
-                            print(f"⚠️ [FLOOR PRICE] LooksRare price conversion error: {e}")
+                            print(
+                                f"⚠️ [FLOOR PRICE] LooksRare price conversion error: {e}"
+                            )
 
                     # Check other marketplaces with proper validation
                     marketplaces = [
                         key for key in data.keys()
-                        if isinstance(data[key], dict) and key not in ["openSea", "looksRare"]
+                        if isinstance(data[key], dict)
+                        and key not in ["openSea", "looksRare"]
                     ]
-                    
+
                     if marketplaces:
-                        print(f"🔍 [FLOOR PRICE] Checking additional marketplaces: {marketplaces}")
+                        print(
+                            f"🔍 [FLOOR PRICE] Checking additional marketplaces: {marketplaces}"
+                        )
                         for marketplace in marketplaces:
                             marketplace_data = data[marketplace]
-                            if (isinstance(marketplace_data, dict) and
-                                "floorPrice" in marketplace_data and
-                                marketplace_data["floorPrice"] is not None):
-                                
+                            if (isinstance(marketplace_data, dict)
+                                    and "floorPrice" in marketplace_data
+                                    and marketplace_data["floorPrice"]
+                                    is not None):
+
                                 try:
-                                    floor_price_eth = float(marketplace_data["floorPrice"])
+                                    floor_price_eth = float(
+                                        marketplace_data["floorPrice"])
                                     if floor_price_eth > 0:
                                         floor_price_usd = floor_price_eth * eth_price_usd
                                         print(
@@ -851,7 +872,9 @@ class EthereumAssetFetcher(AssetFetcher):
                                         )
                                         return floor_price_usd
                                 except (ValueError, TypeError) as e:
-                                    print(f"⚠️ [FLOOR PRICE] {marketplace} price conversion error: {e}")
+                                    print(
+                                        f"⚠️ [FLOOR PRICE] {marketplace} price conversion error: {e}"
+                                    )
 
                     print(
                         f"⚠️ [FLOOR PRICE] No valid floor price data for {contract_address[:12]}..."
@@ -3631,38 +3654,41 @@ async def update_portfolio_data_new():
                 # For NFT assets, get floor price from AssetData object properly
                 floor_price = 0.0
                 balance = asset.get('balance', 0)
-                
+
                 # CRITICAL FIX: Extract floor_price from the original AssetData object
                 # The asset dict is created from AssetData, so we need to access the floor_price properly
                 if hasattr(asset, 'floor_price') and asset.floor_price:
                     floor_price = float(asset.floor_price)
                 elif isinstance(asset, dict) and 'floor_price' in asset:
-                    floor_price = float(asset['floor_price']) if asset['floor_price'] else 0.0
-                
+                    floor_price = float(
+                        asset['floor_price']) if asset['floor_price'] else 0.0
+
                 price_usd = floor_price
                 value_usd = price_usd * balance if price_usd > 0 else 0
-                
+
                 # Safely handle NFT metadata
                 token_ids = []
                 image_url = None
-                
+
                 if hasattr(asset, 'token_ids') and asset.token_ids:
                     token_ids = asset.token_ids
                 elif isinstance(asset, dict) and 'token_ids' in asset:
-                    token_ids = asset['token_ids'] if isinstance(asset['token_ids'], list) else []
-                
+                    token_ids = asset['token_ids'] if isinstance(
+                        asset['token_ids'], list) else []
+
                 if hasattr(asset, 'image_url') and asset.image_url:
                     image_url = asset.image_url
                 elif isinstance(asset, dict) and 'image_url' in asset:
-                    image_url = asset['image_url'] if isinstance(asset['image_url'], str) else None
-                
+                    image_url = asset['image_url'] if isinstance(
+                        asset['image_url'], str) else None
+
                 nft_metadata = json.dumps({
                     "token_ids": token_ids,
                     "count": balance,
                     "image_url": image_url,
                     "floor_price": floor_price
                 })
-                
+
                 print(
                     f"🖼️ [NFT DEBUG] Processing NFT: {asset.get('symbol', 'Unknown')} - Floor: ${floor_price} - Value: ${value_usd:.2f}"
                 )
@@ -3856,13 +3882,14 @@ async def update_portfolio_data_new():
                      is_nft, nft_metadata, floor_price, image_url, purchase_price, total_invested, 
                      realized_pnl, unrealized_pnl, total_return_pct)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (wallet_id, token_address, asset.get('symbol', 'Unknown'), asset.get('name', 'Unknown'),
-                     asset.get('balance', 0), asset.get('balance_formatted', '0.000000'), price_usd,
-                     value_usd, is_nft, nft_metadata,
-                     floor_price if is_nft else 0,
-                     image_url if is_nft else None,
-                     purchase_price, total_invested, realized_pnl,
-                     unrealized_pnl, total_return_pct))
+                """, (wallet_id, token_address, asset.get('symbol', 'Unknown'),
+                      asset.get('name', 'Unknown'), asset.get('balance', 0),
+                      asset.get('balance_formatted',
+                                '0.000000'), price_usd, value_usd, is_nft,
+                      nft_metadata, floor_price if is_nft else 0,
+                      image_url if is_nft else None, purchase_price,
+                      total_invested, realized_pnl, unrealized_pnl,
+                      total_return_pct))
 
                 # Debug log to verify correct values and protect ETH
                 if asset['symbol'] == 'ETH':
@@ -3881,7 +3908,7 @@ async def update_portfolio_data_new():
                 # Debug NFT insertion
                 if is_nft:
                     print(
-                        f"🖼️ [DATABASE] Inserted NFT: {asset['symbol']} - {asset['name']} - Count: {asset['balance']} - Floor: ${asset.get('floor_price', 9)}"
+                        f"🖼️ [DATABASE] Inserted NFT: {asset['symbol']} - {asset['name']} - Count: {asset['balance']} - Floor: ${asset.floor_price}"
                     )
                     print(f"🖼️ [DATABASE] NFT metadata: {nft_metadata}")
                     print(f"🖼️ [DATABASE] Image URL: {asset.get('image_url')}")
