@@ -1911,6 +1911,27 @@ const App = () => {
             })),
           );
 
+          // Process NFTs from savedData.nfts if available
+          const processedNFTs = (savedData.nfts || []).map((nft) => ({
+            id: nft.id || nft.contract_address,
+            contract_address: nft.contract_address,
+            symbol: nft.symbol,
+            name: nft.name,
+            item_count: nft.item_count || 1,
+            token_ids: nft.token_ids || [],
+            floor_price_usd: nft.floor_price_usd || 0,
+            total_value_usd: nft.total_value_usd || 0,
+            image_url: nft.image_url,
+            purchase_price: nft.purchase_price || 0,
+            total_invested: nft.total_invested || 0,
+            realized_pnl: nft.realized_pnl || 0,
+            unrealized_pnl: nft.unrealized_pnl || 0,
+            total_return_pct: nft.total_return_pct || 0,
+            notes: nft.notes || "",
+          }));
+
+          console.log(`🖼️ [NFT DEBUG] Processed ${processedNFTs.length} NFTs from backend:`, processedNFTs);
+
           const transformedAssets = savedData.assets.map((asset, index) => {
             console.log(
               `🔄 [FRONTEND DEBUG] Transforming asset ${index + 1}:`,
@@ -2001,6 +2022,7 @@ const App = () => {
 
           const portfolioUpdate = {
             assets: transformedAssets,
+            nfts: processedNFTs,
             balanceHistory: balanceHistory,
             totalValue: savedTotalValue,
             performance24h: savedData.performance_24h || 0,
@@ -2548,25 +2570,44 @@ const App = () => {
     }
   };
 
-  // Calculate metrics with safe fallbacks
+  // Calculate metrics with safe fallbacks - include valuable NFTs
   const visibleAssets = (portfolioData.assets || []).filter(
     (asset) => asset && !hiddenAssets.includes(asset.id),
   );
 
-  const totalValue = visibleAssets.reduce(
-    (sum, asset) => sum + (asset?.valueUSD || 0),
+  // Include valuable NFTs from portfolioData.nfts if they exist
+  const valuableNFTs = (portfolioData.nfts || []).filter(
+    (nft) => nft && nft.floor_price_usd > 1 && !hiddenAssets.includes(nft.id),
+  );
+
+  // Combine regular assets and valuable NFTs for calculations
+  const allValuedItems = [
+    ...visibleAssets,
+    ...valuableNFTs.map(nft => ({
+      ...nft,
+      valueUSD: nft.total_value_usd || nft.floor_price_usd * nft.item_count,
+      symbol: nft.symbol,
+      name: nft.name,
+      isNFT: true
+    }))
+  ];
+
+  const totalValue = allValuedItems.reduce(
+    (sum, item) => sum + (item?.valueUSD || item?.total_value_usd || 0),
     0,
   );
 
   const topAsset =
-    visibleAssets.length > 0
-      ? visibleAssets.reduce((prev, current) =>
-          prev.valueUSD > current.valueUSD ? prev : current,
-        )
+    allValuedItems.length > 0
+      ? allValuedItems.reduce((prev, current) => {
+          const prevValue = prev.valueUSD || prev.total_value_usd || 0;
+          const currentValue = current.valueUSD || current.total_value_usd || 0;
+          return prevValue > currentValue ? prev : current;
+        })
       : null;
 
   const topAssetWeight = topAsset
-    ? ((topAsset.valueUSD / totalValue) * 100).toFixed(1)
+    ? (((topAsset.valueUSD || topAsset.total_value_usd || 0) / totalValue) * 100).toFixed(1)
     : 0;
 
   // Calculate performance vs raised capital
@@ -2866,7 +2907,7 @@ const App = () => {
 
           <MetricCard
             title="Assets"
-            value={visibleAssets.length}
+            value={allValuedItems.length}
             change="Active positions"
             changeType="white"
           />
@@ -3105,15 +3146,13 @@ const App = () => {
                 Current Positions
               </h3>
               <p className="text-xs sm:text-sm text-gray-400">
-                {visibleAssets.length} positions • $
-                {visibleAssets
-                  .reduce((sum, asset) => sum + asset.valueUSD, 0)
-                  .toLocaleString()}
+                {allValuedItems.length} positions • $
+                {totalValue.toLocaleString()}
               </p>
             </div>
           </div>
 
-          {visibleAssets.length === 0 ? (
+          {allValuedItems.length === 0 ? (
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 sm:p-8 text-center">
               <div className="mb-4">
                 <div className="w-16 h-16 mx-auto mb-4 bg-gray-800 rounded-full flex items-center justify-center">
@@ -3146,12 +3185,63 @@ const App = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {/* Regular Assets */}
               {visibleAssets.map((asset) => (
                 <AssetCard
                   key={asset.id}
                   asset={asset}
                   onClick={() => setSelectedAsset(asset)}
                   onHide={() => toggleHiddenAsset(asset)}
+                  isEditor={isEditor}
+                  totalValue={totalValue}
+                />
+              ))}
+              
+              {/* Valuable NFTs */}
+              {valuableNFTs.map((nft) => (
+                <AssetCard
+                  key={nft.id}
+                  asset={{
+                    id: nft.id,
+                    symbol: nft.symbol,
+                    name: nft.name,
+                    balance: `${nft.item_count} NFTs`,
+                    priceUSD: nft.floor_price_usd,
+                    valueUSD: nft.total_value_usd || nft.floor_price_usd * nft.item_count,
+                    purchase_price: nft.purchase_price || 0,
+                    total_invested: nft.total_invested || 0,
+                    realized_pnl: nft.realized_pnl || 0,
+                    unrealized_pnl: nft.unrealized_pnl || 0,
+                    total_return_pct: nft.total_return_pct || 0,
+                    notes: nft.notes || "",
+                    isNFT: true,
+                    floorPrice: nft.floor_price_usd,
+                    imageUrl: nft.image_url,
+                    tokenIds: nft.token_ids || [],
+                  }}
+                  onClick={() => setSelectedAsset({
+                    id: nft.id,
+                    symbol: nft.symbol,
+                    name: nft.name,
+                    balance: `${nft.item_count} NFTs`,
+                    priceUSD: nft.floor_price_usd,
+                    valueUSD: nft.total_value_usd || nft.floor_price_usd * nft.item_count,
+                    purchase_price: nft.purchase_price || 0,
+                    total_invested: nft.total_invested || 0,
+                    realized_pnl: nft.realized_pnl || 0,
+                    unrealized_pnl: nft.unrealized_pnl || 0,
+                    total_return_pct: nft.total_return_pct || 0,
+                    notes: nft.notes || "",
+                    isNFT: true,
+                    floorPrice: nft.floor_price_usd,
+                    imageUrl: nft.image_url,
+                    tokenIds: nft.token_ids || [],
+                  })}
+                  onHide={() => toggleHiddenAsset({
+                    id: nft.id,
+                    symbol: nft.symbol,
+                    name: nft.name
+                  })}
                   isEditor={isEditor}
                   totalValue={totalValue}
                 />
