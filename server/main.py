@@ -642,8 +642,8 @@ class EthereumAssetFetcher(AssetFetcher):
                 # Convert collections to AssetData objects
                 for contract_address, collection_data in collections.items():
                     try:
-                        # Simple floor price estimation
-                        floor_price_usd = 10.0 if collection_data["count"] > 1 else 1.0
+                        # Get real floor price from Alchemy API
+                        floor_price_usd = await self._fetch_floor_price(contract_address)
 
                         # Create NFT asset
                         nft_asset = AssetData(
@@ -682,6 +682,71 @@ class EthereumAssetFetcher(AssetFetcher):
 
         print(f"🖼️ [ETH NFT] Final result: {len(assets)} NFT collections")
         return assets
+
+    async def _fetch_floor_price(self, contract_address: str) -> float:
+        """
+        Fetch real floor price from Alchemy NFT Floor Price API.
+        Falls back to 0 if API fails.
+        """
+        try:
+            # Extract API key from alchemy_url
+            api_key = self.alchemy_url.split("/v2/")[-1]
+            
+            # Use Alchemy Floor Price API endpoint
+            floor_price_url = f"https://eth-mainnet.g.alchemy.com/nft/v3/{api_key}/getFloorPrice"
+            
+            params = {"contractAddress": contract_address}
+            
+            print(f"🔍 [FLOOR PRICE] Fetching floor price for {contract_address[:12]}...")
+            
+            # Use requests library like the Alchemy sample
+            import requests
+            
+            response = requests.get(
+                floor_price_url,
+                params=params,
+                headers={"accept": "application/json"},
+                timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Parse Alchemy floor price response
+                if "openSea" in data and "floorPrice" in data["openSea"]:
+                    floor_price_eth = data["openSea"]["floorPrice"]
+                    
+                    # Convert ETH to USD (approximate ETH price)
+                    eth_price_usd = 3500.0  # Reasonable fallback ETH price
+                    floor_price_usd = floor_price_eth * eth_price_usd
+                    
+                    print(f"✅ [FLOOR PRICE] {contract_address[:12]}... = {floor_price_eth} ETH (${floor_price_usd:.2f})")
+                    return floor_price_usd
+                    
+                elif "looksRare" in data and "floorPrice" in data["looksRare"]:
+                    floor_price_eth = data["looksRare"]["floorPrice"]
+                    
+                    # Convert ETH to USD
+                    eth_price_usd = 3500.0
+                    floor_price_usd = floor_price_eth * eth_price_usd
+                    
+                    print(f"✅ [FLOOR PRICE] {contract_address[:12]}... = {floor_price_eth} ETH (${floor_price_usd:.2f}) [LooksRare]")
+                    return floor_price_usd
+                    
+                else:
+                    print(f"⚠️ [FLOOR PRICE] No floor price data available for {contract_address[:12]}...")
+                    return 0.0
+                    
+            else:
+                print(f"❌ [FLOOR PRICE] API error {response.status_code} for {contract_address[:12]}...")
+                return 0.0
+                
+        except requests.exceptions.Timeout:
+            print(f"⏰ [FLOOR PRICE] Timeout fetching floor price for {contract_address[:12]}...")
+            return 0.0
+        except Exception as e:
+            print(f"❌ [FLOOR PRICE] Error fetching floor price for {contract_address[:12]}...: {e}")
+            return 0.0
 
     
 
