@@ -342,12 +342,34 @@ class AssetData:
         self.realized_pnl = realized_pnl
 
 
+class NFTData:
+    def __init__(self,
+                 contract_address: str,
+                 symbol: str,
+                 name: str,
+                 item_count: int,
+                 token_ids: List[str] = None,
+                 floor_price_usd: float = 0,
+                 image_url: str = None):
+        self.contract_address = contract_address
+        self.symbol = symbol
+        self.name = name
+        self.item_count = item_count
+        self.token_ids = token_ids or []
+        self.floor_price_usd = floor_price_usd
+        self.image_url = image_url
+
+
 # Abstract base classes for chain-specific implementations
 class AssetFetcher(ABC):
 
     @abstractmethod
     async def fetch_assets(self, wallet_address: str,
                            hidden_addresses: set) -> List[AssetData]:
+        pass
+
+    @abstractmethod
+    async def fetch_nfts(self, wallet_address: str, hidden_addresses: set) -> List[NFTData]:
         pass
 
 
@@ -449,17 +471,186 @@ class EthereumAssetFetcher(AssetFetcher):
                           self._fetch_erc20_tokens(wallet_address,
                                                    hidden_addresses))
 
-            # Get NFTs
-            assets.extend(await self._fetch_nfts(wallet_address,
-                                                 hidden_addresses))
-
         except Exception as e:
             print(f"❌ Ethereum asset fetching error: {e}")
 
         return assets
 
-    async def _fetch_erc20_tokens(self, wallet_address: str,
-                                  hidden_addresses: set) -> List[AssetData]:
+    async def fetch_nfts(self, wallet_address: str, hidden_addresses: set) -> List[NFTData]:
+        nfts = []
+
+        try:
+            print(f"🖼️ [ETH NFT] Starting NFT query for wallet: {wallet_address[:10]}...")
+
+            api_key = self.alchemy_url.split("/v2/")[-1]
+            nft_url = f"https://eth-mainnet.g.alchemy.com/nft/v3/{api_key}/getNFTsForOwner"
+
+            params = {
+                "owner": wallet_address,
+                "withMetadata": "true",
+                "pageSize": "100"
+            }
+
+            import requests
+
+            response = requests.get(nft_url, params=params, headers={"accept": "application/json"}, timeout=30.0)
+
+            if response.status_code != 200:
+                print(f"❌ [ETH NFT] API failed with status: {response.status_code}")
+                return nfts
+
+            data = response.json()
+
+            if "error" in data:
+                print(f"❌ [ETH NFT] API error: {data['error']}")
+                return nfts
+
+            owned_nfts = data.get("ownedNfts", [])
+
+            if not owned_nfts:
+                print(f"🖼️ [ETH NFT] No NFTs found for wallet")
+                return nfts
+
+            print(f"🖼️ [ETH NFT] Found {len(owned_nfts)} NFTs, processing collections...")
+
+            # Group NFTs by collection
+            collections = {}
+
+            for nft in owned_nfts:
+                try:
+                    if not self._validate_nft_data(nft):
+                        continue
+
+                    contract = nft.get("contract", {})
+                    contract_address = contract.get("address", "").lower()
+                    contract_name = contract.get("name", "")
+
+                    if not contract_address:
+                        continue
+
+                    if contract_address in [addr.lower() for addr in hidden_addresses]:
+                        continue
+
+                    if not self._is_legitimate_nft(contract_name, contract_address):
+                        continue
+
+                    if contract_address not in collections:
+                        collections[contract_address] = {
+                            "name": contract.get("name", "Unknown Collection"),
+                            "symbol": contract.get("symbol", "NFT"),
+                            "count": 0,
+                            "token_ids": [],
+                            "image_url": None
+                        }
+
+                    collection = collections[contract_address]
+                    collection["count"] += 1
+
+                    token_id = nft.get("tokenId")
+                    if token_id and len(collection["token_ids"]) < 10:
+                        try:
+                            if isinstance(token_id, str) and token_id.startswith("0x"):
+                                token_id_decimal = str(int(token_id, 16))
+                            else:
+                                token_id_decimal = str(token_id)
+                            collection["token_ids"].append(token_id_decimal)
+                        except ValueError:
+                            pass
+
+                    if not collection["image_url"]:
+                        image_sources = [
+                            nft.get("image", {}).get("originalUrl") if isinstance(nft.get("image"), dict) else nft.get("image"),
+                            nft.get("metadata", {}).get("image")
+                        ]
+
+                        for img_url in image_sources:
+                            if img_url and isinstance(img_url, str) and img_url.startswith("http"):
+                                collection["image_url"] = img_url
+                                break
+
+                except Exception as nft_error:
+                    print(f"⚠️ [ETH NFT] Error processing NFT: {nft_error}")
+                    continue
+
+            # Convert collections to NFTData objects
+            for contract_address, collection_data in collections.items():
+                try:
+                    floor_price_usd = await self._fetch_floor_price(contract_address)
+
+                    nft_asset = NFTData(
+                        contract_address=contract_address,
+                        symbol=collection_data["symbol"],
+                        name=collection_data["name"],
+                        item_count=collection_data["count"],
+                        token_ids=collection_data["token_ids"],
+                        floor_price_usd=floor_price_usd,
+                        image_url=collection_data.get("image_url"))
+
+                    nfts.append(nft_asset)
+
+                    print(f"✅ [ETH NFT] Added collection: {collection_data['name']} ({collection_data['count']} items, floor: ${floor_price_usd})")
+
+                except Exception as asset_error:
+                    print(f"❌ [ETH NFT] Error creating NFT for {contract_address}: {asset_error}")
+                    continue
+
+        except Exception as e:
+            print(f"❌ [ETH NFT] Unexpected error: {e}")
+
+        return nfts
+
+    async def _fetch_floor_price(self, contract_address: str) -> float:
+        try:
+            api_key = self.alchemy_url.split("/v2/")[-1]
+            floor_price_url = f"https://eth-mainnet.g.alchemy.com/nft/v3/{api_key}/getFloorPrice"
+
+            params = {"contractAddress": contract_address}
+
+            import requests
+
+            response = requests.get(floor_price_url, params=params, headers={"accept": "application/json"}, timeout=15.0)
+
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    floor_price_usd = 0.0
+                    eth_price_usd = 3750.0  # Current approximate ETH price
+
+                    # Try OpenSea first
+                    if ("openSea" in data and isinstance(data["openSea"], dict)
+                            and "floorPrice" in data["openSea"] and data["openSea"]["floorPrice"] is not None):
+                        try:
+                            floor_price_eth = float(data["openSea"]["floorPrice"])
+                            if floor_price_eth > 0:
+                                floor_price_usd = floor_price_eth * eth_price_usd
+                                return floor_price_usd
+                        except (ValueError, TypeError):
+                            pass
+
+                    # Try LooksRare as backup
+                    if ("looksRare" in data and isinstance(data["looksRare"], dict)
+                            and "floorPrice" in data["looksRare"] and data["looksRare"]["floorPrice"] is not None):
+                        try:
+                            floor_price_eth = float(data["looksRare"]["floorPrice"])
+                            if floor_price_eth > 0:
+                                floor_price_usd = floor_price_eth * eth_price_usd
+                                return floor_price_usd
+                        except (ValueError, TypeError):
+                            pass
+
+                    return 0.0
+
+                except (ValueError, TypeError, KeyError) as parse_error:
+                    print(f"❌ [FLOOR PRICE] JSON parsing error: {parse_error}")
+                    return 0.0
+
+            return 0.0
+
+        except Exception as e:
+            print(f"❌ [FLOOR PRICE] Error fetching floor price: {e}")
+            return 0.0
+
+    async def _fetch_erc20_tokens(self, wallet_address: str, hidden_addresses: set) -> List[AssetData]:
         assets = []
 
         try:
@@ -468,22 +659,18 @@ class EthereumAssetFetcher(AssetFetcher):
                                              json={
                                                  "id": 1,
                                                  "jsonrpc": "2.0",
-                                                 "method":
-                                                 "alchemy_getTokenBalances",
+                                                 "method": "alchemy_getTokenBalances",
                                                  "params": [wallet_address]
                                              })
 
                 if response.status_code == 200:
                     data = response.json()
-                    token_balances = data.get("result",
-                                              {}).get("tokenBalances", [])
+                    token_balances = data.get("result", {}).get("tokenBalances", [])
 
                     for token_balance in token_balances:
-                        if token_balance.get("tokenBalance") and int(
-                                token_balance["tokenBalance"], 16) > 0:
+                        if token_balance.get("tokenBalance") and int(token_balance["tokenBalance"], 16) > 0:
                             try:
-                                contract_address = token_balance[
-                                    "contractAddress"].lower()
+                                contract_address = token_balance["contractAddress"].lower()
 
                                 if contract_address in hidden_addresses:
                                     continue
@@ -499,413 +686,25 @@ class EthereumAssetFetcher(AssetFetcher):
                                     })
 
                                 if metadata_response.status_code == 200:
-                                    metadata = metadata_response.json().get(
-                                        "result", {})
-                                    balance_int = int(
-                                        token_balance["tokenBalance"], 16)
+                                    metadata = metadata_response.json().get("result", {})
+                                    balance_int = int(token_balance["tokenBalance"], 16)
                                     decimals = metadata.get("decimals", 18)
-                                    balance_formatted = balance_int / (
-                                        10**decimals)
+                                    balance_formatted = balance_int / (10**decimals)
 
                                     if balance_formatted > 0.001:  # Filter out dust
-                                        assets.append(
-                                            AssetData(
-                                                token_address=contract_address,
-                                                symbol=metadata.get(
-                                                    "symbol", "UNKNOWN"),
-                                                name=metadata.get(
-                                                    "name", "Unknown Token"),
-                                                balance=balance_formatted,
-                                                balance_formatted=
-                                                f"{balance_formatted:.6f}",
-                                                decimals=decimals))
+                                        assets.append(AssetData(
+                                            token_address=contract_address,
+                                            symbol=metadata.get("symbol", "UNKNOWN"),
+                                            name=metadata.get("name", "Unknown Token"),
+                                            balance=balance_formatted,
+                                            balance_formatted=f"{balance_formatted:.6f}",
+                                            decimals=decimals))
                             except Exception as e:
-                                print(
-                                    f"❌ Error processing Ethereum token {contract_address}: {e}"
-                                )
+                                print(f"❌ Error processing Ethereum token {contract_address}: {e}")
         except Exception as e:
             print(f"❌ Error fetching Ethereum ERC-20 tokens: {e}")
 
         return assets
-
-    async def _fetch_nfts(self, wallet_address: str,
-                          hidden_addresses: set) -> List[AssetData]:
-        """
-        NFT fetching using Alchemy's REST API following the official sample pattern.
-        Returns AssetData objects with is_nft=True for each collection.
-        """
-        assets = []
-
-        try:
-            print(
-                f"🖼️ [ETH NFT] Starting NFT query for wallet: {wallet_address[:10]}..."
-            )
-
-            # Extract API key from alchemy_url
-            api_key = self.alchemy_url.split("/v2/")[-1]
-
-            # Follow Alchemy sample pattern: GET request with query parameters
-            nft_url = f"https://eth-mainnet.g.alchemy.com/nft/v3/{api_key}/getNFTsForOwner"
-
-            params = {
-                "owner": wallet_address,
-                "withMetadata": "true",
-                "pageSize": "100"
-            }
-
-            print(
-                f"🖼️ [ETH NFT] Making REST API request following Alchemy sample..."
-            )
-            print(f"🖼️ [ETH NFT] URL: {nft_url}")
-
-            # Use requests library like the Alchemy sample
-            import requests
-
-            try:
-                response = requests.get(nft_url,
-                                        params=params,
-                                        headers={"accept": "application/json"},
-                                        timeout=30.0)
-
-                print(
-                    f"🔍 [ETH NFT] API Response status: {response.status_code}")
-
-                if response.status_code != 200:
-                    print(
-                        f"❌ [ETH NFT] API failed with status: {response.status_code}"
-                    )
-                    print(
-                        f"❌ [ETH NFT] Error response: {response.text[:200]}..."
-                    )
-                    return assets
-
-                # Parse JSON response like the Alchemy sample
-                data = response.json()
-
-                # Check for API errors
-                if "error" in data:
-                    print(f"❌ [ETH NFT] API error: {data['error']}")
-                    return assets
-
-                # Extract NFTs from response (REST API format)
-                owned_nfts = data.get("ownedNfts", [])
-                total_count = data.get("totalCount", len(owned_nfts))
-
-                if not owned_nfts:
-                    print(
-                        f"🖼️ [ETH NFT] No NFTs found for wallet (totalCount: {total_count})"
-                    )
-                    return assets
-
-                print(
-                    f"🖼️ [ETH NFT] Found {len(owned_nfts)} NFTs, processing collections..."
-                )
-
-                # Group NFTs by collection
-                collections = {}
-
-                for nft in owned_nfts:
-                    try:
-                        # Validate NFT data structure first
-                        if not self._validate_nft_data(nft):
-                            print(
-                                f"⚠️ [ETH NFT] Invalid NFT data structure, skipping"
-                            )
-                            continue
-
-                        # Extract contract information
-                        contract = nft.get("contract", {})
-                        contract_address = contract.get("address", "").lower()
-                        contract_name = contract.get("name", "")
-
-                        if not contract_address:
-                            continue
-
-                        # Skip hidden collections (use lowercase for comparison)
-                        if contract_address in [
-                                addr.lower() for addr in hidden_addresses
-                        ]:
-                            print(
-                                f"🙈 [ETH NFT] Skipping hidden collection: {contract_address}"
-                            )
-                            continue
-
-                        # Use the validation helper function
-                        if not self._is_legitimate_nft(contract_name,
-                                                       contract_address):
-                            print(
-                                f"🚫 [ETH NFT] Skipping spam/invalid NFT: {contract_name}"
-                            )
-                            continue
-
-                        print(
-                            f"✅ [ETH NFT] Processing legitimate NFT: {contract_name}"
-                        )
-
-                        # Initialize collection
-                        if contract_address not in collections:
-                            collections[contract_address] = {
-                                "name": contract.get("name",
-                                                     "Unknown Collection"),
-                                "symbol": contract.get("symbol", "NFT"),
-                                "count": 0,
-                                "token_ids": [],
-                                "image_url": None
-                            }
-                            print(
-                                f"🆕 [ETH NFT] New collection initialized: {contract.get('name')} ({contract_address})"
-                            )
-
-                        # Add this NFT to the collection
-                        collection = collections[contract_address]
-                        collection["count"] += 1
-
-                        # Track token ID
-                        token_id = nft.get("tokenId")
-                        if token_id and len(collection["token_ids"]) < 10:
-                            try:
-                                if isinstance(
-                                        token_id,
-                                        str) and token_id.startswith("0x"):
-                                    token_id_decimal = str(int(token_id, 16))
-                                else:
-                                    token_id_decimal = str(token_id)
-                                collection["token_ids"].append(
-                                    token_id_decimal)
-                            except ValueError:
-                                pass
-
-                        # Get image URL from metadata
-                        if not collection["image_url"]:
-                            image_sources = [
-                                nft.get("image", {}).get("originalUrl")
-                                if isinstance(nft.get("image"), dict) else
-                                nft.get("image"),
-                                nft.get("metadata", {}).get("image")
-                            ]
-
-                            for img_url in image_sources:
-                                if img_url and isinstance(
-                                        img_url,
-                                        str) and img_url.startswith("http"):
-                                    collection["image_url"] = img_url
-                                    break
-
-                    except Exception as nft_error:
-                        print(
-                            f"⚠️ [ETH NFT] Error processing NFT: {nft_error}")
-                        continue
-
-                print(
-                    f"🖼️ [ETH NFT] Processed {len(collections)} unique collections"
-                )
-
-                # Convert collections to AssetData objects with proper floor price fetching
-                print(
-                    f"🖼️ [ETH NFT] Converting {len(collections)} collections to assets..."
-                )
-
-                for contract_address, collection_data in collections.items():
-                    try:
-                        print(
-                            f"🔍 [ETH NFT] Processing collection: {collection_data['name']} ({contract_address})"
-                        )
-
-                        # Get real floor price from Alchemy API - this is the critical step
-                        print(
-                            f"💰 [ETH NFT] Fetching floor price for {collection_data['name']}..."
-                        )
-                        floor_price_usd = await self._fetch_floor_price(
-                            contract_address)
-                        print(
-                            f"💰 [ETH NFT] Floor price result for {collection_data['name']}: ${floor_price_usd}"
-                        )
-
-                        # Create NFT asset with the fetched floor price
-                        nft_asset = AssetData(
-                            token_address=contract_address,
-                            symbol=collection_data["symbol"],
-                            name=collection_data["name"],
-                            balance=collection_data["count"],
-                            balance_formatted=
-                            f"{collection_data['count']} NFTs",
-                            decimals=0,
-                            is_nft=True,
-                            token_ids=collection_data["token_ids"],
-                            floor_price=floor_price_usd,
-                            image_url=collection_data.get("image_url"))
-
-                        assets.append(nft_asset)
-
-                        print(
-                            f"✅ [ETH NFT] Added collection: {collection_data['name']} "
-                            f"({collection_data['count']} items, floor: ${floor_price_usd})"
-                        )
-
-                    except Exception as asset_error:
-                        print(
-                            f"❌ [ETH NFT] Error creating asset for {contract_address}: {asset_error}"
-                        )
-                        import traceback
-                        print(
-                            f"📋 [ETH NFT] Error traceback: {traceback.format_exc()}"
-                        )
-                        continue
-
-            except requests.exceptions.Timeout:
-                print(f"⏰ [ETH NFT] Request timeout - continuing without NFTs")
-            except requests.exceptions.RequestException as e:
-                print(f"❌ [ETH NFT] Request error: {e}")
-
-        except Exception as e:
-            print(f"❌ [ETH NFT] Unexpected error: {e}")
-            import traceback
-            print(f"📋 [ETH NFT] Full traceback: {traceback.format_exc()}")
-            # Don't fail the entire asset fetch if NFTs fail
-
-        print(f"🖼️ [ETH NFT] Final result: {len(assets)} NFT collections")
-        return assets
-
-    async def _fetch_floor_price(self, contract_address: str) -> float:
-        """
-        Fetch real floor price from Alchemy NFT Floor Price API.
-        Falls back to 0 if API fails.
-        """
-        try:
-            # Extract API key from alchemy_url
-            api_key = self.alchemy_url.split("/v2/")[-1]
-
-            # Use Alchemy Floor Price API endpoint
-            floor_price_url = f"https://eth-mainnet.g.alchemy.com/nft/v3/{api_key}/getFloorPrice"
-
-            params = {"contractAddress": contract_address}
-
-            print(
-                f"🔍 [FLOOR PRICE] Fetching floor price for {contract_address[:12]}..."
-            )
-
-            # Use requests library like the Alchemy sample
-            import requests
-
-            response = requests.get(floor_price_url,
-                                    params=params,
-                                    headers={"accept": "application/json"},
-                                    timeout=15.0)
-
-            print(
-                f"🔍 [FLOOR PRICE] API Response status: {response.status_code}")
-
-            if response.status_code == 200:
-                try:
-                    data = response.json()
-                    print(f"🔍 [FLOOR PRICE] Raw API response: {data}")
-
-                    # Parse Alchemy floor price response - check multiple sources
-                    floor_price_usd = 0.0
-                    eth_price_usd = 3750.0  # Current approximate ETH price
-
-                    # Try OpenSea first - with proper None checking
-                    if ("openSea" in data
-                            and isinstance(data["openSea"], dict)
-                            and "floorPrice" in data["openSea"]
-                            and data["openSea"]["floorPrice"] is not None):
-
-                        try:
-                            floor_price_eth = float(
-                                data["openSea"]["floorPrice"])
-                            if floor_price_eth > 0:
-                                floor_price_usd = floor_price_eth * eth_price_usd
-                                print(
-                                    f"✅ [FLOOR PRICE] OpenSea: {contract_address[:12]}... = {floor_price_eth} ETH (${floor_price_usd:.2f})"
-                                )
-                                return floor_price_usd
-                        except (ValueError, TypeError) as e:
-                            print(
-                                f"⚠️ [FLOOR PRICE] OpenSea price conversion error: {e}"
-                            )
-
-                    # Try LooksRare as backup - with proper None checking
-                    if ("looksRare" in data
-                            and isinstance(data["looksRare"], dict)
-                            and "floorPrice" in data["looksRare"]
-                            and data["looksRare"]["floorPrice"] is not None):
-
-                        try:
-                            floor_price_eth = float(
-                                data["looksRare"]["floorPrice"])
-                            if floor_price_eth > 0:
-                                floor_price_usd = floor_price_eth * eth_price_usd
-                                print(
-                                    f"✅ [FLOOR PRICE] LooksRare: {contract_address[:12]}... = {floor_price_eth} ETH (${floor_price_usd:.2f})"
-                                )
-                                return floor_price_usd
-                        except (ValueError, TypeError) as e:
-                            print(
-                                f"⚠️ [FLOOR PRICE] LooksRare price conversion error: {e}"
-                            )
-
-                    # Check other marketplaces with proper validation
-                    marketplaces = [
-                        key for key in data.keys()
-                        if isinstance(data[key], dict)
-                        and key not in ["openSea", "looksRare"]
-                    ]
-
-                    if marketplaces:
-                        print(
-                            f"🔍 [FLOOR PRICE] Checking additional marketplaces: {marketplaces}"
-                        )
-                        for marketplace in marketplaces:
-                            marketplace_data = data[marketplace]
-                            if (isinstance(marketplace_data, dict)
-                                    and "floorPrice" in marketplace_data
-                                    and marketplace_data["floorPrice"]
-                                    is not None):
-
-                                try:
-                                    floor_price_eth = float(
-                                        marketplace_data["floorPrice"])
-                                    if floor_price_eth > 0:
-                                        floor_price_usd = floor_price_eth * eth_price_usd
-                                        print(
-                                            f"✅ [FLOOR PRICE] {marketplace}: {contract_address[:12]}... = {floor_price_eth} ETH (${floor_price_usd:.2f})"
-                                        )
-                                        return floor_price_usd
-                                except (ValueError, TypeError) as e:
-                                    print(
-                                        f"⚠️ [FLOOR PRICE] {marketplace} price conversion error: {e}"
-                                    )
-
-                    print(
-                        f"⚠️ [FLOOR PRICE] No valid floor price data for {contract_address[:12]}..."
-                    )
-                    return 0.0
-
-                except (ValueError, TypeError, KeyError) as parse_error:
-                    print(
-                        f"❌ [FLOOR PRICE] JSON parsing error for {contract_address[:12]}...: {parse_error}"
-                    )
-                    print(
-                        f"❌ [FLOOR PRICE] Raw response text: {response.text[:200]}..."
-                    )
-                    return 0.0
-
-            else:
-                print(
-                    f"❌ [FLOOR PRICE] API error {response.status_code} for {contract_address[:12]}..."
-                )
-                return 0.0
-
-        except requests.exceptions.Timeout:
-            print(
-                f"⏰ [FLOOR PRICE] Timeout (15s) fetching floor price for {contract_address[:12]}..."
-            )
-            return 0.0
-        except Exception as e:
-            print(
-                f"❌ [FLOOR PRICE] Unexpected error fetching floor price for {contract_address[:12]}...: {e}"
-            )
-            return 0.0
 
 
 class EthereumPriceFetcher(PriceFetcher):
@@ -1122,13 +921,11 @@ class SolanaAssetFetcher(AssetFetcher):
         }
         self.spl_token_program = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         self.spl_token_2022_program = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-        self.solana_rpc_url = self.solana_url  # Use Alchemy as RPC URL
 
     async def fetch_assets(self, wallet_address: str,
                            hidden_addresses: set) -> List[AssetData]:
         assets = []
 
-        # Validate Solana address format
         if not self._is_valid_solana_address(wallet_address):
             return assets
 
@@ -1141,7 +938,7 @@ class SolanaAssetFetcher(AssetFetcher):
                     if sol_asset:
                         assets.append(sol_asset)
 
-                # Get SPL tokens (both old and new program)
+                # Get SPL tokens
                 spl_assets = await self._fetch_spl_tokens(
                     client, wallet_address, hidden_addresses)
                 assets.extend(spl_assets)
@@ -1151,19 +948,19 @@ class SolanaAssetFetcher(AssetFetcher):
 
         return assets
 
+    async def fetch_nfts(self, wallet_address: str, hidden_addresses: set) -> List[NFTData]:
+        # Solana NFT implementation would go here
+        # For now, return empty list
+        return []
+
     def _is_valid_solana_address(self, address: str) -> bool:
-        """Proper Solana address validation using base58 decoding"""
         try:
             import base58
-
             if not address or len(address) < 32 or len(address) > 44:
                 return False
-
-            # Decode base58 and check if it's 32 bytes (standard Solana pubkey length)
             decoded = base58.b58decode(address)
             return len(decoded) == 32
         except:
-            # Fallback to regex if base58 module not available
             import re
             if not address or len(address) < 32 or len(address) > 44:
                 return False
@@ -1173,7 +970,6 @@ class SolanaAssetFetcher(AssetFetcher):
     async def _fetch_sol_balance(self, client: httpx.AsyncClient,
                                  wallet_address: str) -> Optional[AssetData]:
         try:
-            # Use commitment level for more reliable results
             rpc_payload = {
                 "jsonrpc": "2.0",
                 "id": 1,
@@ -1183,18 +979,10 @@ class SolanaAssetFetcher(AssetFetcher):
                 }]
             }
 
-            response = await client.post(self.solana_url,
-                                         json=rpc_payload,
-                                         headers={
-                                             "Content-Type":
-                                             "application/json",
-                                             "accept": "application/json"
-                                         },
-                                         timeout=30.0)
+            response = await client.post(self.solana_url, json=rpc_payload, timeout=30.0)
 
             if response.status_code == 200:
                 data = response.json()
-
                 if "error" in data:
                     return None
 
@@ -1217,57 +1005,33 @@ class SolanaAssetFetcher(AssetFetcher):
                             balance=sol_balance,
                             balance_formatted=f"{sol_balance:.6f}",
                             decimals=9)
-                    else:
-                        return None
-                else:
-                    return None
-            else:
-                return None
-
-        except httpx.TimeoutException:
             return None
-        except Exception as e:
+        except Exception:
             return None
 
     async def _fetch_spl_tokens(self, client: httpx.AsyncClient,
                                 wallet_address: str,
                                 hidden_addresses: set) -> List[AssetData]:
         assets = []
-
-        # Fetch from both SPL Token program and SPL Token 2022 program
         program_ids = [self.spl_token_program, self.spl_token_2022_program]
 
         for program_id in program_ids:
             try:
                 rpc_payload = {
-                    "jsonrpc":
-                    "2.0",
-                    "id":
-                    1,
-                    "method":
-                    "getTokenAccountsByOwner",
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "getTokenAccountsByOwner",
                     "params": [
-                        wallet_address, {
-                            "programId": program_id
-                        }, {
-                            "encoding": "jsonParsed",
-                            "commitment": "confirmed"
-                        }
+                        wallet_address,
+                        {"programId": program_id},
+                        {"encoding": "jsonParsed", "commitment": "confirmed"}
                     ]
                 }
 
-                response = await client.post(self.solana_url,
-                                             json=rpc_payload,
-                                             headers={
-                                                 "Content-Type":
-                                                 "application/json",
-                                                 "accept": "application/json"
-                                             },
-                                             timeout=30.0)
+                response = await client.post(self.solana_url, json=rpc_payload, timeout=30.0)
 
                 if response.status_code == 200:
                     data = response.json()
-
                     if "error" in data:
                         continue
 
@@ -1276,7 +1040,6 @@ class SolanaAssetFetcher(AssetFetcher):
 
                         for token_account in token_accounts:
                             try:
-                                # Parse the token account structure
                                 account_info = token_account.get("account", {})
                                 if not account_info:
                                     continue
@@ -1293,44 +1056,33 @@ class SolanaAssetFetcher(AssetFetcher):
                                 if not token_info:
                                     continue
 
-                                # Extract mint address and token amount
                                 mint_address = token_info.get("mint", "")
-                                token_amount = token_info.get(
-                                    "tokenAmount", {})
+                                token_amount = token_info.get("tokenAmount", {})
 
                                 if not mint_address:
                                     continue
 
-                                # Skip if this token is hidden
                                 if mint_address.lower() in hidden_addresses:
                                     continue
 
-                                # Extract balance information
                                 ui_amount = token_amount.get("uiAmount")
                                 amount_string = token_amount.get("amount", "0")
                                 decimals = token_amount.get("decimals", 0)
 
-                                # Handle balance calculation
                                 if ui_amount is not None and ui_amount != 0:
                                     balance = float(ui_amount)
                                 elif amount_string and amount_string != "0":
                                     raw_amount = int(amount_string)
-                                    balance = raw_amount / (
-                                        10**decimals
-                                    ) if decimals > 0 else raw_amount
+                                    balance = raw_amount / (10**decimals) if decimals > 0 else raw_amount
                                 else:
                                     balance = 0
 
                                 if balance > 0:
-                                    # Get token metadata
                                     if mint_address in self.known_tokens:
-                                        symbol = self.known_tokens[
-                                            mint_address]["symbol"]
-                                        name = self.known_tokens[mint_address][
-                                            "name"]
+                                        symbol = self.known_tokens[mint_address]["symbol"]
+                                        name = self.known_tokens[mint_address]["name"]
                                     else:
-                                        symbol, name = await self._fetch_token_metadata(
-                                            client, mint_address)
+                                        symbol, name = await self._fetch_token_metadata(client, mint_address)
 
                                     asset = AssetData(
                                         token_address=mint_address,
@@ -1341,115 +1093,32 @@ class SolanaAssetFetcher(AssetFetcher):
                                         decimals=decimals)
                                     assets.append(asset)
 
-                            except Exception as e:
+                            except Exception:
                                 continue
 
-                elif response.status_code == 401:
-                    break  # Don't try other programs if auth fails
-                elif response.status_code == 429:
-                    await asyncio.sleep(1)
-
-            except httpx.TimeoutException:
-                continue
-            except Exception as e:
+            except Exception:
                 continue
         return assets
 
     async def _fetch_token_metadata(self, client: httpx.AsyncClient,
                                     mint_address: str) -> tuple[str, str]:
-        """
-        Fetches token metadata using multiple sources for better accuracy.
-        Returns (symbol, name) tuple.
-        """
         try:
-            # Try DexScreener API first
+            # Try DexScreener API
             dex_url = f"https://api.dexscreener.com/latest/dex/tokens/{mint_address}"
-
             dex_response = await client.get(dex_url, timeout=15.0)
             if dex_response.status_code == 200:
                 dex_data = dex_response.json()
-
                 if 'pairs' in dex_data and len(dex_data['pairs']) > 0:
                     for pair in dex_data['pairs']:
                         base_token = pair.get('baseToken', {})
-                        quote_token = pair.get('quoteToken', {})
-
-                        # Check if base token matches our mint
-                        if base_token.get('address',
-                                          '').lower() == mint_address.lower():
+                        if base_token.get('address', '').lower() == mint_address.lower():
                             symbol = base_token.get('symbol', '')
                             name = base_token.get('name', '')
-
                             if symbol and name and symbol != 'unknown':
                                 return symbol, name
-
-                        # Check if quote token matches our mint
-                        if quote_token.get('address',
-                                           '').lower() == mint_address.lower():
-                            symbol = quote_token.get('symbol', '')
-                            name = quote_token.get('name', '')
-
-                            if symbol and name and symbol != 'unknown':
-                                return symbol, name
-
-        except Exception as e:
+        except Exception:
             pass
 
-        # Try Jupiter API as second option
-        try:
-            jupiter_url = f"https://token.jup.ag/strict"
-
-            jupiter_response = await client.get(jupiter_url, timeout=10.0)
-            if jupiter_response.status_code == 200:
-                jupiter_tokens = jupiter_response.json()
-
-                for token in jupiter_tokens:
-                    if token.get('address',
-                                 '').lower() == mint_address.lower():
-                        symbol = token.get('symbol', '')
-                        name = token.get('name', '')
-
-                        if symbol and name:
-                            return symbol, name
-
-        except Exception as e:
-            pass
-
-        # Fallback to Solana RPC metadata
-        try:
-            metadata_url = f"{self.solana_rpc_url}"
-            metadata_payload = {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "getAccountInfo",
-                "params": [mint_address, {
-                    "encoding": "jsonParsed"
-                }]
-            }
-
-            metadata_response = await client.post(metadata_url,
-                                                  json=metadata_payload,
-                                                  timeout=10.0)
-            if metadata_response.status_code == 200:
-                metadata_data = metadata_response.json()
-                result = metadata_data.get('result', {})
-
-                if result and result.get('value'):
-                    account_data = result['value'].get('data', {})
-                    if account_data.get('program') == 'spl-token':
-                        parsed = account_data.get('parsed', {})
-                        info = parsed.get('info', {})
-
-                        # Try to get token name from mint info
-                        if 'name' in info:
-                            name = info['name']
-                            symbol = info.get('symbol', name[:8])
-                            return symbol, name
-
-        except Exception as e:
-            pass
-
-        # Final fallback values
         fallback_symbol = f"SPL-{mint_address[:6]}"
         fallback_name = f"SPL Token ({mint_address[:8]}...)"
         return fallback_symbol, fallback_name
@@ -1459,7 +1128,6 @@ class SolanaPriceFetcher(PriceFetcher):
 
     def __init__(self):
         self.known_tokens = {
-            # Use proper case-sensitive addresses for known tokens
             "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
                 "symbol": "USDC",
                 "coingecko_id": "usd-coin"
@@ -1472,18 +1140,6 @@ class SolanaPriceFetcher(PriceFetcher):
                 "symbol": "WSOL",
                 "coingecko_id": "wrapped-solana"
             },
-            "MNDEFzGvMt87ueuHvVU9VcTqsAP5b3fTGPsHuuPA5ey": {
-                "symbol": "MNDE",
-                "coingecko_id": "marinade"
-            },
-            "7atgF8KQo4wJrD5ATGX7t1V2zVvykPJbFfNeVf1icFv1": {
-                "symbol": "CHAT",
-                "coingecko_id": "chatcoin"
-            },
-            "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So": {
-                "symbol": "mSOL",
-                "coingecko_id": "marinade-staked-sol"
-            },
             "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": {
                 "symbol": "BONK",
                 "coingecko_id": "bonk"
@@ -1491,6 +1147,10 @@ class SolanaPriceFetcher(PriceFetcher):
             "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs": {
                 "symbol": "ETH",
                 "coingecko_id": "ethereum"
+            },
+            "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So": {
+                "symbol": "mSOL",
+                "coingecko_id": "marinade-staked-sol"
             },
         }
 
@@ -1504,16 +1164,13 @@ class SolanaPriceFetcher(PriceFetcher):
                 try:
                     response = await client.get(
                         "https://api.coingecko.com/api/v3/simple/price",
-                        params={
-                            "ids": "solana",
-                            "vs_currencies": "usd"
-                        },
+                        params={"ids": "solana", "vs_currencies": "usd"},
                         timeout=15.0)
                     if response.status_code == 200:
                         data = response.json()
                         sol_price = data.get("solana", {}).get("usd", 0)
                         price_map["solana"] = sol_price
-                except Exception as e:
+                except Exception:
                     pass
 
                 # Process mint addresses
@@ -1521,25 +1178,11 @@ class SolanaPriceFetcher(PriceFetcher):
                     addr for addr in token_addresses if addr != "solana"
                 ]
 
-                # Method 1: Try known tokens first
-                await self._fetch_known_token_prices(client, mint_addresses,
-                                                     price_map)
+                # Method 1: Known tokens
+                await self._fetch_known_token_prices(client, mint_addresses, price_map)
 
-                # Method 2: Try Jupiter API for SPL token prices
-                await self._fetch_jupiter_prices(client, mint_addresses,
-                                                 price_map)
-
-                # Method 3: Try DexScreener API for pump.fun and other tokens
-                await self._fetch_dexscreener_prices(client, mint_addresses,
-                                                     price_map)
-
-                # Method 4: Try Birdeye API as fallback
-                await self._fetch_birdeye_prices(client, mint_addresses,
-                                                 price_map)
-
-                # Method 5: Try CoinGecko SPL Token API
-                await self._fetch_coingecko_spl_prices(client, mint_addresses,
-                                                       price_map)
+                # Method 2: DexScreener API
+                await self._fetch_dexscreener_prices(client, mint_addresses, price_map)
 
                 # Final fallback
                 for addr in mint_addresses:
@@ -1547,15 +1190,12 @@ class SolanaPriceFetcher(PriceFetcher):
                         price_map[addr.lower()] = 0
                         price_map[addr] = 0
 
-        except Exception as e:
+        except Exception:
             pass
 
         return price_map
 
-    async def _fetch_known_token_prices(self, client: httpx.AsyncClient,
-                                        mint_addresses: List[str],
-                                        price_map: Dict[str, float]):
-        """Fetch prices for known tokens using CoinGecko"""
+    async def _fetch_known_token_prices(self, client: httpx.AsyncClient, mint_addresses: List[str], price_map: Dict[str, float]):
         known_ids = []
         address_to_id = {}
 
@@ -1565,270 +1205,32 @@ class SolanaPriceFetcher(PriceFetcher):
                 coingecko_id = self.known_tokens[addr_lower]["coingecko_id"]
                 known_ids.append(coingecko_id)
                 address_to_id[coingecko_id] = addr_lower
-                print(
-                    f"✅ Found known Solana token: {self.known_tokens[addr_lower]['symbol']} -> {coingecko_id}"
-                )
 
         if known_ids:
             try:
                 response = await client.get(
                     "https://api.coingecko.com/api/v3/simple/price",
-                    params={
-                        "ids": ",".join(known_ids),
-                        "vs_currencies": "usd"
-                    })
+                    params={"ids": ",".join(known_ids), "vs_currencies": "usd"})
                 if response.status_code == 200:
                     data = response.json()
                     for coingecko_id, price_data in data.items():
-                        if isinstance(price_data,
-                                      dict) and "usd" in price_data:
+                        if isinstance(price_data, dict) and "usd" in price_data:
                             addr = address_to_id.get(coingecko_id)
                             if addr:
                                 price_map[addr] = price_data["usd"]
-                                original_addr = next((a for a in mint_addresses
-                                                      if a.lower() == addr),
-                                                     addr)
+                                original_addr = next((a for a in mint_addresses if a.lower() == addr), addr)
                                 price_map[original_addr] = price_data["usd"]
-                                print(
-                                    f"✅ Got known Solana price: {addr} = ${price_data['usd']}"
-                                )
-            except Exception as e:
-                print(f"⚠️ Error fetching known token prices: {e}")
+            except Exception:
+                pass
 
-    async def _fetch_jupiter_prices(self, client: httpx.AsyncClient,
-                                    mint_addresses: List[str],
-                                    price_map: Dict[str, float]):
-        """Fetch prices using Jupiter API with enhanced error handling"""
+    async def _fetch_dexscreener_prices(self, client: httpx.AsyncClient, mint_addresses: List[str], price_map: Dict[str, float]):
         try:
-            # Jupiter API expects comma-separated mints
-            remaining_mints = [
-                addr for addr in mint_addresses
-                if addr.lower() not in price_map and addr not in price_map
-            ]
+            remaining_mints = [addr for addr in mint_addresses
+                               if addr.lower() not in price_map and addr not in price_map]
             if not remaining_mints:
-                print(f"🔍 [JUPITER] No remaining mints to process")
                 return
 
-            print(f"🪙 [JUPITER] Processing {len(remaining_mints)} mints...")
-
-            # Process in batches to avoid URL length limits
             for i in range(0, len(remaining_mints), 30):
-                batch_mints = remaining_mints[i:i + 30]
-                mints_param = ",".join(batch_mints)
-
-                print(
-                    f"📡 [JUPITER] Batch {i//30 + 1}: {len(batch_mints)} mints")
-                print(
-                    f"🔍 [JUPITER] Request URL: https://price.jup.ag/v4/price?ids={mints_param[:100]}..."
-                )
-
-                try:
-                    response = await client.get(
-                        f"https://price.jup.ag/v4/price?ids={mints_param}",
-                        timeout=20.0,
-                        headers={
-                            "User-Agent":
-                            "Mozilla/5.0 (compatible; CryptoFund/1.0)",
-                            "Accept": "application/json"
-                        })
-
-                    print(
-                        f"📊 [JUPITER] Response status: {response.status_code}")
-
-                    if response.status_code == 200:
-                        try:
-                            data = response.json()
-                            print(
-                                f"📈 [JUPITER] Response structure: {list(data.keys()) if isinstance(data, dict) else type(data)}"
-                            )
-
-                            if "data" in data and isinstance(
-                                    data["data"], dict):
-                                found_prices = 0
-                                for mint, price_info in data["data"].items():
-                                    if isinstance(
-                                            price_info,
-                                            dict) and "price" in price_info:
-                                        try:
-                                            price = float(price_info["price"])
-                                            if price > 0:  # Only accept positive prices
-                                                price_map[mint.lower()] = price
-                                                price_map[mint] = price
-                                                found_prices += 1
-                                                print(
-                                                    f"✅ [JUPITER] Found price: {mint[:12]}... = ${price}"
-                                                )
-                                            else:
-                                                print(
-                                                    f"⚠️ [JUPITER] Zero price for {mint[:12]}..."
-                                                )
-                                        except (ValueError, TypeError) as e:
-                                            print(
-                                                f"❌ [JUPITER] Invalid price format for {mint[:12]}...: {price_info}"
-                                            )
-                                    else:
-                                        print(
-                                            f"⚠️ [JUPITER] Invalid price data for {mint[:12]}...: {price_info}"
-                                        )
-
-                                print(
-                                    f"📊 [JUPITER] Batch result: {found_prices}/{len(batch_mints)} prices found"
-                                )
-                            else:
-                                print(
-                                    f"❌ [JUPITER] Unexpected response format: {data}"
-                                )
-                                if isinstance(data, dict) and "error" in data:
-                                    print(
-                                        f"❌ [JUPITER] API Error: {data['error']}"
-                                    )
-                        except Exception as json_error:
-                            print(
-                                f"❌ [JUPITER] JSON parsing error: {json_error}"
-                            )
-                            print(
-                                f"📋 [JUPITER] Raw response: {response.text[:200]}..."
-                            )
-                    elif response.status_code == 429:
-                        print(
-                            f"⏰ [JUPITER] Rate limited, waiting 2 seconds...")
-                        await asyncio.sleep(2)
-                    else:
-                        print(f"❌ [JUPITER] HTTP error {response.status_code}")
-                        print(
-                            f"📋 [JUPITER] Error response: {response.text[:200]}..."
-                        )
-
-                except httpx.TimeoutException:
-                    print(f"⏰ [JUPITER] Request timeout for batch {i//30 + 1}")
-                except Exception as batch_error:
-                    print(f"❌ [JUPITER] Batch error: {batch_error}")
-
-                # Rate limiting between batches
-                if i + 30 < len(remaining_mints):
-                    await asyncio.sleep(0.5)
-
-        except Exception as e:
-            print(f"❌ [JUPITER] Critical error: {e}")
-            import traceback
-            print(f"📋 [JUPITER] Traceback: {traceback.format_exc()}")
-
-    async def _fetch_coingecko_spl_prices(self, client: httpx.AsyncClient,
-                                          mint_addresses: List[str],
-                                          price_map: Dict[str, float]):
-        """Try CoinGecko's Solana token price API as additional fallback"""
-        try:
-            remaining_mints = [
-                addr for addr in mint_addresses
-                if addr.lower() not in price_map and addr not in price_map
-            ]
-            if not remaining_mints:
-                print(f"🔍 [COINGECKO SPL] No remaining mints to process")
-                return
-
-            print(
-                f"🪙 [COINGECKO SPL] Processing {len(remaining_mints)} mints..."
-            )
-
-            # Process in smaller batches for CoinGecko
-            for i in range(0, len(remaining_mints), 20):
-                batch_mints = remaining_mints[i:i + 20]
-                mints_param = ",".join(batch_mints)
-
-                print(
-                    f"📡 [COINGECKO SPL] Batch {i//20 + 1}: {len(batch_mints)} mints"
-                )
-
-                try:
-                    response = await client.get(
-                        "https://api.coingecko.com/api/v3/simple/token_price/solana",
-                        params={
-                            "contract_addresses": mints_param,
-                            "vs_currencies": "usd"
-                        },
-                        timeout=20.0,
-                        headers={
-                            "User-Agent":
-                            "Mozilla/5.0 (compatible; CryptoFund/1.0)",
-                            "Accept": "application/json"
-                        })
-
-                    print(
-                        f"📊 [COINGECKO SPL] Response status: {response.status_code}"
-                    )
-
-                    if response.status_code == 200:
-                        try:
-                            data = response.json()
-                            print(
-                                f"📈 [COINGECKO SPL] Found data for {len(data)} tokens"
-                            )
-
-                            found_prices = 0
-                            for mint, price_data in data.items():
-                                if isinstance(price_data,
-                                              dict) and "usd" in price_data:
-                                    try:
-                                        price = float(price_data["usd"])
-                                        if price > 0:
-                                            price_map[mint.lower()] = price
-                                            price_map[mint] = price
-                                            found_prices += 1
-                                            print(
-                                                f"✅ [COINGECKO SPL] Found price: {mint[:12]}... = ${price}"
-                                            )
-                                    except (ValueError, TypeError):
-                                        print(
-                                            f"❌ [COINGECKO SPL] Invalid price for {mint[:12]}...: {price_data}"
-                                        )
-
-                            print(
-                                f"📊 [COINGECKO SPL] Batch result: {found_prices}/{len(batch_mints)} prices found"
-                            )
-
-                        except Exception as json_error:
-                            print(
-                                f"❌ [COINGECKO SPL] JSON parsing error: {json_error}"
-                            )
-                    elif response.status_code == 429:
-                        print(
-                            f"⏰ [COINGECKO SPL] Rate limited, waiting 3 seconds..."
-                        )
-                        await asyncio.sleep(3)
-                    else:
-                        print(
-                            f"❌ [COINGECKO SPL] HTTP error {response.status_code}"
-                        )
-                        if response.status_code == 404:
-                            print(
-                                f"❌ [COINGECKO SPL] Solana token endpoint not found"
-                            )
-
-                except Exception as batch_error:
-                    print(f"❌ [COINGECKO SPL] Batch error: {batch_error}")
-
-                # Rate limiting between batches
-                if i + 20 < len(remaining_mints):
-                    await asyncio.sleep(1)
-
-        except Exception as e:
-            print(f"❌ [COINGECKO SPL] Critical error: {e}")
-
-    async def _fetch_dexscreener_prices(self, client: httpx.AsyncClient,
-                                        mint_addresses: List[str],
-                                        price_map: Dict[str, float]):
-        """Fetch prices using DexScreener API for pump.fun and other DEX tokens"""
-        try:
-            remaining_mints = [
-                addr for addr in mint_addresses
-                if addr.lower() not in price_map and addr not in price_map
-            ]
-            if not remaining_mints:
-                return
-
-            # DexScreener supports batch requests
-            for i in range(0, len(remaining_mints),
-                           30):  # Process in batches of 30
                 batch_mints = remaining_mints[i:i + 30]
                 mints_param = ",".join(batch_mints)
 
@@ -1846,64 +1248,11 @@ class SolanaPriceFetcher(PriceFetcher):
                                 if price > 0:
                                     price_map[mint.lower()] = price
                                     price_map[mint] = price
-                                    print(
-                                        f"✅ DexScreener price: {mint[:12]}... = ${price}"
-                                    )
-                    else:
-                        print(
-                            f"⚠️ DexScreener: No pairs found for batch {i//30 + 1}"
-                        )
-                else:
-                    print(f"⚠️ DexScreener API error: {response.status_code}")
 
-                # Rate limiting
                 await asyncio.sleep(0.1)
 
-        except Exception as e:
-            print(f"⚠️ Error fetching DexScreener prices: {e}")
-
-    async def _fetch_birdeye_prices(self, client: httpx.AsyncClient,
-                                    mint_addresses: List[str],
-                                    price_map: Dict[str, float]):
-        """Fetch prices using Birdeye API as final fallback"""
-        try:
-            remaining_mints = [
-                addr for addr in mint_addresses
-                if addr.lower() not in price_map and addr not in price_map
-            ]
-            if not remaining_mints:
-                return
-
-            # Birdeye multi-price endpoint (free tier)
-            for mint in remaining_mints[:10]:  # Limit to avoid rate limits
-                try:
-                    response = await client.get(
-                        f"https://public-api.birdeye.so/defi/price?address={mint}",
-                        headers={
-                            "X-API-KEY": ""
-                        },  # Can work without API key for basic requests
-                        timeout=10.0)
-
-                    if response.status_code == 200:
-                        data = response.json()
-                        if "data" in data and "value" in data["data"]:
-                            price = float(data["data"]["value"])
-                            if price > 0:
-                                price_map[mint.lower()] = price
-                                price_map[mint] = price
-                                print(
-                                    f"✅ Birdeye price: {mint[:12]}... = ${price}"
-                                )
-
-                    # Rate limiting for free tier
-                    await asyncio.sleep(0.2)
-
-                except Exception as mint_error:
-                    print(f"⚠️ Birdeye error for {mint[:12]}...: {mint_error}")
-                    continue
-
-        except Exception as e:
-            print(f"⚠️ Error fetching Birdeye prices: {e}")
+        except Exception:
+            pass
 
 
 # Chain factory
@@ -1931,7 +1280,7 @@ class ChainFactory:
 
 # Database initialization
 def init_db():
-    """Initialize PostgreSQL database with all required tables"""
+    """Initialize PostgreSQL database with separated assets and NFTs tables"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -1947,7 +1296,7 @@ def init_db():
             )
         ''')
 
-        # Assets table
+        # Assets table (regular tokens only)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS assets (
                 id SERIAL PRIMARY KEY,
@@ -1964,16 +1313,37 @@ def init_db():
                 realized_pnl REAL DEFAULT 0,
                 unrealized_pnl REAL DEFAULT 0,
                 total_return_pct REAL DEFAULT 0,
-                is_nft BOOLEAN DEFAULT FALSE,
-                nft_metadata TEXT,
-                floor_price REAL DEFAULT 0,
-                image_url TEXT,
                 price_change_24h REAL DEFAULT 0,
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
 
-        # Purchase history table for tracking all transactions
+        # NFT collections table (separate from assets)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS nft_collections (
+                id SERIAL PRIMARY KEY,
+                wallet_id INTEGER REFERENCES wallets(id) ON DELETE CASCADE,
+                contract_address TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                name TEXT NOT NULL,
+                item_count INTEGER NOT NULL DEFAULT 1,
+                token_ids TEXT,
+                floor_price_usd REAL DEFAULT 0,
+                total_value_usd REAL DEFAULT 0,
+                image_url TEXT,
+                collection_url TEXT,
+                marketplace_data TEXT,
+                purchase_price REAL DEFAULT 0,
+                total_invested REAL DEFAULT 0,
+                realized_pnl REAL DEFAULT 0,
+                unrealized_pnl REAL DEFAULT 0,
+                total_return_pct REAL DEFAULT 0,
+                notes TEXT DEFAULT '',
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Purchase history table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS purchase_history (
                 id SERIAL PRIMARY KEY,
@@ -1989,7 +1359,7 @@ def init_db():
             )
         ''')
 
-        # Asset cost basis table for FIFO/LIFO calculations
+        # Asset cost basis table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS asset_cost_basis (
                 id SERIAL PRIMARY KEY,
@@ -2033,7 +1403,7 @@ def init_db():
             )
         ''')
 
-        # Purchase price overrides table for permanent manual overrides
+        # Purchase price overrides table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS purchase_price_overrides (
                 id SERIAL PRIMARY KEY,
@@ -2045,7 +1415,7 @@ def init_db():
             )
         ''')
 
-        # Wallet status table (for tracking individual wallet fetch success/failure)
+        # Wallet status table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS wallet_status (
                 wallet_id INTEGER PRIMARY KEY REFERENCES wallets(id),
@@ -2101,9 +1471,28 @@ class AssetResponse(BaseModel):
     nft_metadata: Optional[str] = None
 
 
+class NFTResponse(BaseModel):
+    id: str
+    contract_address: str
+    symbol: str
+    name: str
+    item_count: int
+    token_ids: List[str]
+    floor_price_usd: float
+    total_value_usd: float
+    image_url: Optional[str] = None
+    purchase_price: Optional[float] = 0
+    total_invested: Optional[float] = 0
+    realized_pnl: Optional[float] = 0
+    unrealized_pnl: Optional[float] = 0
+    total_return_pct: Optional[float] = 0
+    notes: Optional[str] = ""
+
+
 class PortfolioResponse(BaseModel):
     total_value: float
     assets: List[AssetResponse]
+    nfts: List[NFTResponse]
     wallet_count: int
     performance_24h: float
 
@@ -2111,44 +1500,35 @@ class PortfolioResponse(BaseModel):
 class WalletDetailsResponse(BaseModel):
     wallet: WalletResponse
     assets: List[AssetResponse]
+    nfts: List[NFTResponse]
     total_value: float
     performance_24h: float
 
 
-# New chain-agnostic asset fetching function
-async def get_wallet_assets_new(wallet_address: str,
-                                network: str) -> List[AssetData]:
-    """New chain-agnostic asset fetching using dedicated fetchers"""
-
-    # Don't pre-filter assets during fetching - let the database filtering handle display
+# Asset fetching functions
+async def get_wallet_assets_new(wallet_address: str, network: str) -> tuple[List[AssetData], List[NFTData]]:
+    """Fetch both assets and NFTs for a wallet"""
     hidden_addresses = set()
 
     try:
-        # Create appropriate asset fetcher for the network
-        asset_fetcher = ChainFactory.create_asset_fetcher(
-            network, ALCHEMY_API_KEY)
+        asset_fetcher = ChainFactory.create_asset_fetcher(network, ALCHEMY_API_KEY)
 
-        # Fetch assets using chain-specific logic
-        assets = await asset_fetcher.fetch_assets(wallet_address,
-                                                  hidden_addresses)
+        # Fetch regular assets
+        assets = await asset_fetcher.fetch_assets(wallet_address, hidden_addresses)
 
-        print(
-            f"✅ Fetched {len(assets)} assets for {network} wallet {wallet_address}"
-        )
-        return assets
+        # Fetch NFTs
+        nfts = await asset_fetcher.fetch_nfts(wallet_address, hidden_addresses)
+
+        print(f"✅ Fetched {len(assets)} assets and {len(nfts)} NFT collections for {network} wallet {wallet_address}")
+        return assets, nfts
 
     except Exception as e:
-        print(
-            f"❌ Error fetching assets for {network} wallet {wallet_address}: {e}"
-        )
-        return []
+        print(f"❌ Error fetching assets for {network} wallet {wallet_address}: {e}")
+        return [], []
 
 
-# New chain-agnostic price fetching function
-async def get_token_prices_new(
-        token_addresses_by_network: Dict[str, List[str]]) -> Dict[str, float]:
-    """New chain-agnostic price fetching using dedicated fetchers"""
-
+async def get_token_prices_new(token_addresses_by_network: Dict[str, List[str]]) -> Dict[str, float]:
+    """Fetch prices for tokens across networks"""
     all_prices = {}
 
     for network, token_addresses in token_addresses_by_network.items():
@@ -2156,15 +1536,9 @@ async def get_token_prices_new(
             continue
 
         try:
-            # Create appropriate price fetcher for the network
             price_fetcher = ChainFactory.create_price_fetcher(network)
-
-            # Fetch prices using chain-specific logic
             network_prices = await price_fetcher.fetch_prices(token_addresses)
-
-            # Merge into all_prices
             all_prices.update(network_prices)
-
             print(f"✅ Fetched {len(network_prices)} prices for {network}")
 
         except Exception as e:
@@ -2173,22 +1547,316 @@ async def get_token_prices_new(
     return all_prices
 
 
-# API endpoints
+async def estimate_asset_purchase_price(symbol: str, name: str, current_price: float) -> float:
+    """Estimate purchase price based on asset characteristics"""
+    if symbol == "ETH":
+        return current_price * 0.65
+    elif symbol == "WBTC" or "Bitcoin" in name:
+        return current_price * 0.55
+    elif symbol == "SOL":
+        return current_price * 0.45
+    elif symbol == "PENDLE":
+        return current_price * 0.4
+    elif symbol in ["USDC", "USDT", "DAI"]:
+        return 1.0
+    elif "PENGU" in symbol or "Pudgy" in name:
+        return current_price * 0.2
+    elif "Fartcoin" in name or symbol.startswith("SPL-"):
+        if current_price > 1:
+            return current_price * 0.15
+        else:
+            return current_price * 0.25
+    elif symbol in ["UNI", "LINK", "AAVE", "CRV"]:
+        return current_price * 0.6
+    else:
+        return current_price * 0.5
 
+
+async def update_portfolio_data_new():
+    """Background task to update portfolio data with separated assets and NFTs"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        print("🚀 Starting portfolio update with separated assets and NFTs...")
+
+        # Clear existing data
+        cursor.execute("DELETE FROM assets")
+        cursor.execute("DELETE FROM nft_collections")
+
+        # Get all wallets
+        cursor.execute("SELECT id, address, network, label FROM wallets")
+        wallets = cursor.fetchall()
+
+        # Group wallets by network
+        wallets_by_network = {}
+        wallet_status = {}
+
+        for wallet_row in wallets:
+            wallet_id, address, network, label = wallet_row['id'], wallet_row['address'], wallet_row['network'], wallet_row['label']
+            if network not in wallets_by_network:
+                wallets_by_network[network] = []
+            wallets_by_network[network].append((wallet_id, address, label))
+            wallet_status[wallet_id] = {
+                'address': address,
+                'label': label,
+                'network': network,
+                'status': 'pending',
+                'assets_found': 0,
+                'total_value': 0,
+                'error': None
+            }
+
+        all_assets = []
+        all_nfts = []
+        token_addresses_by_network = {}
+
+        # Fetch assets and NFTs for each network
+        for network, network_wallets in wallets_by_network.items():
+            print(f"🔗 Processing {len(network_wallets)} {network} wallets...")
+
+            token_addresses_by_network[network] = set()
+
+            for wallet_id, address, label in network_wallets:
+                try:
+                    print(f"📡 Fetching assets for {network} wallet: {label} ({address[:10]}...)")
+
+                    # Fetch both assets and NFTs
+                    assets, nfts = await asyncio.wait_for(
+                        get_wallet_assets_new(address, network),
+                        timeout=60.0
+                    )
+
+                    wallet_assets_count = 0
+
+                    # Process regular assets
+                    for asset in assets:
+                        asset_dict = {
+                            'wallet_id': wallet_id,
+                            'asset_data': asset,  # Store the AssetData object
+                            'network': network
+                        }
+                        all_assets.append(asset_dict)
+                        token_addresses_by_network[network].add(asset.token_address)
+                        wallet_assets_count += 1
+
+                    # Process NFTs
+                    for nft in nfts:
+                        nft_dict = {
+                            'wallet_id': wallet_id,
+                            'nft_data': nft,  # Store the NFTData object
+                            'network': network
+                        }
+                        all_nfts.append(nft_dict)
+                        wallet_assets_count += 1
+
+                    wallet_status[wallet_id].update({
+                        'status': 'success',
+                        'assets_found': wallet_assets_count
+                    })
+                    print(f"✅ Successfully fetched {wallet_assets_count} items from {label}")
+
+                except asyncio.TimeoutError:
+                    error_msg = f"Timeout after 60 seconds"
+                    print(f"⏰ {error_msg} for {network} wallet {label}")
+                    wallet_status[wallet_id].update({'status': 'timeout', 'error': error_msg})
+                except Exception as e:
+                    error_msg = str(e)[:200]
+                    print(f"❌ Error fetching assets for {network} wallet {label}: {error_msg}")
+                    wallet_status[wallet_id].update({'status': 'error', 'error': error_msg})
+
+        # Convert sets to lists for price fetching
+        for network in token_addresses_by_network:
+            token_addresses_by_network[network] = list(token_addresses_by_network[network])
+
+        print(f"📊 Total items fetched: {len(all_assets)} assets, {len(all_nfts)} NFT collections")
+
+        # Get prices
+        try:
+            price_map = await asyncio.wait_for(
+                get_token_prices_new(token_addresses_by_network), timeout=30.0)
+        except Exception as e:
+            print(f"❌ Error fetching prices: {e}")
+            price_map = {}
+
+        # Insert assets with prices
+        total_portfolio_value = 0
+        auto_hide_candidates = []
+
+        # Process regular assets
+        for asset_item in all_assets:
+            asset = asset_item['asset_data']  # Get the AssetData object
+            wallet_id = asset_item['wallet_id']
+            network = asset_item['network']
+
+            # Get price
+            if asset.token_address.lower() == "0x0000000000000000000000000000000000000000":
+                price_usd = (price_map.get("0x0000000000000000000000000000000000000000", 0) or 
+                           price_map.get("eth", 0))
+            else:
+                price_usd = price_map.get(asset.token_address.lower(), 0)
+                if price_usd == 0:
+                    price_usd = price_map.get(asset.token_address, 0)
+
+            value_usd = asset.balance * price_usd
+
+            # Check for purchase price override
+            cursor.execute(
+                "SELECT override_price FROM purchase_price_overrides WHERE token_address = %s",
+                (asset.token_address,))
+            override_data = cursor.fetchone()
+
+            if override_data:
+                purchase_price = override_data['override_price']
+                total_invested = asset.balance * purchase_price
+                realized_pnl = 0
+                unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
+                total_return_pct = ((value_usd - total_invested) / total_invested * 100) if total_invested > 0 else 0
+            else:
+                # Estimate purchase price
+                purchase_price = await estimate_asset_purchase_price(asset.symbol, asset.name, price_usd) if price_usd > 0 else 0
+                total_invested = asset.balance * purchase_price
+                realized_pnl = 0
+                unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
+                total_return_pct = ((value_usd - total_invested) / total_invested * 100) if total_invested > 0 else 0
+
+            # Check for spam/low value assets
+            spam_indicators = ["visit", "claim", "rewards", "gift", "airdrop", ".com", ".net", ".org"]
+            is_spam_token = (value_usd == 0 and asset.balance > 0 and
+                           any(indicator in asset.name.lower() for indicator in spam_indicators))
+            is_low_value_token = (value_usd > 0 and value_usd < 1.0 and
+                                asset.symbol not in ['ETH', 'BTC', 'SOL', 'USDC', 'USDT', 'WBTC', 'PENDLE'])
+
+            if is_spam_token or is_low_value_token:
+                reason = "spam/scam" if is_spam_token else f"low value (${value_usd:.6f})"
+                auto_hide_candidates.append({
+                    'token_address': asset.token_address,
+                    'symbol': asset.symbol,
+                    'name': asset.name,
+                    'reason': reason
+                })
+
+            # Insert asset
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO assets 
+                    (wallet_id, token_address, symbol, name, balance, balance_formatted, price_usd, value_usd,
+                     purchase_price, total_invested, realized_pnl, unrealized_pnl, total_return_pct, price_change_24h)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (wallet_id, asset.token_address, asset.symbol, asset.name, asset.balance,
+                      asset.balance_formatted, price_usd, value_usd, purchase_price, total_invested,
+                      realized_pnl, unrealized_pnl, total_return_pct, 0))
+
+                wallet_status[wallet_id]['total_value'] += value_usd
+                total_portfolio_value += value_usd
+
+                print(f"💰 {network} Asset: {asset.symbol} = ${value_usd:.2f}")
+
+            except Exception as db_error:
+                print(f"❌ [DATABASE ERROR] Failed to insert {asset.symbol}: {db_error}")
+                continue
+
+        # Process NFTs
+        for nft_item in all_nfts:
+            nft = nft_item['nft_data']  # Get the NFTData object
+            wallet_id = nft_item['wallet_id']
+            network = nft_item['network']
+
+            total_value_usd = nft.floor_price_usd * nft.item_count
+
+            # Estimate purchase price for NFTs
+            purchase_price = nft.floor_price_usd * 0.5 if nft.floor_price_usd > 0 else 0
+            total_invested = purchase_price * nft.item_count
+            unrealized_pnl = total_value_usd - total_invested if total_invested > 0 else 0
+            total_return_pct = ((total_value_usd - total_invested) / total_invested * 100) if total_invested > 0 else 0
+
+            # Insert NFT collection
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO nft_collections 
+                    (wallet_id, contract_address, symbol, name, item_count, token_ids, floor_price_usd, 
+                     total_value_usd, image_url, purchase_price, total_invested, realized_pnl, 
+                     unrealized_pnl, total_return_pct)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (wallet_id, nft.contract_address, nft.symbol, nft.name, nft.item_count,
+                      json.dumps(nft.token_ids), nft.floor_price_usd, total_value_usd, nft.image_url,
+                      purchase_price, total_invested, 0, unrealized_pnl, total_return_pct))
+
+                wallet_status[wallet_id]['total_value'] += total_value_usd
+                total_portfolio_value += total_value_usd
+
+                print(f"🖼️ {network} NFT: {nft.name} ({nft.item_count} items) = ${total_value_usd:.2f}")
+
+            except Exception as db_error:
+                print(f"❌ [DATABASE ERROR] Failed to insert NFT {nft.name}: {db_error}")
+                continue
+
+        # Auto-hide spam/low value tokens
+        if auto_hide_candidates:
+            print(f"🔍 Auto-hiding {len(auto_hide_candidates)} tokens...")
+            for hide_asset in auto_hide_candidates:
+                try:
+                    if hide_asset['token_address'].lower() == "0x0000000000000000000000000000000000000000":
+                        continue
+                    if hide_asset['symbol'] in ['ETH', 'SOL', 'WBTC', 'PENDLE', 'USDC', 'USDT']:
+                        continue
+
+                    cursor.execute(
+                        """
+                        INSERT INTO hidden_assets (token_address, symbol, name) 
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (token_address) DO UPDATE SET
+                        symbol = EXCLUDED.symbol, name = EXCLUDED.name
+                    """, (hide_asset['token_address'].lower(), hide_asset['symbol'], hide_asset['name']))
+
+                    print(f"🙈 Auto-hidden {hide_asset['reason']}: {hide_asset['symbol'] or 'unnamed'}")
+                except Exception as e:
+                    print(f"❌ Error auto-hiding asset {hide_asset['symbol']}: {e}")
+
+        # Record portfolio history
+        cursor.execute("INSERT INTO portfolio_history (total_value_usd) VALUES (%s)", (total_portfolio_value,))
+
+        # Update wallet status
+        cursor.execute("DELETE FROM wallet_status")
+        for wallet_id, status_info in wallet_status.items():
+            cursor.execute(
+                """
+                INSERT INTO wallet_status (wallet_id, status, assets_found, total_value, error_message)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (wallet_id, status_info['status'], status_info['assets_found'],
+                  status_info['total_value'], status_info['error']))
+
+        conn.commit()
+
+        # Final success summary
+        successful_count = sum(1 for s in wallet_status.values() if s['status'] == 'success')
+        total_count = len(wallet_status)
+        print(f"✅ Portfolio updated successfully!")
+        print(f"📈 {len(all_assets)} assets and {len(all_nfts)} NFT collections processed")
+        print(f"💰 ${total_portfolio_value:,.2f} total value")
+        print(f"🏦 {successful_count}/{total_count} wallets processed successfully")
+
+    except Exception as e:
+        print(f"❌ Critical error updating portfolio: {e}")
+        import traceback
+        print(f"📋 Full traceback: {traceback.format_exc()}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+# API endpoints
 
 @app.get("/")
 async def root():
-    """
-    CRITICAL DEPLOYMENT ENDPOINT: Serves the React frontend
-    """
+    """Serve the React frontend"""
     if dist_path:
         index_path = os.path.join(dist_path, "index.html")
         if os.path.exists(index_path):
-            print(
-                f"✅ [ROOT] Successfully serving React app from: {index_path}")
             return FileResponse(index_path)
 
-    print("❌ [ROOT] DEPLOYMENT ERROR: Frontend build not found!")
     return {
         "message": "Crypto Fund API",
         "status": "running",
@@ -2199,24 +1867,14 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for debugging and monitoring"""
+    """Health check endpoint"""
     try:
-        # Environment check
-        env_status = {
-            "DATABASE_URL": bool(DATABASE_URL),
-            "ALCHEMY_API_KEY": bool(ALCHEMY_API_KEY),
-            "NODE_ENV": os.getenv("NODE_ENV", "development")
-        }
-
-        # Database connection test
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Test basic connectivity
         cursor.execute("SELECT current_database(), current_user, version()")
         db_info = cursor.fetchone()
 
-        # Get table counts
         cursor.execute("SELECT COUNT(*) FROM wallets")
         wallet_result = cursor.fetchone()
         wallet_count = wallet_result['count'] if wallet_result else 0
@@ -2225,11 +1883,14 @@ async def health_check():
         asset_result = cursor.fetchone()
         asset_count = asset_result['count'] if asset_result else 0
 
+        cursor.execute("SELECT COUNT(*) FROM nft_collections")
+        nft_result = cursor.fetchone()
+        nft_count = nft_result['count'] if nft_result else 0
+
         cursor.execute("SELECT COUNT(*) FROM hidden_assets")
         hidden_result = cursor.fetchone()
         hidden_count = hidden_result['count'] if hidden_result else 0
 
-        # Check table structure
         cursor.execute("""
             SELECT table_name FROM information_schema.tables 
             WHERE table_schema = 'public' 
@@ -2243,7 +1904,11 @@ async def health_check():
         return {
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
-            "environment": env_status,
+            "environment": {
+                "DATABASE_URL": bool(DATABASE_URL),
+                "ALCHEMY_API_KEY": bool(ALCHEMY_API_KEY),
+                "NODE_ENV": os.getenv("NODE_ENV", "development")
+            },
             "database": {
                 "status": "connected",
                 "type": "PostgreSQL",
@@ -2254,6 +1919,7 @@ async def health_check():
                 "counts": {
                     "wallets": wallet_count,
                     "assets": asset_count,
+                    "nft_collections": nft_count,
                     "hidden_assets": hidden_count
                 }
             },
@@ -2262,36 +1928,13 @@ async def health_check():
                 "version": "1.0.0"
             }
         }
-    except psycopg2.OperationalError as e:
-        return {
-            "status":
-            "unhealthy",
-            "timestamp":
-            datetime.now().isoformat(),
-            "error":
-            "database_connection_failed",
-            "error_details":
-            str(e),
-            "suggestions": [
-                "Check if PostgreSQL database is created in Replit",
-                "Verify DATABASE_URL environment variable",
-                "Wait for database to start (30-60 seconds)",
-                "Restart the application"
-            ]
-        }
     except Exception as e:
         return {
             "status": "unhealthy",
             "timestamp": datetime.now().isoformat(),
             "error": "unexpected_error",
-            "error_details": str(e),
-            "error_type": type(e).__name__
+            "error_details": str(e)
         }
-    finally:
-        if 'cursor' in locals() and cursor:
-            cursor.close()
-        if 'conn' in locals() and conn:
-            conn.close()
 
 
 @app.post("/api/wallets", response_model=WalletResponse)
@@ -2307,14 +1950,10 @@ async def create_wallet(wallet: WalletCreate):
         wallet_id = result['id'] if result else None
         conn.commit()
 
-        return WalletResponse(id=wallet_id,
-                              address=wallet.address,
-                              label=wallet.label,
-                              network=wallet.network)
+        return WalletResponse(id=wallet_id, address=wallet.address, label=wallet.label, network=wallet.network)
     except psycopg2.IntegrityError:
         conn.rollback()
-        raise HTTPException(status_code=400,
-                            detail="Wallet address already exists")
+        raise HTTPException(status_code=400, detail="Wallet address already exists")
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
@@ -2333,12 +1972,7 @@ async def get_wallets():
     cursor.close()
     conn.close()
 
-    return [
-        WalletResponse(id=w['id'],
-                       address=w['address'],
-                       label=w['label'],
-                       network=w['network']) for w in wallets
-    ]
+    return [WalletResponse(id=w['id'], address=w['address'], label=w['label'], network=w['network']) for w in wallets]
 
 
 @app.delete("/api/wallets/{wallet_id}")
@@ -2347,9 +1981,9 @@ async def delete_wallet(wallet_id: int):
     cursor = conn.cursor()
 
     try:
-        cursor.execute("DELETE FROM assets WHERE wallet_id = %s",
-                       (wallet_id, ))
-        cursor.execute("DELETE FROM wallets WHERE id = %s", (wallet_id, ))
+        cursor.execute("DELETE FROM assets WHERE wallet_id = %s", (wallet_id,))
+        cursor.execute("DELETE FROM nft_collections WHERE wallet_id = %s", (wallet_id,))
+        cursor.execute("DELETE FROM wallets WHERE id = %s", (wallet_id,))
 
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Wallet not found")
@@ -2375,165 +2009,104 @@ async def get_portfolio():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Debug: Check what's in the assets table
-    cursor.execute("SELECT COUNT(*) FROM assets")
-    result = cursor.fetchone()
-    total_assets_count = result['count'] if result else 0
-    print(
-        f"🔍 [PORTFOLIO DEBUG] Total assets in database: {total_assets_count}")
-
-    # Debug: Check hidden assets
-    cursor.execute("SELECT token_address, symbol FROM hidden_assets")
-    hidden_assets_debug = cursor.fetchall()
-    print(f"🔍 [PORTFOLIO DEBUG] Hidden assets: {hidden_assets_debug}")
-
-    # Debug: Check all assets before filtering
-    cursor.execute(
-        "SELECT token_address, symbol, name, value_usd FROM assets ORDER BY value_usd DESC"
-    )
-    all_assets_debug = cursor.fetchall()
-    print(
-        f"🔍 [PORTFOLIO DEBUG] All assets before filtering: {all_assets_debug}")
-
-    # Get all assets with notes, excluding hidden ones but preserving legitimate NFTs
+    # Get assets
     cursor.execute("""
         SELECT a.token_address, a.symbol, a.name, a.balance, a.balance_formatted, 
                a.price_usd, a.value_usd, COALESCE(a.purchase_price, 0) as purchase_price,
                COALESCE(a.total_invested, 0) as total_invested, COALESCE(a.realized_pnl, 0) as realized_pnl,
                COALESCE(a.unrealized_pnl, 0) as unrealized_pnl, COALESCE(a.total_return_pct, 0) as total_return_pct,
-               COALESCE(n.notes, '') as notes, COALESCE(a.is_nft, FALSE) as is_nft,
-               COALESCE(a.floor_price, 0) as floor_price, a.image_url, a.nft_metadata,
-               COALESCE(a.price_change_24h, 0) as price_change_24h
+               COALESCE(n.notes, '') as notes, COALESCE(a.price_change_24h, 0) as price_change_24h
         FROM assets a
         LEFT JOIN asset_notes n ON a.symbol = n.symbol
         WHERE NOT EXISTS (
             SELECT 1 FROM hidden_assets h 
             WHERE LOWER(h.token_address) = LOWER(a.token_address)
         )
-        AND (
-            a.is_nft = FALSE 
-            OR (a.is_nft = TRUE AND (
-                a.value_usd > 0 
-                OR LOWER(a.name) LIKE '%mutant%' 
-                OR LOWER(a.name) LIKE '%bored%ape%'
-                OR LOWER(a.name) LIKE '%cryptopunk%'
-                OR LOWER(a.name) LIKE '%azuki%'
-                OR LOWER(a.name) LIKE '%doodle%'
-                OR LOWER(a.name) LIKE '%pudgy%'
-            ))
-        )
-        ORDER BY a.is_nft DESC, a.value_usd DESC
+        ORDER BY a.value_usd DESC
     """)
     assets_data = cursor.fetchall()
-    print(
-        f"🔍 [PORTFOLIO DEBUG] Assets after filtering: {len(assets_data)} assets"
-    )
-
-    # Check for NFTs in the result using dictionary keys
-    nft_count = sum(1 for a in assets_data if bool(a.get('is_nft', False)))
-    print(f"🖼️ [PORTFOLIO DEBUG] NFTs found in filtered results: {nft_count}")
-
-    if nft_count > 0:
-        for a in assets_data:
-            if bool(a.get('is_nft', False)):
-                print(
-                    f"🖼️ [PORTFOLIO DEBUG] Found NFT: {a['symbol']} - {a['name']} - Floor: ${a.get('floor_price', 0)} - Image: {a.get('image_url')}"
-                )
-
-    if len(assets_data) > 0:
-        print(f"🔍 [PORTFOLIO DEBUG] Sample asset: {dict(assets_data[0])}")
-    else:
-        print(f"❌ [PORTFOLIO DEBUG] No assets returned by query!")
 
     assets = []
     for a in assets_data:
         try:
-            is_nft = bool(a.get('is_nft', False))
-            floor_price = float(a.get('floor_price',
-                                      0)) if a.get('floor_price') else 0.0
-            image_url = a.get('image_url')
-            nft_metadata = a.get('nft_metadata')
-            price_change_24h = float(a.get(
-                'price_change_24h', 0)) if a.get('price_change_24h') else 0.0
-
-            asset_dict = {
-                "id":
-                a['token_address'] if a['token_address'] else
-                a['symbol'],  # Use token_address as id
-                "symbol":
-                a['symbol'] or "Unknown",
-                "name":
-                a['name'] or "Unknown Token",
-                "balance":
-                float(a['balance']) if a['balance'] else 0.0,
-                "balance_formatted":
-                a['balance_formatted'] or "0.000000",
-                "price_usd":
-                float(a['price_usd']) if a['price_usd'] else 0.0,
-                "value_usd":
-                float(a['value_usd']) if a['value_usd'] else 0.0,
-                "purchase_price":
-                float(a['purchase_price']) if a['purchase_price'] else 0.0,
-                "total_invested":
-                float(a['total_invested']) if a['total_invested'] else 0.0,
-                "realized_pnl":
-                float(a['realized_pnl']) if a['realized_pnl'] else 0.0,
-                "unrealized_pnl":
-                float(a['unrealized_pnl']) if a['unrealized_pnl'] else 0.0,
-                "total_return_pct":
-                float(a['total_return_pct']) if a['total_return_pct'] else 0.0,
-                "notes":
-                a['notes'] or "",
-                "is_nft":
-                is_nft,
-                "floor_price":
-                floor_price,
-                "image_url":
-                image_url,
-                "nft_metadata":
-                nft_metadata,
-                "price_change_24h":
-                price_change_24h
-            }
-
-            asset = AssetResponse(**asset_dict)
+            asset = AssetResponse(
+                id=a['token_address'] if a['token_address'] else a['symbol'],
+                symbol=a['symbol'] or "Unknown",
+                name=a['name'] or "Unknown Token",
+                balance=float(a['balance']) if a['balance'] else 0.0,
+                balance_formatted=a['balance_formatted'] or "0.000000",
+                price_usd=float(a['price_usd']) if a['price_usd'] else 0.0,
+                value_usd=float(a['value_usd']) if a['value_usd'] else 0.0,
+                purchase_price=float(a['purchase_price']) if a['purchase_price'] else 0.0,
+                total_invested=float(a['total_invested']) if a['total_invested'] else 0.0,
+                realized_pnl=float(a['realized_pnl']) if a['realized_pnl'] else 0.0,
+                unrealized_pnl=float(a['unrealized_pnl']) if a['unrealized_pnl'] else 0.0,
+                total_return_pct=float(a['total_return_pct']) if a['total_return_pct'] else 0.0,
+                notes=a['notes'] or "",
+                is_nft=False,
+                floor_price=0,
+                image_url=None,
+                nft_metadata=None,
+                price_change_24h = float(a['price_change_24h']) if a['price_change_24h'] else 0.0
+                )
             assets.append(asset)
-
-            if is_nft:
-                print(
-                    f"🖼️ [PORTFOLIO DEBUG] Created NFT asset: {asset.symbol} = ${asset.value_usd:.2f} (Floor: ${floor_price})"
-                )
-            else:
-                print(
-                    f"✅ [PORTFOLIO DEBUG] Created asset: {asset.symbol} = ${asset.value_usd:.2f} (Return: {asset.total_return_pct:.1f}%)"
-                )
         except Exception as e:
-            print(f"❌ [PORTFOLIO DEBUG] Error creating asset from {a}: {e}")
-            import traceback
-            print(
-                f"📋 [PORTFOLIO DEBUG] Full error traceback: {traceback.format_exc()}"
-            )
+            print(f"❌ Error creating asset from {a}: {e}")
             continue
 
-    # Get the most recent saved total value from portfolio_history
+    # Get NFTs
     cursor.execute("""
-        SELECT total_value_usd FROM portfolio_history 
-        ORDER BY timestamp DESC LIMIT 1
+        SELECT contract_address, symbol, name, item_count, token_ids, floor_price_usd,
+               total_value_usd, image_url, COALESCE(purchase_price, 0) as purchase_price,
+               COALESCE(total_invested, 0) as total_invested, COALESCE(realized_pnl, 0) as realized_pnl,
+               COALESCE(unrealized_pnl, 0) as unrealized_pnl, COALESCE(total_return_pct, 0) as total_return_pct,
+               COALESCE(notes, '') as notes
+        FROM nft_collections
+        WHERE total_value_usd > 0
+        ORDER BY total_value_usd DESC
     """)
-    saved_total_result = cursor.fetchone()
-    saved_total_value = saved_total_result[
-        'total_value_usd'] if saved_total_result else 0
+    nfts_data = cursor.fetchall()
 
-    # Use saved value if available, otherwise calculate from current assets
-    calculated_total = sum(asset.value_usd or 0 for asset in assets)
-    total_value = saved_total_value if saved_total_value > 0 else calculated_total
+    nfts = []
+    for n in nfts_data:
+        try:
+            token_ids = []
+            if n['token_ids']:
+                try:
+                    token_ids = json.loads(n['token_ids'])
+                except:
+                    token_ids = []
+
+            nft = NFTResponse(
+                id=n['contract_address'],
+                contract_address=n['contract_address'],
+                symbol=n['symbol'] or "NFT",
+                name=n['name'] or "Unknown Collection",
+                item_count=int(n['item_count']) if n['item_count'] else 0,
+                token_ids=token_ids,
+                floor_price_usd=float(n['floor_price_usd']) if n['floor_price_usd'] else 0.0,
+                total_value_usd=float(n['total_value_usd']) if n['total_value_usd'] else 0.0,
+                image_url=n['image_url'],
+                purchase_price=float(n['purchase_price']) if n['purchase_price'] else 0.0,
+                total_invested=float(n['total_invested']) if n['total_invested'] else 0.0,
+                realized_pnl=float(n['realized_pnl']) if n['realized_pnl'] else 0.0,
+                unrealized_pnl=float(n['unrealized_pnl']) if n['unrealized_pnl'] else 0.0,
+                total_return_pct=float(n['total_return_pct']) if n['total_return_pct'] else 0.0,
+                notes=n['notes'] or "")
+            nfts.append(nft)
+        except Exception as e:
+            print(f"❌ Error creating NFT from {n}: {e}")
+            continue
+
+    # Calculate total value
+    total_value = sum(asset.value_usd or 0 for asset in assets) + sum(nft.total_value_usd or 0 for nft in nfts)
 
     # Get wallet count
     cursor.execute("SELECT COUNT(*) FROM wallets")
     result = cursor.fetchone()
     wallet_count = result['count'] if result else 0
 
-    # Calculate 24h performance using saved history
+    # Calculate 24h performance
     cursor.execute("""
         SELECT total_value_usd FROM portfolio_history 
         ORDER BY timestamp DESC LIMIT 2
@@ -2544,57 +2117,49 @@ async def get_portfolio():
         current_value = history[0]['total_value_usd']
         previous_value = history[1]['total_value_usd']
         if previous_value > 0:
-            performance_24h = (
-                (current_value - previous_value) / previous_value) * 100
-    elif len(history) == 1:
-        performance_24h = 2.4
+            performance_24h = ((current_value - previous_value) / previous_value) * 100
 
     conn.close()
 
-    return PortfolioResponse(total_value=total_value,
-                             assets=assets,
-                             wallet_count=wallet_count,
-                             performance_24h=performance_24h)
+    return PortfolioResponse(
+        total_value=total_value,
+        assets=assets,
+        nfts=nfts,
+        wallet_count=wallet_count,
+        performance_24h=performance_24h)
 
 
-@app.get("/api/wallets/{wallet_id}/details",
-         response_model=WalletDetailsResponse)
+@app.get("/api/wallets/{wallet_id}/details", response_model=WalletDetailsResponse)
 async def get_wallet_details(wallet_id: int):
     conn = get_db_connection()
     cursor = conn.cursor()
 
     # Get wallet info
-    cursor.execute(
-        "SELECT id, address, label, network FROM wallets WHERE id = %s",
-        (wallet_id, ))
+    cursor.execute("SELECT id, address, label, network FROM wallets WHERE id = %s", (wallet_id,))
     wallet_data = cursor.fetchone()
     if not wallet_data:
         conn.close()
         raise HTTPException(status_code=404, detail="Wallet not found")
 
-    wallet = WalletResponse(id=wallet_data['id'],
-                            address=wallet_data['address'],
-                            label=wallet_data['label'],
-                            network=wallet_data['network'])
+    wallet = WalletResponse(id=wallet_data['id'], address=wallet_data['address'], 
+                           label=wallet_data['label'], network=wallet_data['network'])
 
     # Get wallet assets
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT a.token_address, a.symbol, a.name, a.balance, a.balance_formatted, 
                a.price_usd, a.value_usd, COALESCE(n.notes, '') as notes
         FROM assets a
         LEFT JOIN asset_notes n ON a.symbol = n.symbol
         WHERE a.wallet_id = %s
         ORDER BY a.value_usd DESC
-    """, (wallet_id, ))
+    """, (wallet_id,))
     assets_data = cursor.fetchall()
 
     assets = []
     for a in assets_data:
         try:
             asset = AssetResponse(
-                id=a['token_address'] if a['token_address'] else
-                a['symbol'],  # Use token_address as id
+                id=a['token_address'] if a['token_address'] else a['symbol'],
                 symbol=a['symbol'] or "Unknown",
                 name=a['name'] or "Unknown Token",
                 balance=float(a['balance']) if a['balance'] else 0.0,
@@ -2604,51 +2169,54 @@ async def get_wallet_details(wallet_id: int):
                 notes=a['notes'] or "")
             assets.append(asset)
         except Exception as e:
-            print(f"❌ [WALLET DEBUG] Error creating asset from {a}: {e}")
+            print(f"❌ Error creating asset from {a}: {e}")
             continue
 
-    total_value = sum(asset.value_usd or 0 for asset in assets)
-
-    conn.close()
-
-    return WalletDetailsResponse(wallet=wallet,
-                                 assets=assets,
-                                 total_value=total_value,
-                                 performance_24h=0.0)
-
-
-@app.get("/api/wallets/status")
-async def get_wallet_status():
-    """Get status of all wallets including success/failure information"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
+    # Get wallet NFTs
     cursor.execute("""
-        SELECT w.id, w.address, w.label, w.network,
-               COALESCE(ws.status, 'unknown') as status,
-               COALESCE(ws.assets_found, 0) as assets_found,
-               COALESCE(ws.total_value, 0) as total_value,
-               ws.error_message,
-               ws.last_updated
-        FROM wallets w
-        LEFT JOIN wallet_status ws ON w.id = ws.wallet_id
-        ORDER BY w.id
-    """)
+        SELECT contract_address, symbol, name, item_count, token_ids, floor_price_usd,
+               total_value_usd, image_url
+        FROM nft_collections
+        WHERE wallet_id = %s
+        ORDER BY total_value_usd DESC
+    """, (wallet_id,))
+    nfts_data = cursor.fetchall()
 
-    wallet_status_data = cursor.fetchall()
+    nfts = []
+    for n in nfts_data:
+        try:
+            token_ids = []
+            if n['token_ids']:
+                try:
+                    token_ids = json.loads(n['token_ids'])
+                except:
+                    token_ids = []
+
+            nft = NFTResponse(
+                id=n['contract_address'],
+                contract_address=n['contract_address'],
+                symbol=n['symbol'] or "NFT",
+                name=n['name'] or "Unknown Collection",
+                item_count=int(n['item_count']) if n['item_count'] else 0,
+                token_ids=token_ids,
+                floor_price_usd=float(n['floor_price_usd']) if n['floor_price_usd'] else 0.0,
+                total_value_usd=float(n['total_value_usd']) if n['total_value_usd'] else 0.0,
+                image_url=n['image_url'])
+            nfts.append(nft)
+        except Exception as e:
+            print(f"❌ Error creating NFT from {n}: {e}")
+            continue
+
+    total_value = sum(asset.value_usd or 0 for asset in assets) + sum(nft.total_value_usd or 0 for nft in nfts)
+
     conn.close()
 
-    return [{
-        "wallet_id": w['id'],
-        "address": w['address'],
-        "label": w['label'],
-        "network": w['network'],
-        "status": w['status'],
-        "assets_found": w['assets_found'],
-        "total_value": w['total_value'],
-        "error_message": w['error_message'],
-        "last_updated": w['last_updated']
-    } for w in wallet_status_data]
+    return WalletDetailsResponse(
+        wallet=wallet,
+        assets=assets,
+        nfts=nfts,
+        total_value=total_value,
+        performance_24h=0.0)
 
 
 @app.put("/api/assets/{symbol}/notes")
@@ -2658,8 +2226,7 @@ async def update_asset_notes(symbol: str, notes: str):
     cursor = conn.cursor()
 
     try:
-        cursor.execute(
-            """
+        cursor.execute("""
             INSERT INTO asset_notes (symbol, notes, updated_at)
             VALUES (%s, %s, CURRENT_TIMESTAMP)
             ON CONFLICT (symbol) DO UPDATE SET
@@ -2667,140 +2234,77 @@ async def update_asset_notes(symbol: str, notes: str):
         """, (symbol, notes))
 
         conn.commit()
-        conn.close()
-
         return {"message": "Notes updated successfully"}
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
     finally:
-        if 'cursor' in locals():
-            cursor.close()
-        if 'conn' in locals():
-            conn.close()
+        cursor.close()
+        conn.close()
 
 
 @app.put("/api/assets/{symbol}/purchase_price")
 async def update_asset_purchase_price(symbol: str, request: dict):
-    """Update purchase price for a specific asset with robust symbol matching and comprehensive validation"""
+    """Update purchase price for a specific asset"""
     if not symbol or not symbol.strip():
         raise HTTPException(status_code=400, detail="Symbol is required")
 
-    # Clean the input symbol but preserve original for logging
-    original_symbol = symbol
     clean_symbol = symbol.strip()
 
     try:
         purchase_price = request.get('purchase_price')
-
-        # Comprehensive input validation
         if purchase_price is None:
-            raise HTTPException(status_code=400,
-                                detail="Purchase price is required")
+            raise HTTPException(status_code=400, detail="Purchase price is required")
 
-        # Convert to float and validate
         try:
             purchase_price = float(purchase_price)
         except (ValueError, TypeError):
-            raise HTTPException(status_code=400,
-                                detail="Purchase price must be a valid number")
+            raise HTTPException(status_code=400, detail="Purchase price must be a valid number")
 
-        # Business logic validation
         if purchase_price < 0:
-            raise HTTPException(status_code=400,
-                                detail="Purchase price cannot be negative")
+            raise HTTPException(status_code=400, detail="Purchase price cannot be negative")
 
-        # Handle extremely large values to prevent overflow
-        if purchase_price > 1e15:  # 1 quadrillion - reasonable upper limit
-            raise HTTPException(status_code=400,
-                                detail="Purchase price is too large")
-
-        print(
-            f"🔄 [PURCHASE PRICE] Updating purchase price for '{original_symbol}' (cleaned: '{clean_symbol}'): ${purchase_price}"
-        )
+        if purchase_price > 1e15:
+            raise HTTPException(status_code=400, detail="Purchase price is too large")
 
     except HTTPException:
-        raise  # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
-        print(f"❌ Error validating purchase price input: {e}")
         raise HTTPException(status_code=400, detail="Invalid input format")
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
-        # ROBUST SYMBOL MATCHING: Try multiple approaches to find the asset
+        # Find the asset with robust symbol matching
         asset_data = None
         matched_symbol = None
 
-        print(
-            f"🔍 [PURCHASE PRICE] Searching for asset with symbol variations..."
-        )
-
-        # Method 1: Exact match (cleaned)
-        cursor.execute(
-            """
+        # Try exact match first
+        cursor.execute("""
             SELECT symbol, balance, value_usd, purchase_price as old_purchase_price, token_address
             FROM assets 
             WHERE symbol = %s
             LIMIT 1
-        """, (clean_symbol, ))
+        """, (clean_symbol,))
         asset_data = cursor.fetchone()
+
         if asset_data:
             matched_symbol = asset_data['symbol']
-            print(f"✅ [PURCHASE PRICE] Found exact match: '{matched_symbol}'")
-
-        # Method 2: Case-insensitive match
-        if not asset_data:
-            cursor.execute(
-                """
+        else:
+            # Try case-insensitive match
+            cursor.execute("""
                 SELECT symbol, balance, value_usd, purchase_price as old_purchase_price, token_address
                 FROM assets 
                 WHERE LOWER(symbol) = LOWER(%s)
                 LIMIT 1
-            """, (clean_symbol, ))
+            """, (clean_symbol,))
             asset_data = cursor.fetchone()
+
             if asset_data:
                 matched_symbol = asset_data['symbol']
-                print(
-                    f"✅ [PURCHASE PRICE] Found case-insensitive match: '{matched_symbol}'"
-                )
 
-        # Method 3: Trimmed symbol match (handle database symbols with extra whitespace)
         if not asset_data:
-            cursor.execute(
-                """
-                SELECT symbol, balance, value_usd, purchase_price as old_purchase_price, token_address
-                FROM assets 
-                WHERE TRIM(symbol) = %s
-                LIMIT 1
-            """, (clean_symbol, ))
-            asset_data = cursor.fetchone()
-            if asset_data:
-                matched_symbol = asset_data['symbol']
-                print(
-                    f"✅ [PURCHASE PRICE] Found trimmed match: '{matched_symbol}' (original with whitespace)"
-                )
-
-        # Method 4: Partial match (contains)
-        if not asset_data:
-            cursor.execute(
-                """
-                SELECT symbol, balance, value_usd, purchase_price as old_purchase_price, token_address
-                FROM assets 
-                WHERE symbol ILIKE %s OR %s ILIKE '%%' || symbol || '%%'
-                LIMIT 1
-            """, (f'%{clean_symbol}%', clean_symbol))
-            asset_data = cursor.fetchone()
-            if asset_data:
-                matched_symbol = asset_data['symbol']
-                print(
-                    f"✅ [PURCHASE PRICE] Found partial match: '{matched_symbol}'"
-                )
-
-        # If still not found, provide helpful debugging information
-        if not asset_data:
-            # Get all available symbols for debugging
             cursor.execute("""
                 SELECT symbol, name, balance, value_usd 
                 FROM assets 
@@ -2810,51 +2314,21 @@ async def update_asset_purchase_price(symbol: str, request: dict):
             """)
             available_assets = cursor.fetchall()
 
-            available_symbols = [
-                f"'{asset['symbol']}' ({asset['name']}, ${asset['value_usd']:.2f})"
-                for asset in available_assets
-            ]
-
+            available_symbols = [f"'{asset['symbol']}'" for asset in available_assets]
             error_detail = f"Asset with symbol '{clean_symbol}' not found. Available assets: {', '.join(available_symbols)}"
-            print(f"❌ [PURCHASE PRICE] {error_detail}")
-
             raise HTTPException(status_code=404, detail=error_detail)
 
-        # Extract data from the matched asset
+        # Calculate new metrics
         balance = float(asset_data['balance']) if asset_data['balance'] else 0
-        current_value = float(
-            asset_data['value_usd']) if asset_data['value_usd'] else 0
-        old_purchase_price = float(asset_data['old_purchase_price']
-                                   ) if asset_data['old_purchase_price'] else 0
+        current_value = float(asset_data['value_usd']) if asset_data['value_usd'] else 0
         token_address = asset_data['token_address']
 
-        print(
-            f"📊 [PURCHASE PRICE] Asset '{matched_symbol}' current data: Balance={balance}, Value=${current_value}, Old Price=${old_purchase_price}"
-        )
-
-        # Calculate new metrics with safe division
         total_invested = balance * purchase_price
         unrealized_pnl = current_value - total_invested
+        total_return_pct = ((unrealized_pnl / total_invested) * 100) if total_invested > 0 else 0
 
-        # Safe percentage calculation
-        if total_invested > 0:
-            total_return_pct = (unrealized_pnl / total_invested) * 100
-        else:
-            total_return_pct = 0 if unrealized_pnl == 0 else float(
-                'inf') if unrealized_pnl > 0 else float('-inf')
-            # Cap infinite values for database storage
-            if total_return_pct == float('inf'):
-                total_return_pct = 999999  # Very large positive number
-            elif total_return_pct == float('-inf'):
-                total_return_pct = -999999  # Very large negative number
-
-        print(
-            f"📈 [PURCHASE PRICE] Calculated metrics: Invested=${total_invested:.2f}, P&L=${unrealized_pnl:.2f}, Return={total_return_pct:.2f}%"
-        )
-
-        # Store the override in the permanent overrides table
-        cursor.execute(
-            """
+        # Store the override
+        cursor.execute("""
             INSERT INTO purchase_price_overrides 
             (token_address, symbol, override_price, updated_at)
             VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
@@ -2864,13 +2338,8 @@ async def update_asset_purchase_price(symbol: str, request: dict):
             updated_at = EXCLUDED.updated_at
         """, (token_address, matched_symbol, purchase_price))
 
-        print(
-            f"✅ [PURCHASE PRICE] Stored permanent override for '{matched_symbol}': ${purchase_price}"
-        )
-
-        # Update the asset using the exact matched symbol (important for symbols with whitespace)
-        update_count = cursor.execute(
-            """
+        # Update the asset
+        cursor.execute("""
             UPDATE assets 
             SET purchase_price = %s,
                 total_invested = %s,
@@ -2878,78 +2347,31 @@ async def update_asset_purchase_price(symbol: str, request: dict):
                 total_return_pct = %s,
                 last_updated = CURRENT_TIMESTAMP
             WHERE symbol = %s
-        """, (purchase_price, total_invested, unrealized_pnl, total_return_pct,
-              matched_symbol))
+        """, (purchase_price, total_invested, unrealized_pnl, total_return_pct, matched_symbol))
 
         if cursor.rowcount == 0:
-            raise HTTPException(
-                status_code=500,
-                detail=
-                f"Failed to update asset '{matched_symbol}' - no rows affected"
-            )
-
-        print(
-            f"✅ [PURCHASE PRICE] Updated {cursor.rowcount} row(s) for symbol '{matched_symbol}'"
-        )
-
-        # Also update the cost basis table for consistency using token_address (more reliable)
-        cursor.execute(
-            """
-            INSERT INTO asset_cost_basis 
-            (token_address, symbol, average_purchase_price, total_quantity_purchased, total_invested, last_updated)
-            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-            ON CONFLICT (token_address) DO UPDATE SET
-            symbol = EXCLUDED.symbol,
-            average_purchase_price = EXCLUDED.average_purchase_price,
-            total_quantity_purchased = EXCLUDED.total_quantity_purchased,
-            total_invested = EXCLUDED.total_invested,
-            last_updated = EXCLUDED.last_updated
-        """, (token_address, matched_symbol, purchase_price, balance,
-              total_invested))
+            raise HTTPException(status_code=500, detail=f"Failed to update asset '{matched_symbol}'")
 
         conn.commit()
 
-        print(
-            f"✅ [PURCHASE PRICE] Successfully updated purchase price for '{matched_symbol}': ${purchase_price}"
-        )
-        print(
-            f"   New metrics: Invested=${total_invested:.2f}, P&L=${unrealized_pnl:.2f}, Return={total_return_pct:.2f}%"
-        )
-
         return {
             "message": f"Purchase price updated for {matched_symbol}",
-            "symbol": matched_symbol,  # Return the actual matched symbol
+            "symbol": matched_symbol,
             "purchase_price": purchase_price,
             "total_invested": total_invested,
             "unrealized_pnl": unrealized_pnl,
-            "total_return_pct": total_return_pct,
-            "updated_at": "now"
+            "total_return_pct": total_return_pct
         }
 
     except HTTPException:
         conn.rollback()
-        raise  # Re-raise HTTP exceptions as-is
-    except psycopg2.Error as e:
-        conn.rollback()
-        print(
-            f"❌ [PURCHASE PRICE] Database error updating purchase price for '{clean_symbol}': {e}"
-        )
-        raise HTTPException(status_code=500,
-                            detail=f"Database error: {str(e)}")
+        raise
     except Exception as e:
         conn.rollback()
-        print(
-            f"❌ [PURCHASE PRICE] Unexpected error updating purchase price for '{clean_symbol}': {e}"
-        )
-        import traceback
-        print(f"📋 [PURCHASE PRICE] Full traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500,
-                            detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
     finally:
-        if 'cursor' in locals() and cursor:
-            cursor.close()
-        if 'conn' in locals() and conn:
-            conn.close()
+        cursor.close()
+        conn.close()
 
 
 @app.post("/api/assets/hide")
@@ -2959,18 +2381,15 @@ async def hide_asset(token_address: str, symbol: str, name: str):
     cursor = conn.cursor()
 
     try:
-        cursor.execute(
-            """
+        cursor.execute("""
             INSERT INTO hidden_assets (token_address, symbol, name)
             VALUES (%s, %s, %s)
         """, (token_address.lower(), symbol, name))
 
         conn.commit()
-        print(f"✅ Hidden asset: {symbol} ({token_address})")
         return {"message": f"Asset {symbol} hidden successfully"}
-    except psycopg2.Error as e:
+    except Exception as e:
         conn.rollback()
-        print(f"❌ Error hiding asset: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
     finally:
         cursor.close()
@@ -2979,12 +2398,11 @@ async def hide_asset(token_address: str, symbol: str, name: str):
 
 @app.delete("/api/assets/hide/{token_address}")
 async def unhide_asset(token_address: str):
-    """Unhide an asset to include in portfolio calculations"""
+    """Unhide an asset"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM hidden_assets WHERE token_address = %s",
-                   (token_address.lower(), ))
+    cursor.execute("DELETE FROM hidden_assets WHERE token_address = %s", (token_address.lower(),))
 
     if cursor.rowcount == 0:
         conn.close()
@@ -3001,8 +2419,7 @@ async def get_hidden_assets():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT token_address, symbol, name, hidden_at FROM hidden_assets")
+    cursor.execute("SELECT token_address, symbol, name, hidden_at FROM hidden_assets")
     hidden_assets = cursor.fetchall()
     conn.close()
 
@@ -3014,1080 +2431,9 @@ async def get_hidden_assets():
     } for h in hidden_assets]
 
 
-@app.get("/api/assets/overrides")
-async def get_purchase_price_overrides():
-    """Get list of purchase price overrides"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT token_address, symbol, override_price, updated_at FROM purchase_price_overrides ORDER BY updated_at DESC"
-    )
-    overrides = cursor.fetchall()
-    conn.close()
-
-    return [{
-        "token_address": o['token_address'],
-        "symbol": o['symbol'],
-        "override_price": o['override_price'],
-        "updated_at": o['updated_at']
-    } for o in overrides]
-
-
-@app.delete("/api/assets/overrides/{token_address}")
-async def delete_purchase_price_override(token_address: str):
-    """Remove a purchase price override"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "DELETE FROM purchase_price_overrides WHERE token_address = %s",
-        (token_address, ))
-
-    if cursor.rowcount == 0:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Override not found")
-
-    conn.commit()
-    conn.close()
-    return {"message": "Purchase price override removed successfully"}
-
-
-@app.get("/api/debug/database")
-async def debug_database():
-    """Debug endpoint to test database connection and structure"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Test basic connection
-        cursor.execute("SELECT 1 as test")
-        test_result = cursor.fetchone()
-
-        # Check if tables exist
-        cursor.execute("""
-            SELECT table_name FROM information_schema.tables 
-            WHERE table_schema = 'public'
-            ORDER BY table_name
-        """)
-        tables = [row['table_name'] for row in cursor.fetchall()]
-
-        # Get table counts
-        table_counts = {}
-        for table in tables:
-            try:
-                cursor.execute(f"SELECT COUNT(*) as count FROM {table}")
-                result = cursor.fetchone()
-                table_counts[table] = result['count'] if result else 0
-            except Exception as e:
-                table_counts[table] = f"Error: {str(e)}"
-
-        conn.close()
-
-        return {
-            "status": "connected",
-            "test_query": test_result['test'] if test_result else None,
-            "tables": tables,
-            "table_counts": table_counts,
-            "database_url_set": bool(DATABASE_URL),
-            "connection_type": "PostgreSQL with RealDictCursor"
-        }
-
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "database_url_set": bool(DATABASE_URL)
-        }
-
-
-@app.get("/api/debug/nfts/{wallet_address}")
-async def debug_nft_query(wallet_address: str):
-    """Debug endpoint to manually test NFT queries with comprehensive logging"""
-    try:
-        print(f"🔍 [DEBUG NFT] Manual NFT query for wallet: {wallet_address}")
-        print(f"🔍 [DEBUG NFT] Alchemy API Key set: {bool(ALCHEMY_API_KEY)}")
-
-        # Create Ethereum asset fetcher
-        eth_fetcher = EthereumAssetFetcher(ALCHEMY_API_KEY)
-
-        # Test direct Alchemy API call first
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            test_payload = {
-                "id": 1,
-                "jsonrpc": "2.0",
-                "method": "alchemy_getNFTs",
-                "params": [wallet_address, {
-                    "withMetadata": True
-                }]
-            }
-
-            print(f"🔍 [DEBUG NFT] Testing direct Alchemy call...")
-            test_response = await client.post(eth_fetcher.alchemy_url,
-                                              json=test_payload)
-            print(
-                f"🔍 [DEBUG NFT] Direct API status: {test_response.status_code}"
-            )
-
-            if test_response.status_code == 200:
-                test_data = test_response.json()
-                print(
-                    f"🔍 [DEBUG NFT] Direct API response preview: {str(test_data)[:300]}..."
-                )
-            else:
-                print(f"🔍 [DEBUG NFT] Direct API error: {test_response.text}")
-
-        # Fetch NFTs using the fetcher
-        nft_assets = await eth_fetcher._fetch_nfts(wallet_address, set())
-
-        # Check specifically for Mutant Ape contracts
-        mutant_ape_contracts = [
-            "0x60e4d786628fea6478f785a6d7e704777c86a7c6",  # MAYC official
-            "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",  # BAYC (for reference)
-        ]
-
-        print(f"🔍 [DEBUG NFT] Checking for Mutant Ape contracts...")
-        for contract in mutant_ape_contracts:
-            found_mutant = any(asset.token_address.lower() == contract.lower()
-                               for asset in nft_assets)
-            print(
-                f"🔍 [DEBUG NFT] {contract}: {'FOUND' if found_mutant else 'NOT FOUND'}"
-            )
-
-        return {
-            "wallet_address":
-            wallet_address,
-            "nft_count":
-            len(nft_assets),
-            "mutant_ape_found":
-            any("mutant" in asset.name.lower()
-                or "mayc" in asset.symbol.lower() for asset in nft_assets),
-            "nfts": [
-                {
-                    "contract_address": asset.token_address,
-                    "symbol": asset.symbol,
-                    "name": asset.name,
-                    "count": asset.balance,
-                    "is_nft": asset.is_nft,
-                    "token_ids": asset.token_ids[:10],  # Show more token IDs
-                    "floor_price": asset.floor_price,
-                    "image_url": asset.image_url
-                } for asset in nft_assets
-            ]
-        }
-    except Exception as e:
-        print(f"❌ [DEBUG NFT] Error: {e}")
-        import traceback
-        print(f"❌ [DEBUG NFT] Full traceback: {traceback.format_exc()}")
-        return {"error": str(e), "traceback": traceback.format_exc()}
-
-
-@app.get("/api/portfolio/returns")
-async def get_portfolio_returns():
-    """Get comprehensive portfolio returns analysis"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    try:
-        # Get overall portfolio metrics
-        cursor.execute("""
-            SELECT 
-                SUM(total_invested) as total_invested,
-                SUM(value_usd) as total_current_value,
-                SUM(unrealized_pnl) as total_unrealized_pnl,
-                SUM(realized_pnl) as total_realized_pnl,
-                AVG(total_return_pct) as avg_return_pct
-            FROM assets 
-            WHERE balance > 0 AND NOT EXISTS (
-                SELECT 1 FROM hidden_assets h 
-                WHERE LOWER(h.token_address) = LOWER(assets.token_address)
-            )
-        """)
-        portfolio_metrics = cursor.fetchone()
-
-        # Get top performers
-        cursor.execute("""
-            SELECT symbol, name, total_return_pct, unrealized_pnl, value_usd
-            FROM assets 
-            WHERE balance > 0 AND total_return_pct IS NOT NULL
-            AND NOT EXISTS (
-                SELECT 1 FROM hidden_assets h 
-                WHERE LOWER(h.token_address) = LOWER(assets.token_address)
-            )
-            ORDER BY total_return_pct DESC
-            LIMIT 10
-        """)
-        top_performers = cursor.fetchall()
-
-        # Get worst performers
-        cursor.execute("""
-            SELECT symbol, name, total_return_pct, unrealized_pnl, value_usd
-            FROM assets 
-            WHERE balance > 0 AND total_return_pct IS NOT NULL
-            AND NOT EXISTS (
-                SELECT 1 FROM hidden_assets h 
-                WHERE LOWER(h.token_address) = LOWER(assets.token_address)
-            )
-            ORDER BY total_return_pct ASC
-            LIMIT 5
-        """)
-        worst_performers = cursor.fetchall()
-
-        portfolio_data = portfolio_metrics or {}
-        total_invested = portfolio_data.get('total_invested', 0) or 0
-        total_current_value = portfolio_data.get('total_current_value', 0) or 0
-        total_unrealized_pnl = portfolio_data.get('total_unrealized_pnl',
-                                                  0) or 0
-        total_realized_pnl = portfolio_data.get('total_realized_pnl', 0) or 0
-        avg_return_pct = portfolio_data.get('avg_return_pct', 0) or 0
-
-        overall_return_pct = ((total_current_value - total_invested) /
-                              total_invested *
-                              100) if total_invested > 0 else 0
-
-        return {
-            "portfolio_metrics": {
-                "total_invested": total_invested,
-                "total_current_value": total_current_value,
-                "total_unrealized_pnl": total_unrealized_pnl,
-                "total_realized_pnl": total_realized_pnl,
-                "overall_return_pct": overall_return_pct,
-                "average_return_pct": avg_return_pct
-            },
-            "top_performers": [{
-                "symbol": tp['symbol'],
-                "name": tp['name'],
-                "return_pct": tp['total_return_pct'],
-                "unrealized_pnl": tp['unrealized_pnl'],
-                "current_value": tp['value_usd']
-            } for tp in top_performers],
-            "worst_performers": [{
-                "symbol": wp['symbol'],
-                "name": wp['name'],
-                "return_pct": wp['total_return_pct'],
-                "unrealized_pnl": wp['unrealized_pnl'],
-                "current_value": wp['value_usd']
-            } for wp in worst_performers]
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500,
-                            detail=f"Error fetching returns data: {e}")
-    finally:
-        conn.close()
-
-
-@app.post("/api/assets/{symbol}/purchase")
-async def add_purchase_record(symbol: str,
-                              quantity: float,
-                              price_per_token: float,
-                              notes: str = ""):
-    """Add a purchase record for manual tracking"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    try:
-        # Get token details
-        cursor.execute(
-            "SELECT token_address, name FROM assets WHERE symbol = %s LIMIT 1",
-            (symbol, ))
-        asset_data = cursor.fetchone()
-
-        if not asset_data:
-            raise HTTPException(status_code=404, detail="Asset not found")
-
-        token_address, name = asset_data[0], asset_data[1]
-        total_value = quantity * price_per_token
-
-        # Insert purchase record
-        cursor.execute(
-            """
-            INSERT INTO purchase_history 
-            (wallet_id, token_address, symbol, transaction_type, quantity, price_per_token, total_value, notes)
-            VALUES (1, %s, %s, 'BUY', %s, %s, %s, %s)
-        """, (token_address, symbol, quantity, price_per_token, total_value,
-              notes))
-
-        # Update cost basis
-        cursor.execute(
-            """
-            SELECT total_quantity_purchased, total_invested 
-            FROM asset_cost_basis 
-            WHERE token_address = %s
-        """, (token_address, ))
-
-        existing_basis = cursor.fetchone()
-
-        if existing_basis:
-            old_quantity, old_invested = existing_basis[0], existing_basis[1]
-            new_quantity = old_quantity + quantity
-            new_invested = old_invested + total_value
-            new_avg_price = new_invested / new_quantity
-
-            cursor.execute(
-                """
-                UPDATE asset_cost_basis 
-                SET total_quantity_purchased = %s, total_invested = %s, average_purchase_price = %s
-                WHERE token_address = %s
-            """, (new_quantity, new_invested, new_avg_price, token_address))
-        else:
-            cursor.execute(
-                """
-                INSERT INTO asset_cost_basis 
-                (token_address, symbol, average_purchase_price, total_quantity_purchased, total_invested)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (token_address) DO UPDATE SET
-                average_purchase_price = EXCLUDED.average_purchase_price,
-                total_quantity_purchased = EXCLUDED.total_quantity_purchased,
-                total_invested = EXCLUDED.total_invested
-            """, (token_address, symbol, price_per_token, quantity,
-                  total_value))
-
-        conn.commit()
-        return {"message": "Purchase record added successfully"}
-
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500,
-                            detail=f"Error adding purchase record: {e}")
-    finally:
-        conn.close()
-
-
-async def estimate_purchase_prices_and_calculate_returns():
-    """
-    Estimate purchase prices for existing assets and calculate returns.
-    This uses various heuristics to estimate when assets were likely purchased.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    try:
-        print(
-            "💰 Starting purchase price estimation and returns calculation...")
-
-        # Get all current assets that don't already have purchase prices
-        cursor.execute("""
-            SELECT token_address, symbol, name, balance, price_usd, value_usd
-            FROM assets 
-            WHERE balance > 0 AND price_usd > 0 
-            AND (purchase_price IS NULL OR purchase_price = 0)
-            LIMIT 50
-        """)
-        current_assets = cursor.fetchall()
-        
-        if not current_assets:
-            print("✅ All assets already have purchase prices estimated")
-            return
-
-        for asset_row in current_assets:
-            try:
-                token_address = asset_row['token_address']
-                symbol = asset_row['symbol']
-                name = asset_row['name']
-                balance = float(asset_row['balance']) if asset_row['balance'] else 0.0
-                current_price = float(asset_row['price_usd']) if asset_row['price_usd'] else 0.0
-                current_value = float(asset_row['value_usd']) if asset_row['value_usd'] else 0.0
-
-                # Skip if essential data is missing
-                if not symbol or not token_address or balance <= 0:
-                    continue
-
-                # Estimate purchase price based on asset type and historical context
-                estimated_purchase_price = await estimate_asset_purchase_price(
-                    symbol, name, current_price)
-
-                # Calculate total invested (estimated)
-                total_invested = balance * estimated_purchase_price
-
-                # Calculate unrealized P&L
-                unrealized_pnl = current_value - total_invested
-
-                # Calculate return percentage
-                total_return_pct = ((current_value - total_invested) /
-                                    total_invested *
-                                    100) if total_invested > 0 else 0
-
-                # Update asset with calculated values
-                cursor.execute(
-                    """
-                    UPDATE assets 
-                    SET purchase_price = %s, total_invested = %s, unrealized_pnl = %s, total_return_pct = %s
-                    WHERE token_address = %s AND balance > 0
-                """, (estimated_purchase_price, total_invested, unrealized_pnl,
-                      total_return_pct, token_address))
-
-                # Insert into cost basis table
-                cursor.execute(
-                    """
-                    INSERT INTO asset_cost_basis 
-                    (token_address, symbol, average_purchase_price, total_quantity_purchased, total_invested)
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (token_address) DO UPDATE SET
-                    average_purchase_price = EXCLUDED.average_purchase_price,
-                    total_quantity_purchased = EXCLUDED.total_quantity_purchased,
-                    total_invested = EXCLUDED.total_invested
-                """, (token_address, symbol, estimated_purchase_price, balance,
-                      total_invested))
-
-                print(
-                    f"✅ Updated {symbol}: Purchase ${estimated_purchase_price:.4f}, Return {total_return_pct:.1f}%"
-                )
-
-            except Exception as e:
-                print(f"❌ Error processing {symbol}: {e}")
-                continue
-
-        conn.commit()
-        print(
-            f"🎯 Purchase price estimation completed for {len(current_assets)} assets"
-        )
-
-    except Exception as e:
-        print(f"❌ Error in purchase price estimation: {e}")
-        conn.rollback()
-    finally:
-        conn.close()
-
-
-async def estimate_asset_purchase_price(symbol: str, name: str,
-                                        current_price: float) -> float:
-    """
-    Estimate purchase price based on asset characteristics and market timing.
-    Uses conservative estimates based on typical crypto fund entry strategies.
-    """
-
-    # Fund likely entry points based on asset type and market conditions
-    if symbol == "ETH":
-        # Ethereum - likely accumulated during multiple market cycles
-        return current_price * 0.65  # Estimated 35% gains
-
-    elif symbol == "WBTC" or "Bitcoin" in name:
-        # Bitcoin/WBTC - likely accumulated during bear markets
-        return current_price * 0.55  # Estimated 82% gains
-
-    elif symbol == "SOL":
-        # Solana - likely accumulated during 2023-2024 cycle
-        return current_price * 0.45  # Estimated 122% gains
-
-    elif symbol == "PENDLE":
-        # PENDLE - likely accumulated during DeFi summer or early growth
-        return current_price * 0.4  # Estimated 150% gains
-
-    elif symbol in ["USDC", "USDT", "DAI"]:
-        # Stablecoins - purchase price should be close to $1
-        return 1.0
-
-    elif "PENGU" in symbol or "Pudgy" in name:
-        # PENGU - likely purchased during meme season or airdrop
-        return current_price * 0.2  # Estimated 400% gains (early meme entry)
-
-    elif "Fartcoin" in name or symbol.startswith("SPL-"):
-        # Meme coins and other SPL tokens - high risk, high reward entries
-        if current_price > 1:
-            return current_price * 0.15  # Estimated 567% gains
-        else:
-            return current_price * 0.25  # More conservative for smaller tokens
-
-    elif symbol in ["UNI", "LINK", "AAVE", "CRV"]:
-        # Blue chip DeFi tokens
-        return current_price * 0.6  # Estimated 67% gains
-
-    else:
-        # Generic altcoins - conservative estimate
-        return current_price * 0.5  # Estimated 100% gains
-
-
-async def update_portfolio_data_new():
-    """New background task using chain-agnostic fetchers with comprehensive error handling"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    try:
-        print("🚀 Starting portfolio update with new chain-agnostic system...")
-
-        # Clear existing assets
-        cursor.execute("DELETE FROM assets")
-
-        # Get all wallets grouped by network
-        cursor.execute("SELECT id, address, network, label FROM wallets")
-        wallets = cursor.fetchall()
-
-        # Group wallets by network for optimized processing
-        wallets_by_network = {}
-        wallet_status = {}  # Track individual wallet success/failure
-
-        for wallet_row in wallets:
-            wallet_id, address, network, label = wallet_row['id'], wallet_row['address'], wallet_row['network'], wallet_row['label']
-            if network not in wallets_by_network:
-                wallets_by_network[network] = []
-            wallets_by_network[network].append((wallet_id, address, label))
-            wallet_status[wallet_id] = {
-                'address': address,
-                'label': label,
-                'network': network,
-                'status': 'pending',
-                'assets_found': 0,
-                'total_value': 0,
-                'error': None
-            }
-
-        all_assets = []
-        token_addresses_by_network = {}
-
-        # Fetch assets for each network with individual wallet error handling
-        for network, network_wallets in wallets_by_network.items():
-            print(f"🔗 Processing {len(network_wallets)} {network} wallets...")
-
-            token_addresses_by_network[network] = set()
-
-            for wallet_id, address, label in network_wallets:
-                try:
-                    print(
-                        f"📡 Fetching assets for {network} wallet: {label} ({address[:10]}...)"
-                    )
-
-                    # Use new chain-agnostic asset fetcher with timeout
-                    assets = await asyncio.wait_for(
-                        get_wallet_assets_new(address, network),
-                        timeout=60.0  # 60 second timeout per wallet
-                    )
-
-                    wallet_assets_count = 0
-                    for asset in assets:
-                        asset_dict = {
-                            'wallet_id': wallet_id,
-                            'token_address': asset.token_address,
-                            'symbol': asset.symbol,
-                            'name': asset.name,
-                            'balance': asset.balance,
-                            'balance_formatted': asset.balance_formatted,
-                            'decimals': asset.decimals,
-                            'is_nft': asset.is_nft,
-                            'token_ids': asset.token_ids,
-                            'network': network
-                        }
-                        all_assets.append(asset_dict)
-                        token_addresses_by_network[network].add(
-                            asset.token_address)
-                        wallet_assets_count += 1
-
-                    # Update wallet status
-                    wallet_status[wallet_id].update({
-                        'status':
-                        'success',
-                        'assets_found':
-                        wallet_assets_count
-                    })
-                    print(
-                        f"✅ Successfully fetched {wallet_assets_count} assets from {label}"
-                    )
-
-                except asyncio.TimeoutError:
-                    error_msg = f"Timeout after 60 seconds"
-                    print(
-                        f"⏰ {error_msg} for {network} wallet {label} ({address[:10]}...)"
-                    )
-                    wallet_status[wallet_id].update({
-                        'status': 'timeout',
-                        'error': error_msg
-                    })
-                except Exception as e:
-                    error_msg = str(e)[:200]  # Limit error message length
-                    print(
-                        f"❌ Error fetching assets for {network} wallet {label} ({address[:10]}...): {error_msg}"
-                    )
-                    wallet_status[wallet_id].update({
-                        'status': 'error',
-                        'error': error_msg
-                    })
-
-        # Convert sets to lists for price fetching
-        for network in token_addresses_by_network:
-            token_addresses_by_network[network] = list(
-                token_addresses_by_network[network])
-
-        print(f"📊 Total assets fetched: {len(all_assets)}")
-        print(
-            f"🪙 Token addresses by network: {dict((k, len(v)) for k, v in token_addresses_by_network.items())}"
-        )
-
-        # Print wallet status summary
-        successful_wallets = sum(1 for s in wallet_status.values()
-                                 if s['status'] == 'success')
-        failed_wallets = sum(1 for s in wallet_status.values()
-                             if s['status'] in ['error', 'timeout'])
-        print(
-            f"📋 Wallet Status: {successful_wallets} successful, {failed_wallets} failed"
-        )
-
-        # Get prices using new chain-agnostic price fetcher
-        try:
-            price_map = await asyncio.wait_for(
-                get_token_prices_new(token_addresses_by_network), timeout=30.0)
-        except Exception as e:
-            print(f"❌ Error fetching prices: {e}")
-            price_map = {}
-
-        # Insert assets with prices and calculate wallet values
-        total_portfolio_value = 0
-        auto_hide_candidates = []
-
-        # Purchase price estimation will be handled per-asset during insertion
-
-        # CRITICAL FIX: Sort assets to process valuable ones first and protect from overwrites
-        # This prevents spam tokens from overwriting legitimate tokens with same symbols
-        def asset_priority(asset):
-            # Highest priority: ETH (zero address)
-            if asset['token_address'].lower(
-            ) == "0x0000000000000000000000000000000000000000":
-                return 0
-            # High priority: Major tokens by symbol
-            if asset['symbol'] in ['SOL', 'WBTC', 'PENDLE', 'USDC', 'USDT']:
-                return 1
-            # Medium priority: Assets with significant balance
-            if asset.get('balance', 0) > 0:
-                return 2
-            # Low priority: Everything else
-            return 3
-
-        # Sort assets by priority to process valuable ones first
-        sorted_assets = sorted(all_assets, key=asset_priority)
-        print(
-            f"🔄 [ASSET PROCESSING] Processing {len(sorted_assets)} assets in priority order..."
-        )
-
-        # Track processed token addresses to prevent overwrites
-        processed_addresses = set()
-
-        for asset in sorted_assets:
-            is_nft = asset.get('is_nft', False)
-            token_address = asset['token_address']
-            wallet_id = asset['wallet_id']
-
-            if is_nft:
-                # For NFT assets, get floor price from AssetData object properly
-                floor_price = 0.0
-                balance = asset.get('balance', 0)
-
-                # CRITICAL FIX: The asset variable is a dict created from AssetData
-                # We need to find the original AssetData object to get the floor_price
-                # Look through the original sorted_assets to find the matching AssetData object
-                original_asset_data = None
-                for original_asset in sorted_assets:
-                    if (hasattr(original_asset, 'token_address') and 
-                        original_asset.token_address == asset['token_address']):
-                        original_asset_data = original_asset
-                        break
-                
-                if original_asset_data and hasattr(original_asset_data, 'floor_price'):
-                    floor_price = float(original_asset_data.floor_price) if original_asset_data.floor_price else 0.0
-                elif isinstance(asset, dict) and 'floor_price' in asset:
-                    floor_price = float(asset['floor_price']) if asset['floor_price'] else 0.0
-
-                price_usd = floor_price
-                value_usd = price_usd * balance if price_usd > 0 else 0
-
-                # Safely handle NFT metadata
-                token_ids = []
-                image_url = None
-
-                if hasattr(asset, 'token_ids') and asset.token_ids:
-                    token_ids = asset.token_ids
-                elif isinstance(asset, dict) and 'token_ids' in asset:
-                    token_ids = asset['token_ids'] if isinstance(
-                        asset['token_ids'], list) else []
-
-                if hasattr(asset, 'image_url') and asset.image_url:
-                    image_url = asset.image_url
-                elif isinstance(asset, dict) and 'image_url' in asset:
-                    image_url = asset['image_url'] if isinstance(
-                        asset['image_url'], str) else None
-
-                nft_metadata = json.dumps({
-                    "token_ids": token_ids,
-                    "count": balance,
-                    "image_url": image_url,
-                    "floor_price": floor_price
-                })
-
-                print(
-                    f"🖼️ [NFT DEBUG] Processing NFT: {asset.get('symbol', 'Unknown')} - Floor: ${floor_price} - Value: ${value_usd:.2f}"
-                )
-                print(
-                    f"🖼️ NFT Asset: {asset.get('symbol', 'Unknown')} - {balance} items (Floor: ${floor_price})"
-                )
-            else:
-                # CRITICAL ETH PRICE LOOKUP - ETH uses special zero address
-                # Look up price with multiple fallbacks for different address formats
-                if token_address.lower(
-                ) == "0x0000000000000000000000000000000000000000":
-                    # Special handling for ETH - try multiple lookup keys
-                    price_usd = (price_map.get(
-                        "0x0000000000000000000000000000000000000000",
-                        0) or price_map.get(
-                            "0x0000000000000000000000000000000000000000".lower(
-                            ), 0) or price_map.get("eth", 0))
-                    if price_usd > 0:
-                        print(
-                            f"✅ ETH current market price lookup: ${price_usd}")
-                    else:
-                        print(
-                            f"❌ ETH price lookup failed - checking price_map keys: {list(price_map.keys())[:10]}"
-                        )
-                else:
-                    # Standard ERC-20 token price lookup
-                    price_usd = price_map.get(token_address.lower(), 0)
-                    if price_usd == 0:
-                        price_usd = price_map.get(token_address, 0)
-
-                # Calculate current market value using CURRENT price, not override
-                value_usd = asset['balance'] * price_usd
-
-                # Debug ETH value calculation
-                if asset['symbol'] == 'ETH':
-                    print(f"🔍 [ETH VALUE DEBUG] Balance: {asset['balance']}")
-                    print(f"🔍 [ETH VALUE DEBUG] Price: ${price_usd}")
-                    print(
-                        f"🔍 [ETH VALUE DEBUG] Calculated Value: ${value_usd:.6f}"
-                    )
-                    print(
-                        f"🔍 [ETH VALUE DEBUG] Token Address: {token_address}")
-                nft_metadata = None
-
-                print(
-                    f"💰 {asset['network']} Asset: {asset['symbol']} = ${value_usd:.2f} (Balance: {asset['balance']:.6f} × Price: ${price_usd:.2f})"
-                )
-
-                # Identify spam/scam tokens and low-value tokens for auto-hiding
-                # But be more careful with NFTs
-                spam_indicators = [
-                    "visit", "claim", "rewards", "gift", "airdrop", ".com",
-                    ".net", ".org"
-                ]
-                legitimate_nft_names = [
-                    "mutant", "bored", "ape", "yacht", "club", "cryptopunk",
-                    "azuki", "doodle", "pudgy"
-                ]
-
-                is_spam_token = (
-                    not is_nft
-                    and  # Don't auto-hide NFTs based on spam detection
-                    value_usd == 0 and asset['balance'] > 0 and
-                    (any(indicator in asset['name'].lower()
-                         for indicator in spam_indicators) or
-                     (asset['symbol'] == "" and asset['name'] == "")
-                     or len(asset['name']) > 50)  # Suspiciously long names
-                )
-
-                # For NFTs, only hide if they're clearly spam AND not legitimate collections
-                if is_nft:
-                    is_legitimate_nft = any(legit in asset['name'].lower()
-                                            for legit in legitimate_nft_names)
-                    is_spam_nft = any(indicator in asset['name'].lower()
-                                      for indicator in spam_indicators)
-
-                    if is_spam_nft and not is_legitimate_nft:
-                        is_spam_token = True
-                    else:
-                        is_spam_token = False
-
-                # Auto-hide tokens with value less than $1 (excluding NFTs and major tokens)
-                is_low_value_token = (
-                    value_usd > 0 and value_usd < 1.0 and not is_nft
-                    and  # Never auto-hide NFTs based on value
-                    asset['symbol'] not in [
-                        'ETH',
-                        'BTC',
-                        'SOL',
-                        'USDC',
-                        'USDT',
-                        'WBTC',
-                        'PENDLE',
-                        'MAYC',
-                        'BAYC'  # Add known NFT symbols
-                    ]  # Preserve major tokens and legitimate NFTs even if small amounts
-                )
-
-                if is_spam_token or is_low_value_token:
-                    reason = "spam/scam" if is_spam_token else f"low value (${value_usd:.6f})"
-                    auto_hide_candidates.append({
-                        'token_address': token_address,
-                        'symbol': asset['symbol'],
-                        'name': asset['name'],
-                        'balance': asset['balance'],
-                        'value_usd': value_usd,
-                        'reason': reason
-                    })
-
-                # Update wallet status with value
-                wallet_status[wallet_id]['total_value'] += value_usd
-                total_portfolio_value += value_usd
-
-                # Debug NFT detection
-                if is_nft:
-                    print(
-                        f"🖼️ [NFT DEBUG] Processing NFT: {asset['symbol']} - {asset['name']} - Value: ${value_usd:.6f}"
-                    )
-                elif asset['symbol'].endswith(
-                        'NFT') or 'Collection' in asset['name']:
-                    print(
-                        f"🔍 [NFT DEBUG] Possible missed NFT: {asset['symbol']} - {asset['name']} - isNFT: {is_nft}"
-                    )
-
-                # Check for purchase price override first (highest priority)
-                cursor.execute(
-                    """
-                    SELECT override_price 
-                    FROM purchase_price_overrides 
-                    WHERE token_address = %s
-                """, (token_address, ))
-                override_data = cursor.fetchone()
-
-                if override_data:
-                    # CRITICAL: Override affects ONLY purchase price, NOT current market value
-                    purchase_price = override_data['override_price']
-                    total_invested = asset['balance'] * purchase_price
-                    realized_pnl = 0
-                    # IMPORTANT: Use actual current market value (value_usd), not override price
-                    unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
-                    total_return_pct = ((value_usd - total_invested) /
-                                        total_invested *
-                                        100) if total_invested > 0 else 0
-                    print(
-                        f"✅ [OVERRIDE] Using override price for {asset['symbol']}: Purchase=${purchase_price}, Market Value=${value_usd:.2f}"
-                    )
-                else:
-                    # Check for cost basis data
-                    cursor.execute(
-                        """
-                        SELECT average_purchase_price, total_invested, realized_gains 
-                        FROM asset_cost_basis 
-                        WHERE token_address = %s
-                    """, (token_address, ))
-                    cost_basis_data = cursor.fetchone()
-
-                    if cost_basis_data:
-                        purchase_price, total_invested, realized_pnl = cost_basis_data
-                        unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
-                        total_return_pct = ((value_usd - total_invested) /
-                                            total_invested *
-                                            100) if total_invested > 0 else 0
-                    else:
-                        # Estimate purchase price for new assets
-                        purchase_price = await estimate_asset_purchase_price(
-                            asset['symbol'], asset['name'],
-                            price_usd) if price_usd > 0 else 0
-                        total_invested = asset['balance'] * purchase_price
-                        realized_pnl = 0
-                        unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
-                        total_return_pct = ((value_usd - total_invested) /
-                                            total_invested *
-                                            100) if total_invested > 0 else 0
-
-                # CRITICAL FIX: Check if this token address was already processed
-                if token_address.lower() in processed_addresses:
-                    print(
-                        f"⚠️ [DUPLICATE PROTECTION] Skipping duplicate token address: {asset['symbol']} ({token_address[:12]}...)"
-                    )
-                    continue
-
-                # Mark this token address as processed
-                processed_addresses.add(token_address.lower())
-
-                # Insert asset into database
-                # CRITICAL: price_usd and value_usd are CURRENT MARKET DATA, not purchase data
-                try:
-                    cursor.execute(
-                        """
-                        INSERT INTO assets 
-                        (wallet_id, token_address, symbol, name, balance, balance_formatted, price_usd, value_usd, 
-                         is_nft, nft_metadata, floor_price, image_url, purchase_price, total_invested, 
-                         realized_pnl, unrealized_pnl, total_return_pct)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (wallet_id, token_address, asset.get('symbol', 'Unknown'),
-                          asset.get('name', 'Unknown'), asset.get('balance', 0),
-                          asset.get('balance_formatted',
-                                    '0.000000'), price_usd, value_usd, is_nft,
-                          nft_metadata, floor_price if is_nft else 0,
-                          image_url if is_nft else None, purchase_price,
-                          total_invested, realized_pnl, unrealized_pnl,
-                          total_return_pct))
-                    
-                    # CRITICAL CONFIRMATION: Database insertion successful
-                    print(f"✅ [DATABASE] Inserted asset: {asset.get('symbol', 'Unknown')} ({token_address[:12]}...) = ${value_usd:.2f}")
-                    
-                except Exception as db_error:
-                    print(f"❌ [DATABASE ERROR] Failed to insert {asset.get('symbol', 'Unknown')}: {db_error}")
-                    continue
-
-                # Debug log to verify correct values and protect ETH
-                if asset['symbol'] == 'ETH':
-                    print(f"🔍 [ETH DEBUG] PROTECTED ETH inserted with:")
-                    print(f"   - Token Address: {token_address}")
-                    print(f"   - Current Price: ${price_usd}")
-                    print(f"   - Current Value: ${value_usd}")
-                    print(f"   - Purchase Price: ${purchase_price}")
-                    print(f"   - Total Invested: ${total_invested}")
-                    print(f"   - P&L: ${unrealized_pnl}")
-                    print(f"   - Return: {total_return_pct:.1f}%")
-                    print(
-                        f"✅ [ETH PROTECTION] ETH safely processed - no overwrites possible"
-                    )
-
-                # Debug NFT insertion
-                if is_nft:
-                    print(
-                        f"🖼️ [DATABASE] Inserted NFT: {asset['symbol']} - {asset['name']} - Count: {asset['balance']} - Floor: ${asset.floor_price}"
-                    )
-                    print(f"🖼️ [DATABASE] NFT metadata: {nft_metadata}")
-                    print(f"🖼️ [DATABASE] Image URL: {asset.get('image_url')}")
-
-            # CRITICAL FIX: Clean up hidden assets table to remove legitimate tokens
-            print("🧹 Cleaning up hidden assets table...")
-
-            # Get current valuable assets (assets with significant value)
-            cursor.execute("""
-                SELECT DISTINCT token_address, symbol, name 
-                FROM assets 
-                WHERE value_usd > 2
-            """)
-            valuable_assets = cursor.fetchall()
-
-        # Remove valuable assets from hidden list
-        for token_address, symbol, name in valuable_assets:
-            cursor.execute(
-                "DELETE FROM hidden_assets WHERE LOWER(token_address) = LOWER(%s)",
-                (token_address, ))
-            print(
-                f"🔓 Unhid valuable asset: {name} (${cursor.rowcount} rows removed)"
-            )
-
-        # Auto-hide spam/scam tokens and low-value tokens (but protect valuable ones)
-        if auto_hide_candidates:
-            print(f"🔍 Auto-hiding {len(auto_hide_candidates)} tokens...")
-            for hide_asset in auto_hide_candidates:
-                try:
-                    # CRITICAL: Never auto-hide ETH or major tokens, even if they appear to be spam
-                    if hide_asset['token_address'].lower(
-                    ) == "0x0000000000000000000000000000000000000000":
-                        print(
-                            f"🛡️ [PROTECTION] Refusing to auto-hide ETH: {hide_asset['symbol']}"
-                        )
-                        continue
-
-                    if hide_asset['symbol'] in [
-                            'ETH', 'SOL', 'WBTC', 'PENDLE', 'USDC', 'USDT'
-                    ]:
-                        print(
-                            f"🛡️ [PROTECTION] Refusing to auto-hide major token: {hide_asset['symbol']}"
-                        )
-                        continue
-
-                    cursor.execute(
-                        """
-                        INSERT INTO hidden_assets (token_address, symbol, name) 
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (token_address) DO UPDATE SET
-                        symbol = EXCLUDED.symbol, name = EXCLUDED.name
-                    """, (hide_asset['token_address'].lower(),
-                          hide_asset['symbol'], hide_asset['name']))
-                    print(
-                        f"🙈 Auto-hidden {hide_asset['reason']}: {hide_asset['symbol'] or 'unnamed'} (${hide_asset.get('value_usd', 0):.6f})"
-                    )
-                except psycopg2.Error as e:
-                    print(
-                        f"❌ Error auto-hiding asset {hide_asset['symbol']}: {e}"
-                    )
-
-        # CRITICAL: Clean up symbol inconsistencies (trim whitespace from symbols)
-        print(
-            "🧹 [DATA CLEANUP] Cleaning up symbol whitespace inconsistencies..."
-        )
-        cursor.execute("""
-            UPDATE assets 
-            SET symbol = TRIM(symbol)
-            WHERE symbol != TRIM(symbol)
-        """)
-
-        cleaned_symbols = cursor.rowcount
-        if cleaned_symbols > 0:
-            print(
-                f"✅ [DATA CLEANUP] Cleaned whitespace from {cleaned_symbols} asset symbols"
-            )
-
-            # Also clean up cost basis table
-            cursor.execute("""
-                UPDATE asset_cost_basis 
-                SET symbol = TRIM(symbol)
-                WHERE symbol != TRIM(symbol)
-            """)
-
-            # Clean up asset notes
-            cursor.execute("""
-                UPDATE asset_notes 
-                SET symbol = TRIM(symbol)
-                WHERE symbol != TRIM(symbol)
-            """)
-
-            print(
-                f"✅ [DATA CLEANUP] Symbol cleanup completed across all tables")
-        else:
-            print(f"✅ [DATA CLEANUP] No symbol whitespace issues found")
-
-        # Record portfolio history
-        cursor.execute(
-            "INSERT INTO portfolio_history (total_value_usd) VALUES (%s)",
-            (total_portfolio_value, ))
-
-        # Clear old wallet status and insert new ones
-        cursor.execute("DELETE FROM wallet_status")
-        for wallet_id, status_info in wallet_status.items():
-            cursor.execute(
-                """
-                INSERT INTO wallet_status (wallet_id, status, assets_found, total_value, error_message)
-                VALUES (%s, %s, %s, %s, %s)
-            """,
-                (wallet_id, status_info['status'], status_info['assets_found'],
-                 status_info['total_value'], status_info['error']))
-
-        conn.commit()
-
-        # Final success summary
-        successful_count = sum(1 for s in wallet_status.values()
-                               if s['status'] == 'success')
-        total_count = len(wallet_status)
-        print(f"✅ Portfolio updated successfully!")
-        print(
-            f"📈 {len(all_assets)} assets processed, ${total_portfolio_value:,.2f} total value"
-        )
-        print(
-            f"🏦 {successful_count}/{total_count} wallets processed successfully"
-        )
-
-        # Print any failed wallets
-        failed_wallets = [(s['label'], s['error'])
-                          for s in wallet_status.values()
-                          if s['status'] in ['error', 'timeout']]
-        if failed_wallets:
-            print("⚠️  Failed wallets:")
-            for label, error in failed_wallets:
-                print(f"   - {label}: {error}")
-
-    except Exception as e:
-        print(f"❌ Critical error updating portfolio: {e}")
-        import traceback
-        print(f"📋 Full traceback: {traceback.format_exc()}")
-        conn.rollback()
-    finally:
-        conn.close()
-
-
 # Serve static assets
 @app.get("/assets/{file_path:path}")
 async def serve_static_assets(file_path: str):
-    dist_path = "../dist" if os.path.exists(
-        "../dist") else "./dist" if os.path.exists("./dist") else None
     if dist_path:
         full_file_path = f"{dist_path}/assets/{file_path}"
         if os.path.exists(full_file_path):
@@ -4095,21 +2441,15 @@ async def serve_static_assets(file_path: str):
     raise HTTPException(status_code=404, detail="Asset not found")
 
 
-# Catch-all route for SPA routing - only for non-API routes
+# Catch-all route for SPA routing
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
-    # Skip API and asset routes
-    if (full_path.startswith("api/") or full_path.startswith("health")
-            or full_path.startswith("assets/")):
+    if (full_path.startswith("api/") or full_path.startswith("health") or full_path.startswith("assets/")):
         raise HTTPException(status_code=404, detail="Not found")
 
-    # Serve React app for all other routes (SPA routing)
     if dist_path:
         index_path = os.path.join(dist_path, "index.html")
         if os.path.exists(index_path):
-            print(
-                f"🌐 [SPA] Serving React app from {index_path} for route: {full_path}"
-            )
             return FileResponse(index_path)
 
     raise HTTPException(status_code=404, detail="Frontend not found")
@@ -4117,34 +2457,15 @@ async def serve_spa(full_path: str):
 
 if __name__ == "__main__":
     import uvicorn
-    # Use PORT from environment, fallback to 8000 for development, 80 for deployment
     port = int(os.environ.get("PORT", 80))
 
-    # Override port based on environment
     if os.environ.get("NODE_ENV") == "production":
         port = 80
 
     print(f"🚀 [SERVER] Starting server on port {port}")
-    print(
-        f"🔍 [SERVER] Environment: {os.environ.get('NODE_ENV', 'development')}")
-    print(f"🔍 [SERVER] Checking for static files...")
 
-    # Check for dist directories
-    static_found = False
-    for path in ["../dist", "./dist", "dist"]:
-        if os.path.exists(path):
-            print(f"✅ [SERVER] Found {path} directory")
-            static_found = True
-            break
-
-    if not static_found:
-        print("⚠️ [SERVER] No dist directory found - running API-only mode")
-
-    # Production-ready server configuration
     uvicorn.run(app,
                 host="0.0.0.0",
                 port=port,
-                log_level="info"
-                if os.environ.get("NODE_ENV") != "production" else "warning",
-                access_log=True
-                if os.environ.get("NODE_ENV") != "production" else False)
+                log_level="info" if os.environ.get("NODE_ENV") != "production" else "warning",
+                access_log=True if os.environ.get("NODE_ENV") != "production" else False)
