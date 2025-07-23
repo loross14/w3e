@@ -3666,10 +3666,10 @@ async def update_portfolio_data_new():
                             "0x0000000000000000000000000000000000000000".lower(
                             ), 0) or price_map.get("eth", 0))
                     if price_usd > 0:
-                        print(f"✅ ETH current market price: ${price_usd}")
+                        print(f"✅ ETH current market price lookup: ${price_usd}")
                     else:
                         print(
-                            f"❌ ETH price lookup failed - checking price_map keys: {list(price_map.keys())}"
+                            f"❌ ETH price lookup failed - checking price_map keys: {list(price_map.keys())[:10]}"
                         )
                 else:
                     # Standard ERC-20 token price lookup
@@ -3679,6 +3679,13 @@ async def update_portfolio_data_new():
 
                 # Calculate current market value using CURRENT price, not override
                 value_usd = asset['balance'] * price_usd
+                
+                # Debug ETH value calculation
+                if asset['symbol'] == 'ETH':
+                    print(f"🔍 [ETH VALUE DEBUG] Balance: {asset['balance']}")
+                    print(f"🔍 [ETH VALUE DEBUG] Price: ${price_usd}")
+                    print(f"🔍 [ETH VALUE DEBUG] Calculated Value: ${value_usd:.6f}")
+                    print(f"🔍 [ETH VALUE DEBUG] Token Address: {token_address}")
                 nft_metadata = None
 
                 print(
@@ -3747,13 +3754,13 @@ async def update_portfolio_data_new():
                     purchase_price = override_data['override_price']
                     total_invested = asset['balance'] * purchase_price
                     realized_pnl = 0
-                    # Use actual current market value, not override price
+                    # IMPORTANT: Use actual current market value (value_usd), not override price
                     unrealized_pnl = value_usd - total_invested if total_invested > 0 else 0
                     total_return_pct = ((value_usd - total_invested) /
                                         total_invested *
                                         100) if total_invested > 0 else 0
                     print(
-                        f"✅ [OVERRIDE] Using override price for {asset['symbol']}: ${purchase_price} (Current market value: ${value_usd:.2f})"
+                        f"✅ [OVERRIDE] Using override price for {asset['symbol']}: Purchase=${purchase_price}, Market Value=${value_usd:.2f}"
                     )
                 else:
                     # Check for cost basis data
