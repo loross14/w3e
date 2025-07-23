@@ -3366,13 +3366,19 @@ async def estimate_purchase_prices_and_calculate_returns():
         print(
             "💰 Starting purchase price estimation and returns calculation...")
 
-        # Get all current assets
+        # Get all current assets that don't already have purchase prices
         cursor.execute("""
             SELECT token_address, symbol, name, balance, price_usd, value_usd
             FROM assets 
-            WHERE balance > 0 AND price_usd > 0
+            WHERE balance > 0 AND price_usd > 0 
+            AND (purchase_price IS NULL OR purchase_price = 0)
+            LIMIT 50
         """)
         current_assets = cursor.fetchall()
+        
+        if not current_assets:
+            print("✅ All assets already have purchase prices estimated")
+            return
 
         for asset_row in current_assets:
             try:
@@ -3382,6 +3388,10 @@ async def estimate_purchase_prices_and_calculate_returns():
                 balance = float(asset_row['balance']) if asset_row['balance'] else 0.0
                 current_price = float(asset_row['price_usd']) if asset_row['price_usd'] else 0.0
                 current_value = float(asset_row['value_usd']) if asset_row['value_usd'] else 0.0
+
+                # Skip if essential data is missing
+                if not symbol or not token_address or balance <= 0:
+                    continue
 
                 # Estimate purchase price based on asset type and historical context
                 estimated_purchase_price = await estimate_asset_purchase_price(
@@ -3624,8 +3634,7 @@ async def update_portfolio_data_new():
         total_portfolio_value = 0
         auto_hide_candidates = []
 
-        # First, estimate purchase prices for new assets
-        await estimate_purchase_prices_and_calculate_returns()
+        # Purchase price estimation will be handled per-asset during insertion
 
         # CRITICAL FIX: Sort assets to process valuable ones first and protect from overwrites
         # This prevents spam tokens from overwriting legitimate tokens with same symbols
