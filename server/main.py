@@ -3628,15 +3628,33 @@ async def update_portfolio_data_new():
             wallet_id = asset['wallet_id']
 
             if is_nft:
-                # For NFT assets, use consistent dictionary access
-                floor_price = asset.get('floor_price', 0) if isinstance(asset.get('floor_price'), (int, float)) else 0
+                # For NFT assets, get floor price from AssetData object properly
+                floor_price = 0.0
                 balance = asset.get('balance', 0)
+                
+                # CRITICAL FIX: Extract floor_price from the original AssetData object
+                # The asset dict is created from AssetData, so we need to access the floor_price properly
+                if hasattr(asset, 'floor_price') and asset.floor_price:
+                    floor_price = float(asset.floor_price)
+                elif isinstance(asset, dict) and 'floor_price' in asset:
+                    floor_price = float(asset['floor_price']) if asset['floor_price'] else 0.0
+                
                 price_usd = floor_price
                 value_usd = price_usd * balance if price_usd > 0 else 0
                 
                 # Safely handle NFT metadata
-                token_ids = asset.get('token_ids', []) if isinstance(asset.get('token_ids'), list) else []
-                image_url = asset.get('image_url') if isinstance(asset.get('image_url'), str) else None
+                token_ids = []
+                image_url = None
+                
+                if hasattr(asset, 'token_ids') and asset.token_ids:
+                    token_ids = asset.token_ids
+                elif isinstance(asset, dict) and 'token_ids' in asset:
+                    token_ids = asset['token_ids'] if isinstance(asset['token_ids'], list) else []
+                
+                if hasattr(asset, 'image_url') and asset.image_url:
+                    image_url = asset.image_url
+                elif isinstance(asset, dict) and 'image_url' in asset:
+                    image_url = asset['image_url'] if isinstance(asset['image_url'], str) else None
                 
                 nft_metadata = json.dumps({
                     "token_ids": token_ids,
@@ -3646,10 +3664,10 @@ async def update_portfolio_data_new():
                 })
                 
                 print(
-                    f"🖼️ [NFT DEBUG] Processing NFT: {asset.get('symbol', 'Unknown')} - Floor: ${price_usd} - Value: ${value_usd:.2f}"
+                    f"🖼️ [NFT DEBUG] Processing NFT: {asset.get('symbol', 'Unknown')} - Floor: ${floor_price} - Value: ${value_usd:.2f}"
                 )
                 print(
-                    f"🖼️ NFT Asset: {asset.get('symbol', 'Unknown')} - {balance} items (Floor: ${price_usd})"
+                    f"🖼️ NFT Asset: {asset.get('symbol', 'Unknown')} - {balance} items (Floor: ${floor_price})"
                 )
             else:
                 # CRITICAL ETH PRICE LOOKUP - ETH uses special zero address
