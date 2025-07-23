@@ -3518,8 +3518,7 @@ async def update_portfolio_data_new():
         wallet_status = {}  # Track individual wallet success/failure
 
         for wallet_row in wallets:
-            wallet_id, address, network, label = wallet_row['id'], wallet_row[
-                'address'], wallet_row['network'], wallet_row['label']
+            wallet_id, address, network, label = wallet_row['id'], wallet_row['address'], wallet_row['network'], wallet_row['label']
             if network not in wallets_by_network:
                 wallets_by_network[network] = []
             wallets_by_network[network].append((wallet_id, address, label))
