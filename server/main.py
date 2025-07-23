@@ -639,13 +639,19 @@ class EthereumAssetFetcher(AssetFetcher):
 
                 print(f"🖼️ [ETH NFT] Processed {len(collections)} unique collections")
 
-                # Convert collections to AssetData objects
+                # Convert collections to AssetData objects with proper floor price fetching
+                print(f"🖼️ [ETH NFT] Converting {len(collections)} collections to assets...")
+                
                 for contract_address, collection_data in collections.items():
                     try:
-                        # Get real floor price from Alchemy API
+                        print(f"🔍 [ETH NFT] Processing collection: {collection_data['name']} ({contract_address})")
+                        
+                        # Get real floor price from Alchemy API - this is the critical step
+                        print(f"💰 [ETH NFT] Fetching floor price for {collection_data['name']}...")
                         floor_price_usd = await self._fetch_floor_price(contract_address)
+                        print(f"💰 [ETH NFT] Floor price result for {collection_data['name']}: ${floor_price_usd}")
 
-                        # Create NFT asset
+                        # Create NFT asset with the fetched floor price
                         nft_asset = AssetData(
                             token_address=contract_address,
                             symbol=collection_data["symbol"],
@@ -667,6 +673,8 @@ class EthereumAssetFetcher(AssetFetcher):
 
                     except Exception as asset_error:
                         print(f"❌ [ETH NFT] Error creating asset for {contract_address}: {asset_error}")
+                        import traceback
+                        print(f"📋 [ETH NFT] Error traceback: {traceback.format_exc()}")
                         continue
 
             except requests.exceptions.Timeout:
@@ -698,6 +706,8 @@ class EthereumAssetFetcher(AssetFetcher):
             params = {"contractAddress": contract_address}
             
             print(f"🔍 [FLOOR PRICE] Fetching floor price for {contract_address[:12]}...")
+            print(f"🔍 [FLOOR PRICE] API URL: {floor_price_url}")
+            print(f"🔍 [FLOOR PRICE] Params: {params}")
             
             # Use requests library like the Alchemy sample
             import requests
@@ -706,46 +716,69 @@ class EthereumAssetFetcher(AssetFetcher):
                 floor_price_url,
                 params=params,
                 headers={"accept": "application/json"},
-                timeout=10.0
+                timeout=15.0
             )
             
+            print(f"🔍 [FLOOR PRICE] API Response status: {response.status_code}")
+            
             if response.status_code == 200:
-                data = response.json()
-                
-                # Parse Alchemy floor price response
-                if "openSea" in data and "floorPrice" in data["openSea"]:
-                    floor_price_eth = data["openSea"]["floorPrice"]
+                try:
+                    data = response.json()
+                    print(f"🔍 [FLOOR PRICE] Raw API response: {data}")
                     
-                    # Convert ETH to USD (approximate ETH price)
-                    eth_price_usd = 3500.0  # Reasonable fallback ETH price
-                    floor_price_usd = floor_price_eth * eth_price_usd
+                    # Parse Alchemy floor price response - check multiple sources
+                    floor_price_usd = 0.0
+                    eth_price_usd = 3750.0  # Current approximate ETH price
                     
-                    print(f"✅ [FLOOR PRICE] {contract_address[:12]}... = {floor_price_eth} ETH (${floor_price_usd:.2f})")
-                    return floor_price_usd
+                    # Try OpenSea first
+                    if "openSea" in data and data["openSea"] and "floorPrice" in data["openSea"]:
+                        floor_price_eth = float(data["openSea"]["floorPrice"])
+                        if floor_price_eth > 0:
+                            floor_price_usd = floor_price_eth * eth_price_usd
+                            print(f"✅ [FLOOR PRICE] OpenSea: {contract_address[:12]}... = {floor_price_eth} ETH (${floor_price_usd:.2f})")
+                            return floor_price_usd
                     
-                elif "looksRare" in data and "floorPrice" in data["looksRare"]:
-                    floor_price_eth = data["looksRare"]["floorPrice"]
+                    # Try LooksRare as backup
+                    if "looksRare" in data and data["looksRare"] and "floorPrice" in data["looksRare"]:
+                        floor_price_eth = float(data["looksRare"]["floorPrice"])
+                        if floor_price_eth > 0:
+                            floor_price_usd = floor_price_eth * eth_price_usd
+                            print(f"✅ [FLOOR PRICE] LooksRare: {contract_address[:12]}... = {floor_price_eth} ETH (${floor_price_usd:.2f})")
+                            return floor_price_usd
                     
-                    # Convert ETH to USD
-                    eth_price_usd = 3500.0
-                    floor_price_usd = floor_price_eth * eth_price_usd
+                    # Check if any other marketplace data exists
+                    marketplaces = [key for key in data.keys() if isinstance(data[key], dict)]
+                    if marketplaces:
+                        print(f"🔍 [FLOOR PRICE] Available marketplaces: {marketplaces}")
+                        for marketplace in marketplaces:
+                            if "floorPrice" in data[marketplace] and data[marketplace]["floorPrice"]:
+                                floor_price_eth = float(data[marketplace]["floorPrice"])
+                                if floor_price_eth > 0:
+                                    floor_price_usd = floor_price_eth * eth_price_usd
+                                    print(f"✅ [FLOOR PRICE] {marketplace}: {contract_address[:12]}... = {floor_price_eth} ETH (${floor_price_usd:.2f})")
+                                    return floor_price_usd
                     
-                    print(f"✅ [FLOOR PRICE] {contract_address[:12]}... = {floor_price_eth} ETH (${floor_price_usd:.2f}) [LooksRare]")
-                    return floor_price_usd
+                    print(f"⚠️ [FLOOR PRICE] No valid floor price data for {contract_address[:12]}...")
+                    print(f"⚠️ [FLOOR PRICE] Available data keys: {list(data.keys())}")
+                    return 0.0
                     
-                else:
-                    print(f"⚠️ [FLOOR PRICE] No floor price data available for {contract_address[:12]}...")
+                except (ValueError, TypeError, KeyError) as parse_error:
+                    print(f"❌ [FLOOR PRICE] JSON parsing error for {contract_address[:12]}...: {parse_error}")
+                    print(f"❌ [FLOOR PRICE] Raw response text: {response.text[:200]}...")
                     return 0.0
                     
             else:
                 print(f"❌ [FLOOR PRICE] API error {response.status_code} for {contract_address[:12]}...")
+                print(f"❌ [FLOOR PRICE] Error response: {response.text[:200]}...")
                 return 0.0
                 
         except requests.exceptions.Timeout:
-            print(f"⏰ [FLOOR PRICE] Timeout fetching floor price for {contract_address[:12]}...")
+            print(f"⏰ [FLOOR PRICE] Timeout (15s) fetching floor price for {contract_address[:12]}...")
             return 0.0
         except Exception as e:
-            print(f"❌ [FLOOR PRICE] Error fetching floor price for {contract_address[:12]}...: {e}")
+            print(f"❌ [FLOOR PRICE] Unexpected error fetching floor price for {contract_address[:12]}...: {e}")
+            import traceback
+            print(f"📋 [FLOOR PRICE] Full traceback: {traceback.format_exc()}")
             return 0.0
 
     
