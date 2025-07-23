@@ -3563,7 +3563,7 @@ async def update_portfolio_data_new():
             cursor.execute("""
                 SELECT DISTINCT token_address, symbol, name 
                 FROM assets 
-                WHERE value_usd > 10
+                WHERE value_usd > 2
             """)
             valuable_assets = cursor.fetchall()
 
