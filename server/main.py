@@ -3875,21 +3875,29 @@ async def update_portfolio_data_new():
 
                 # Insert asset into database
                 # CRITICAL: price_usd and value_usd are CURRENT MARKET DATA, not purchase data
-                cursor.execute(
-                    """
-                    INSERT INTO assets 
-                    (wallet_id, token_address, symbol, name, balance, balance_formatted, price_usd, value_usd, 
-                     is_nft, nft_metadata, floor_price, image_url, purchase_price, total_invested, 
-                     realized_pnl, unrealized_pnl, total_return_pct)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (wallet_id, token_address, asset.get('symbol', 'Unknown'),
-                      asset.get('name', 'Unknown'), asset.get('balance', 0),
-                      asset.get('balance_formatted',
-                                '0.000000'), price_usd, value_usd, is_nft,
-                      nft_metadata, floor_price if is_nft else 0,
-                      image_url if is_nft else None, purchase_price,
-                      total_invested, realized_pnl, unrealized_pnl,
-                      total_return_pct))
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO assets 
+                        (wallet_id, token_address, symbol, name, balance, balance_formatted, price_usd, value_usd, 
+                         is_nft, nft_metadata, floor_price, image_url, purchase_price, total_invested, 
+                         realized_pnl, unrealized_pnl, total_return_pct)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (wallet_id, token_address, asset.get('symbol', 'Unknown'),
+                          asset.get('name', 'Unknown'), asset.get('balance', 0),
+                          asset.get('balance_formatted',
+                                    '0.000000'), price_usd, value_usd, is_nft,
+                          nft_metadata, floor_price if is_nft else 0,
+                          image_url if is_nft else None, purchase_price,
+                          total_invested, realized_pnl, unrealized_pnl,
+                          total_return_pct))
+                    
+                    # CRITICAL CONFIRMATION: Database insertion successful
+                    print(f"✅ [DATABASE] Inserted asset: {asset.get('symbol', 'Unknown')} ({token_address[:12]}...) = ${value_usd:.2f}")
+                    
+                except Exception as db_error:
+                    print(f"❌ [DATABASE ERROR] Failed to insert {asset.get('symbol', 'Unknown')}: {db_error}")
+                    continue
 
                 # Debug log to verify correct values and protect ETH
                 if asset['symbol'] == 'ETH':
