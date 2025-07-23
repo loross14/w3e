@@ -545,34 +545,15 @@ class EthereumAssetFetcher(AssetFetcher):
                         if not contract_address:
                             continue
 
-                        # Skip hidden collections (use lowercase for comparison)
-                        if contract_address.lower() in [addr.lower() for addr in hidden_addresses]:
+                        # Skip hidden collections
+                        if contract_address in hidden_addresses:
                             print(f"🙈 [ETH NFT] Skipping hidden collection: {contract_address}")
                             continue
 
-                        # Basic spam detection - but preserve legitimate NFTs
+                        # Basic spam detection
                         contract_name = contract.get("name", "")
                         if not contract_name or len(contract_name) < 2:
                             print(f"🚫 [ETH NFT] Skipping unnamed contract: {contract_address}")
-                            continue
-
-                        # Skip obvious spam NFTs but preserve legitimate collections
-                        spam_indicators = [
-                            "visit ", "claim ", "access ", ".com", ".net", ".org",
-                            "award", "gift", "airdrop", "mysterybox", "recipient"
-                        ]
-                        
-                        # Known legitimate collections that should never be filtered
-                        legitimate_collections = [
-                            "mutantapeyachtclub", "boredapeyachtclub", "cryptopunks",
-                            "azuki", "doodles", "pudgypenguins", "0n1 force"
-                        ]
-                        
-                        is_spam = any(indicator.lower() in contract_name.lower() for indicator in spam_indicators)
-                        is_legitimate = any(legit.lower() in contract_name.lower() for legit in legitimate_collections)
-                        
-                        if is_spam and not is_legitimate:
-                            print(f"🚫 [ETH NFT] Skipping spam NFT: {contract_name}")
                             continue
 
                         # Initialize collection
@@ -2130,7 +2111,7 @@ async def get_portfolio():
     print(
         f"🔍 [PORTFOLIO DEBUG] All assets before filtering: {all_assets_debug}")
 
-    # Get all assets with notes, excluding hidden ones but preserving legitimate NFTs
+    # Get all assets with notes, excluding hidden ones
     cursor.execute("""
         SELECT a.token_address, a.symbol, a.name, a.balance, a.balance_formatted, 
                a.price_usd, a.value_usd, COALESCE(a.purchase_price, 0) as purchase_price,
@@ -2145,19 +2126,7 @@ async def get_portfolio():
             SELECT 1 FROM hidden_assets h 
             WHERE LOWER(h.token_address) = LOWER(a.token_address)
         )
-        AND (
-            a.is_nft = FALSE 
-            OR (a.is_nft = TRUE AND (
-                a.value_usd > 0 
-                OR LOWER(a.name) LIKE '%mutant%' 
-                OR LOWER(a.name) LIKE '%bored%ape%'
-                OR LOWER(a.name) LIKE '%cryptopunk%'
-                OR LOWER(a.name) LIKE '%azuki%'
-                OR LOWER(a.name) LIKE '%doodle%'
-                OR LOWER(a.name) LIKE '%pudgy%'
-            ))
-        )
-        ORDER BY a.is_nft DESC, a.value_usd DESC
+        ORDER BY a.value_usd DESC
     """)
     assets_data = cursor.fetchall()
     print(
@@ -3414,32 +3383,21 @@ async def update_portfolio_data_new():
                 )
 
                 # Identify spam/scam tokens and low-value tokens for auto-hiding
-                # But be more careful with NFTs
-                spam_indicators = ["visit", "claim", "rewards", "gift", "airdrop", ".com", ".net", ".org"]
-                legitimate_nft_names = ["mutant", "bored", "ape", "yacht", "club", "cryptopunk", "azuki", "doodle", "pudgy"]
-                
                 is_spam_token = (
-                    not is_nft and  # Don't auto-hide NFTs based on spam detection
                     value_usd == 0 and asset['balance'] > 0 and
-                    (any(indicator in asset['name'].lower() for indicator in spam_indicators)
-                     or (asset['symbol'] == "" and asset['name'] == "")
-                     or len(asset['name']) > 50)  # Suspiciously long names
-                )
-
-                # For NFTs, only hide if they're clearly spam AND not legitimate collections
-                if is_nft:
-                    is_legitimate_nft = any(legit in asset['name'].lower() for legit in legitimate_nft_names)
-                    is_spam_nft = any(indicator in asset['name'].lower() for indicator in spam_indicators)
-                    
-                    if is_spam_nft and not is_legitimate_nft:
-                        is_spam_token = True
-                    else:
-                        is_spam_token = False
+                    ("visit" in asset['name'].lower()
+                     or "claim" in asset['name'].lower()
+                     or "rewards" in asset['name'].lower()
+                     or "gift" in asset['name'].lower()
+                     or "airdrop" in asset['name'].lower() or
+                     (asset['symbol'] == "" and asset['name'] == "")
+                     or len(asset['name']) > 50  # Suspiciously long names
+                     ))
 
                 # Auto-hide tokens with value less than $1 (excluding NFTs and major tokens)
                 is_low_value_token = (
                     value_usd > 0 and value_usd < 1.0 and not is_nft
-                    and  # Never auto-hide NFTs based on value
+                    and  # Never auto-hide NFTs
                     asset['symbol'] not in [
                         'ETH', 'BTC', 'SOL', 'USDC', 'USDT', 'WBTC',
                         'PENDLE'
