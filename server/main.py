@@ -3655,13 +3655,20 @@ async def update_portfolio_data_new():
                 floor_price = 0.0
                 balance = asset.get('balance', 0)
 
-                # CRITICAL FIX: Extract floor_price from the original AssetData object
-                # The asset dict is created from AssetData, so we need to access the floor_price properly
-                if hasattr(asset, 'floor_price') and asset.floor_price:
-                    floor_price = float(asset.floor_price)
+                # CRITICAL FIX: The asset variable is a dict created from AssetData
+                # We need to find the original AssetData object to get the floor_price
+                # Look through the original sorted_assets to find the matching AssetData object
+                original_asset_data = None
+                for original_asset in sorted_assets:
+                    if (hasattr(original_asset, 'token_address') and 
+                        original_asset.token_address == asset['token_address']):
+                        original_asset_data = original_asset
+                        break
+                
+                if original_asset_data and hasattr(original_asset_data, 'floor_price'):
+                    floor_price = float(original_asset_data.floor_price) if original_asset_data.floor_price else 0.0
                 elif isinstance(asset, dict) and 'floor_price' in asset:
-                    floor_price = float(
-                        asset['floor_price']) if asset['floor_price'] else 0.0
+                    floor_price = float(asset['floor_price']) if asset['floor_price'] else 0.0
 
                 price_usd = floor_price
                 value_usd = price_usd * balance if price_usd > 0 else 0
