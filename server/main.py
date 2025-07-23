@@ -3615,21 +3615,18 @@ async def update_portfolio_data_new():
             wallet_id = asset['wallet_id']
 
             if is_nft:
-                print(
-                    f"🔄 [LOOK HERE] price_usd {price_usd} and {asset.get('floor_price', 4)}..."
-                )
-                price_usd = asset.get('floor_price', 6)
-                value_usd = price_usd * asset['balance'] if price_usd > 0 else 0
+                # For NFTs, use the floor_price from AssetData object
+                price_usd = asset.floor_price if hasattr(asset, 'floor_price') else 0
+                value_usd = price_usd * asset.balance if price_usd > 0 else 0
                 nft_metadata = json.dumps({
-                    "token_ids":
-                    asset.get('token_ids', []),
-                    "count":
-                    asset.get('balance', 0),
-                    "image_url":
-                    asset.get('image_url'),
-                    "floor_price":
-                    asset.get('floor_price', 7)
+                    "token_ids": asset.token_ids or [],
+                    "count": asset.balance,
+                    "image_url": asset.image_url,
+                    "floor_price": asset.floor_price
                 })
+                print(
+                    f"🖼️ [NFT DEBUG] Processing NFT: {asset.symbol} - Floor: ${price_usd} - Value: ${value_usd:.2f}"
+                )
                 print(
                     f"🖼️ NFT Asset: {asset['symbol']} - {asset['balance']} items (Floor: ${price_usd})"
                 )
@@ -3820,10 +3817,11 @@ async def update_portfolio_data_new():
                      is_nft, nft_metadata, floor_price, image_url, purchase_price, total_invested, 
                      realized_pnl, unrealized_pnl, total_return_pct)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (wallet_id, token_address, asset['symbol'], asset['name'],
-                      asset['balance'], asset['balance_formatted'], price_usd,
+                """, (wallet_id, token_address, asset.symbol, asset.name,
+                      asset.balance, asset.balance_formatted, price_usd,
                       value_usd, is_nft, nft_metadata,
-                      asset.get('floor_price', 0), asset.get('image_url'),
+                      asset.floor_price if hasattr(asset, 'floor_price') else 0, 
+                      asset.image_url if hasattr(asset, 'image_url') else None,
                       purchase_price, total_invested, realized_pnl,
                       unrealized_pnl, total_return_pct))
 
