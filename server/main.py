@@ -3374,8 +3374,15 @@ async def estimate_purchase_prices_and_calculate_returns():
         """)
         current_assets = cursor.fetchall()
 
-        for token_address, symbol, name, balance, current_price, current_value in current_assets:
+        for asset_row in current_assets:
             try:
+                token_address = asset_row['token_address']
+                symbol = asset_row['symbol']
+                name = asset_row['name']
+                balance = float(asset_row['balance']) if asset_row['balance'] else 0.0
+                current_price = float(asset_row['price_usd']) if asset_row['price_usd'] else 0.0
+                current_value = float(asset_row['value_usd']) if asset_row['value_usd'] else 0.0
+
                 # Estimate purchase price based on asset type and historical context
                 estimated_purchase_price = await estimate_asset_purchase_price(
                     symbol, name, current_price)
